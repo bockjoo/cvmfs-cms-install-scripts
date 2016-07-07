@@ -1,0 +1,771 @@
+#!/bin/sh
+#
+# Bockjoo Kim, U of Florida
+# This is executed in various slc machines.
+# I will assume it is executed in slc5 first, then slc6, and then slc7 etc etc
+# create a file /cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates to indicate new updates
+#
+# This script also depends on
+# cvmfs_check_siteconf_git.sh
+# create_host_proxy_download_siteconf.sh
+#
+# This script is cronized on the 25th minute on the server $cvmfs_host
+# and on the 55th minute on the slc6 machine every hour.
+#
+# versiono 0.9.5
+version=0.9.5
+workdir=$HOME
+#CERN CVMFS
+db=$HOME/cron_install_cmssw.db.txt
+#
+# This is a hack to add dev archs and cmssws to be installed
+# Add archs whenever a new cmssw is installed by checking extra archs for the cmssw
+#dev_archs=$HOME/$(basename $0 | sed "s#\.sh##g").dev.archs.txt
+dev_arch_cmssws=$HOME/cron_install_cmssw.dev.arch.cmssws.txt
+dev_arch_rpm_list=$HOME/cron_install_cmssw.dev.arch.rpm
+
+#CERN rpmdb local dir
+rpmdb_local_dir=/var/tmp/cms # /scratch/shared
+#CERN CVMFS at cvmfs-cms.cern.ch
+cvmfs_server_yes=yes
+uname -a | grep -q lxcvmfs40.cern.ch
+if [ $? -eq 0 ] ; then
+   cvmfs_server_yes=yes
+fi
+uname -a | grep -q vocms10
+if [ $? -eq 0 ] ; then
+   cvmfs_server_yes=no
+   workdir=$HOME
+   rpmdb_local_dir=$HOME
+fi
+
+slcs_excluded="_ia32_"
+cmssws_excluded="CMSSW_4_2_3_onlpatch2"
+updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
+#NOTCERN workdir=/tmp # scratch/shared/cms
+#NOTCERN db=$workdir/$(basename $0 | sed "s#\.sh##g").db.txt
+
+slc_vm_machines="slc6+vocms10"
+ssh_key_file=$HOME/.ssh/id_rsa
+
+#
+notifytowhom=bockjoo@phys.ufl.edu
+release_tag_xml="https://cmstags.cern.ch/tc/ReleasesXML?anytype=1"
+# As of Jan 21, 2014
+release_tag_xml="https://cmssdt.cern.ch/SDT/cgi-bin/ReleasesXML?anytype=1"
+releases_map="https://cmssdt.cern.ch/SDT/releases.map"
+bootstrap_script=http://cmsrep.cern.ch/cmssw/cms/bootstrap.sh
+rpms_list=http://cmsrep.cern.ch/cmssw/cms/RPMS/
+crab_tarball_top="http://cmsdoc.cern.ch/cms/ccs/wm/scripts/Crab"
+export crab3_REPO=comp.pre.bbockelm
+export crab3_REPO=comp
+export crab3_SCRAM_ARCH=slc5_amd64_gcc461
+crab3_RPMS=http://cmsrep.cern.ch/cmssw/${crab3_REPO}/RPMS/${crab3_SCRAM_ARCH}/
+
+# 18JUL2013
+cms_common_version_archs="1115+slc5_amd64_gcc472"
+cms_common_version_archs="1116+slc5_amd64_gcc481"
+
+which_slc=
+uname -a  | grep ^Linux | grep GNU/Linux | grep -q .el5
+[ $? -eq 0 ] && which_slc=slc5
+uname -a  | grep ^Linux | grep GNU/Linux | grep -q .el6
+[ $? -eq 0 ] && which_slc=slc6
+
+lock=$workdir/cron_install_cmssw.lock
+
+
+export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
+export LANG="C"
+
+# Functions
+function list_requested_cmssw_archs () { # This function needs a manual edition
+    echo slc6_amd64_gcc472
+    cat $dev_arch_cmssws 2>/dev/null | grep slc | awk '{print $1}' | sort -u
+    return 0
+}
+
+function list_requested_arch_cmssws () { # This function needs a manual edition
+    #echo /cvmfs/cms.cern.ch/slc5_amd64_gcc462/cms/cmssw/CMSSW_5_3_11* | sed 's#/# #g' | awk '{print $NF}'
+    #echo /cvmfs/cms.cern.ch/slc5_amd64_gcc462/cms/cmssw-patch/CMSSW_5_3_11* | sed 's#/# #g' | awk '{print $NF}'
+    echo slc6_amd64_gcc472 CMSSW_5_3_11
+    echo slc6_amd64_gcc472 CMSSW_5_3_11_patch1
+    echo slc6_amd64_gcc472 CMSSW_5_3_11_patch2
+    echo slc6_amd64_gcc472 CMSSW_5_3_11_patch3
+    #package does not exist echo slc6_amd64_gcc472 CMSSW_5_3_11_patch4
+    echo slc6_amd64_gcc472 CMSSW_5_3_11_patch5
+    cat $dev_arch_cmssws 2>/dev/null | grep slc | grep CMSSW
+    return 0
+}
+
+function list_announced_cmssw_archs () {
+    #a_archs=$(wget --no-check-certificate -q -O- "$release_tag_xml" | grep "<architecture" | cut -d\" -f2 | sort -u)
+    a_archs=$(wget --no-check-certificate -q -O- "${releases_map}" |  cut -d\; -f1 | cut -d= -f2 | sort -u | grep slc | grep -v slc3_ | grep -v slc4_ | grep -v slc5_ia32_)
+    r_archs=$(list_requested_cmssw_archs)
+    for the_arch in $a_archs $r_archs ; do
+       echo $the_arch
+    done | sort -u
+    return 0
+}
+
+function list_announced_arch_cmssws () {
+    ARCH=$1
+    #a_cmssws=$(wget --no-check-certificate -q -O- "${release_tag_xml}&architecture=$ARCH" | grep "<project" | grep "Announced" | cut -d\" -f2 | sort -u)
+    a_cmssws=$(wget --no-check-certificate -q -O- "${releases_map}" | grep "$ARCH" | grep label=CMSSW_ | cut -d\; -f2 | cut -d= -f2)
+    r_cmssws=$(list_requested_arch_cmssws | grep "$ARCH" | awk '{print $NF}')
+    for the_cmssw in $a_cmssws $r_cmssws ; do
+       echo $the_cmssw
+    done | sort -u
+    return 0
+}
+
+function collect_arch_rpms_page () {
+    # to be executed only once at each execution of the script to create arch rpms page files
+    a_archs=$(wget --no-check-certificate -q -O- "$rpms_list" | grep slc[0-9]_ | grep amd | sed "s#/</a>#|#g" | sed "s#slc#|slc#g" | cut -d\| -f3 | sort -u)
+    for a in $a_archs ; do
+        #wget --no-check-certificate -q $rpms_list/${a} -O-
+        echo "$a" | grep -q "$which_slc"
+        [ $? -eq 0 ] && continue
+        echo INFO downloading rpm list for $a
+        wget --no-check-certificate -q $rpms_list/${a} -O ${dev_arch_rpm_list}.${a}.txt
+        echo INFO downloaded rpm list for $a
+        #sleep 5
+    done
+    return 0
+}
+
+function list_cmssw_dev_archs () {
+    cmssw=$1
+    arch=$2
+    # a few checks
+    echo "$cmssw" | grep -q CMSSW_
+    [ $? -eq 0 ] || return 1
+    echo "$arch" | grep -q slc
+    [ $? -eq 0 ] || return 1
+    #DEBUG dev_arch_cmssws=$HOME/cron_install_cmssw.dev.arch.dev.arch.cmssws.txt
+    #DEBUG dev_arch_rpm_list=$HOME/cron_install_cmssw.dev.arch.rpm
+
+    echo DEBUG ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1)
+    if [ ! -f ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1) ] ; then
+      touch ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1)
+    fi
+    #return 1
+    # available archs
+    a_archs=$(wget --no-check-certificate -q -O- "$rpms_list" | grep slc[0-9]_ | grep amd | sed "s#/</a>#|#g" | sed "s#slc#|slc#g" | cut -d\| -f3 | sort -u | grep -v "$arch")
+    for a in $a_archs ; do
+       #wget --no-check-certificate -q -O- $rpms_list/${a} | grep cms+cmssw | grep +${cmssw}-* | grep -q .rpm
+       #echo DEBUG checking "rpm_list}.${a}.txt | grep +${cmssw}-"
+       #grep cms+cmssw ${dev_arch_rpm_list}.${a}.txt | grep +${cmssw}-* | grep .rpm
+       grep cms+cmssw ${dev_arch_rpm_list}.${a}.txt | grep +${cmssw}- | grep -q \\.rpm
+
+       if [ $? -eq 0 ] ; then
+          grep -q "$a $cmssw" ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1)
+          [ $? -eq 0 ] && { echo DEBUG ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1) already has it ; continue ; } ;
+          echo $a $cmssw
+          echo $a $cmssw >> ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1)
+          echo DEBUG updated added $a $cmssw to ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1)
+          printf "list_cmssw_dev_archs() adding $a $cmssw to ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1)" | mail -s "list_cmssw_dev_archs $a $cmssw added" $notifytowhom
+       #else
+       #   echo DEBUG ${dev_arch_rpm_list}.${a}.txt does not have "$a $cmssw"
+       fi
+    done
+    return 0
+}
+
+function update_cmssw_dev_archs () {
+    cmssw=$1
+    arch=$2
+    # a few checks
+    echo "$cmssw" | grep -q CMSSW_
+    [ $? -eq 0 ] || return 1
+    echo "$arch" | grep -q slc
+    [ $? -eq 0 ] || return 1
+    #DEBUG dev_arch_cmssws=$HOME/cron_install_cmssw.dev.arch.dev.arch.cmssws.txt
+    #DEBUG dev_arch_rpm_list=$HOME/cron_install_cmssw.dev.arch.rpm
+
+    echo DEBUG ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1)
+    if [ ! -f ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1) ] ; then
+      touch ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1)
+    fi
+    #return 1
+    # available archs
+    a_archs=$(wget --no-check-certificate -q -O- "$rpms_list" | grep slc[0-9]_ | grep amd | sed "s#/</a>#|#g" | sed "s#slc#|slc#g" | cut -d\| -f3 | sort -u | grep -v "$arch")
+    for a in $a_archs ; do
+       [ "x$a" == "x$arch" ] && continue
+       #wget --no-check-certificate -q -O- $rpms_list/${a} | grep cms+cmssw | grep +${cmssw}-* | grep -q .rpm
+       #echo DEBUG checking "rpm_list}.${a}.txt | grep +${cmssw}-"
+       #grep cms+cmssw ${dev_arch_rpm_list}.${a}.txt | grep +${cmssw}- | grep \\.rpm
+       grep cms+cmssw ${dev_arch_rpm_list}.${a}.txt | grep +${cmssw}- | grep -q \\.rpm
+
+       if [ $? -eq 0 ] ; then
+          grep -q "$a $cmssw" ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1)
+          [ $? -eq 0 ] && { echo DEBUG ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1) already has it ; continue ; } ;
+          echo $a $cmssw
+          echo $a $cmssw >> ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1)
+          echo DEBUG updated and added $a $cmssw to ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1)
+          printf "update_cmssw_dev_archs() $(/bin/hostname -s) adding $a $cmssw to ${dev_arch_cmssws}.$(echo $arch | cut -d_ -f1)" | mail -s "update_cmssw_dev_archs $a $cmssw added" $notifytowhom
+       #else
+       #   echo DEBUG ${dev_arch_rpm_list}.${a}.txt does not have "$a $cmssw"
+       fi
+    done
+    return 0
+}
+
+function mock_up_bootstrap_arch () {
+   echo INFO "bootstrap_arch()"
+   return 0
+}
+
+function bootstrap_arch () {
+   
+   if [ $# -lt 1 ] ; then
+      echo ERROR bootstrap_arch"()" scram_arch
+      printf "bootstrap_arch() scram_arch\nNot enough number of argument" | mail -s "bootstrap_arch() failed" $notifytowhom
+      return 1
+   fi
+   SCRAM_ARCH=$1
+   echo "$SCRAM_ARCH" | grep -q slc[0-9]
+   if [ $? -ne 0 ] ; then
+      echo ERROR bootstrap_arch"()" SCRAM_ARCH=$SCRAM_ARCH does not start with slc
+      printf "bootstrap_arch() SCRAM_ARCH=$SCRAM_ARCH does not start with slc\n" | mail -s "bootstrap_arch() failed" $notifytowhom
+      return 1
+   fi
+   
+   # 3.1 Check if bootstrap is needed for $arch
+   ls -al $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
+   if [ $? -eq 0 ] ; then
+      echo INFO bootstratp unnecessary ${SCRAM_ARCH}
+      return 0
+   fi
+   
+   #apt_init_script=$(echo $(echo $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh))
+   #apt_init_script=$(echo $(ls -t $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh | head -1))
+   echo INFO bootstratp necessary for ${SCRAM_ARCH}
+   # 3.2 Download bootstrap.sh
+   wget -q -O $VO_CMS_SW_DIR/bootstrap.sh $bootstrap_script
+   if [ $? -ne 0 ] ; then
+      echo ERROR bootstrap_arch"()" failed: wget -O $VO_CMS_SW_DIR/bootstrap.sh $bootstrap_script
+      printf "bootstrap_arch() failed: wget -O $VO_CMS_SW_DIR/bootstrap.sh $bootstrap_script\n" | mail -s "bootstrap_arch() failed" $notifytowhom
+      return 1
+   fi
+
+   # 3.3 Check integrity of bootstrap.sh
+   grep -q ^cleanup_and_exit $VO_CMS_SW_DIR/bootstrap.sh
+   if [ $? -ne 0 ] ; then
+      echo ERROR bootstrap_arch"()" cleanup_and_exit not found in the downloaded $VO_CMS_SW_DIR/bootstrap.sh
+      printf "bootstrap_arch() cleanup_and_exit not found in the downloaded $VO_CMS_SW_DIR/bootstrap.sh\n" | mail -s "bootstrap_arch() cleanup_and_exit not found in the downloaded $VO_CMS_SW_DIR/bootstrap" $notifytowhom
+      return 1
+   fi
+   echo INFO executing bootstrap.sh
+   sh -x $VO_CMS_SW_DIR/bootstrap.sh -repository cms setup -path $VO_CMS_SW_DIR -a ${SCRAM_ARCH} 2>&1 | tee $VO_CMS_SW_DIR/bootstrap_${SCRAM_ARCH}.log
+   
+   return $?
+
+}
+
+function mock_up_install_cmssw () {
+   echo INFO "install_cmssw()"
+   return 0
+}
+
+function install_cmssw () {
+
+   # 4.0 Check number of arguments
+   if [ $# -lt 2 ] ; then
+      echo ERROR install_cmssw"()" cmssw scram_arch
+      printf "install_cmssw() cmssw scram_arch\nNot enough number of arguments" | mail -s "install_cmssw() failed" $notifytowhom
+      return 1
+   fi
+
+   # 4.1 Check the first argument
+   cmssw_release=$1
+   export SCRAM_ARCH=$2
+   echo "$cmssw_release" | grep -q CMSSW_
+   if [ $? -ne 0 ] ; then
+      echo ERROR install_cmssw"()" cmssw_release=$cmssw_release does not start with CMSSW_
+      printf "install_cmssw() cmssw_release=$cmssw_release does not start with CMSSW_\n" | mail -s "install_cmssw() failed" $notifytowhom
+      return 1
+   fi
+   
+   # 4.2 Check the second argument
+   echo "$SCRAM_ARCH" | grep -q slc[0-9]
+   if [ $? -ne 0 ] ; then
+      echo ERROR install_cmssw"()" SCRAM_ARCH=$SCRAM_ARCH does not start with slc
+      printf "install_cmssw() SCRAM_ARCH=$SCRAM_ARCH does not start with slc\n" | mail -s "install_cmssw() failed" $notifytowhom
+      return 1
+   fi
+
+   # 4.3 Check if this is already installed
+   thedir=cmssw
+   echo $cmssw_release | grep -q patch && thedir=cmssw-patch
+   echo INFO checking ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/cms/${thedir}/$cmssw_release/src
+   ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/cms/${thedir}/$cmssw_release/src 2>/dev/null 1>/dev/null
+   if [ $? -eq 0 ] ; then
+      echo INFO $cmssw_release $SCRAM_ARCH is already installed
+      if [ -f "$db" ] ; then
+         grep -q "$cmssw_release ${SCRAM_ARCH}" $db
+         if [ $? -ne 0 ] ; then
+           echo "$cmssw_release ${SCRAM_ARCH}" >> $db
+         fi
+      fi
+      return 1
+   fi
+   #echo DEBUG ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/cms/${thedir}/$cmssw_release/src
+   #ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/cms/${thedir}/$cmssw_release/src
+   #echo DEBUG $? : status of ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/cms/${thedir}/$cmssw_release/src
+   # 4.4 prepare and install it
+   second_plus=
+   cmssw_release_last_string=$(echo $cmssw_release | sed "s#_# #g" | awk '{print $NF}')
+
+   echo "$cmssw_release_last_string" | grep -q patch && second_plus=-patch
+
+   cd $VO_CMS_SW_DIR
+
+   #source ${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh
+   source $(ls -t ${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh | head -1)
+
+   if [ $? -ne 0 ] ; then
+      echo ERROR failed sourcing apt init.sh
+      printf "install_cmssw() sourceing apt init.sh failed\n" | mail -s "$(basename $0) failed" $notifytowhom
+      return 1
+   fi
+
+   echo INFO executing apt-get --assume-yes update for $cmssw_release ${SCRAM_ARCH}
+   apt-get --assume-yes update 2>&1 | tee $HOME/apt_get_update.log
+   if [ $? -ne 0 ] ; then
+      echo ERROR failed apt-get update
+      printf "install_cmssw() apt-get update failed\n$(cat $HOME/apt_get_update.log | sed 's#%#%%#g')\n" | mail -s "install_cmssw() failed" $notifytowhom
+      return 1
+   fi
+
+   grep -q -i "^error: " $HOME/apt_get_update.log
+   if [ $? -eq 0 ] ; then
+      echo ERROR failed apt-get update
+      printf "install_cmssw() apt-get update failed\n$(cat $HOME/apt_get_update.log | sed 's#%#%%#g')\n" | mail -s "install_cmssw() failed" $notifytowhom
+      return 1
+   fi
+
+   grep -q -i "^E: " $HOME/apt_get_update.log
+   if [ $? -eq 0 ] ; then
+      echo ERROR failed apt-get update
+      printf "install_cmssw() apt-get update failed\n$(cat $HOME/apt_get_update.log | sed 's#%#%%#g')\n" | mail -s "install_cmssw() failed" $notifytowhom
+      return 1
+   fi
+
+   echo INFO installing $cmssw_release ${SCRAM_ARCH} via apt-get install cms+cmssw${second_plus}+$cmssw_release
+   apt-get --assume-yes install cms+cmssw${second_plus}+$cmssw_release 2>&1 | tee $HOME/apt_get_install.log
+   status=$?
+
+   grep -A 100 -B 100 "W: Bizarre Error - File size is not what the server reported" $HOME/apt_get_install.log | grep -q "E: Unable to fetch some archives"
+   if [ $? -eq 0 ] ; then
+      echo DEBUG we will try to install apt
+      apt-get --assume-yes install external+apt+0.5.16 2>&1 | tee $HOME/apt_get_install_external+apt.log
+      source $(ls -t ${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh | head -1)
+      status_init=$?
+      echo DEBUG status_init=$status_init which apt-get
+      which apt-get 2>&1
+
+      echo INFO executing apt-get --assume-yes update for $cmssw_release ${SCRAM_ARCH}
+      apt-get --assume-yes update 2>&1 | tee $HOME/apt_get_update.log
+      if [ $? -ne 0 ] ; then
+         echo ERROR failed apt-get update
+         printf "install_cmssw() 2 apt-get update failed\n$(cat $HOME/apt_get_update.log | sed 's#%#%%#g')\n" | mail -s "install_cmssw() failed" $notifytowhom
+         return 1
+      fi
+
+      grep -q -i "^error: " $HOME/apt_get_update.log
+      if [ $? -eq 0 ] ; then
+         echo ERROR failed apt-get update
+         printf "install_cmssw() 2 apt-get update failed for $cmssw_release $SCRAM_ARCH\n$(cat $HOME/apt_get_update.log | sed 's#%#%%#g')\n" | mail -s "install_cmssw() failed" $notifytowhom
+         return 1
+      fi
+
+      grep -q -i "^E: " $HOME/apt_get_update.log
+      if [ $? -eq 0 ] ; then
+         echo ERROR failed apt-get update
+         printf "install_cmssw() 2 apt-get update failed for $cmssw_release $SCRAM_ARCH\n$(cat $HOME/apt_get_update.log | sed 's#%#%%#g')\n" | mail -s "install_cmssw() failed" $notifytowhom
+         return 1
+      fi
+
+      echo INFO executing CMSSW install again
+      apt-get --assume-yes install cms+cmssw${second_plus}+$cmssw_release 2>&1 | tee $HOME/apt_get_install.log
+      status=$?
+   fi
+
+   grep -q -i "^error: " $HOME/apt_get_install.log
+   if [ $? -eq 0 ] ; then
+      printf "install_cmssw() apt-get install failed for $cmssw_release $SCRAM_ARCH\n$(cat $HOME/apt_get_install.log | sed 's#%#%%#g')\n" | mail -s "install_cmssw() failed" $notifytowhom
+      return 1
+   fi
+
+   grep -q -i "^E: " $HOME/apt_get_install.log
+   if [ $? -eq 0 ] ; then
+      printf "install_cmssw() apt-get install failed for $cmssw_release $SCRAM_ARCH \n$(cat $HOME/apt_get_install.log | sed 's#%#%%#g')\n" | mail -s "install_cmssw() failed" $notifytowhom
+      return 1
+   fi
+
+   ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/cms/${thedir}/$cmssw_release/src 2>/dev/null 1>/dev/null
+   if [ $? -ne 0 ] ; then
+      echo ERROR strangely $cmssw_release $SCRAM_ARCH is not installed
+      printf "install_cmssw() apt-get install failed for $cmssw_release $SCRAM_ARCH\nCheck ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/cms/${thedir}/$cmssw_release/src\n$(ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/cms/${thedir}/$cmssw_release/src)\n$(cat $HOME/apt_get_install.log | sed 's#%#%%#g')\n" | mail -s "install_cmssw() failed" $notifytowhom
+      return 1
+   fi
+
+   if [ $status -eq 0 ] ; then
+      printf "install_cmssw() $cmssw_release $SCRAM_ARCH installed from $(/bin/hostname -f)\n$(cat $HOME/apt_get_install.log | sed 's#%#%%#g')\n" | mail -s "[1] install_cmssw() $cmssw_release INSTALLED" $notifytowhom
+   else
+      echo ERROR failed apt-get install
+      printf "install_cmssw() apt-get install failed for $cmssw_release $SCRAM_ARCH\n$(cat $HOME/apt_get_install.log | sed 's#%#%%#g')\n" | mail -s "[1] install_cmssw() failed" $notifytowhom
+      return 1
+   fi
+
+   echo INFO cmssw installed: $cmssw_release $SCRAM_ARCH
+   return 0
+}
+
+# 0.6.4
+# 15JUL2013 we should add split and make new installation dir nested
+function add_nested_entry_to_cvmfsdirtab () {
+   if [ $# -lt 1 ] ; then
+      echo ERROR add_nested_entry_to_cvmfsdirtab arch
+      return 1
+   fi
+   thearch=$1
+   for thecmssw in cmssw cmssw-patch ; do
+      n_a_cmssw=$(ls  $VO_CMS_SW_DIR/${thearch}/cms/$thecmssw | wc -l)
+      if [ $n_a_cmssw -gt 0 ] ; then
+         grep -q /${thearch}/cms/$thecmssw $VO_CMS_SW_DIR/.cvmfsdirtab
+         if [ $? -eq 0 ] ; then
+            echo INFO the entry /${thearch}/cms/$thecmssw is already in $VO_CMS_SW_DIR/.cvmfsdirtab
+         else
+            echo INFO adding the entry /${thearch}/cms/$thecmssw to $VO_CMS_SW_DIR/.cvmfsdirtab
+            echo /${thearch}/cms/$thecmssw >> $VO_CMS_SW_DIR/.cvmfsdirtab
+            printf "add_nested_entry_to_cvmfsdirtab INFO: added the entry /${thearch}/cms/$thecmssw to $VO_CMS_SW_DIR/.cvmfsdirtab\n" | mail -s "add_nested_entry_to_cvmfsdirtab INFO: Nested CVMFS dir entry added for $thearch" $notifytowhom
+         fi
+      fi
+   done
+   
+   return 0
+}
+
+function mock_up_publish_cmssw_cvmfs () {
+   echo INFO "publish_cmssw_cvmfs()"
+   return 0
+}
+
+function publish_cmssw_cvmfs () {
+   for_what=$1
+   echo INFO publishing the installation in the cvmfs
+   time cvmfs_server publish 2>&1 | tee $HOME/cvmfs_server+publish+cmssw+install.log
+   if [ $? -eq 0 ] ; then
+      printf "publish_cmssw_cvmfs () cvmfs_server_publish OK for $for_what \n$(cat $HOME/cvmfs_server+publish+cmssw+install.log | sed 's#%#%%#g')\n" | mail -s "publish_cmssw_cvmfs () cvmfs_server publish for cmssw install OK" $notifytowhom
+   else
+      echo ERROR failed cvmfs_server publish
+      printf "publish_cmssw_cvmfs () cvmfs_server publish failed for $for_what\n$(cat $HOME/cvmfs_server+publish+cmssw+install.log | sed 's#%#%%#g')\n" | mail -s "publish_cmssw_cvmfs () failed" $notifytowhom
+      return 1
+   fi
+   echo INFO cmssw installation is published from the cvmfs server
+   if [ -f $HOME/cic_send_log.sh ] ; then
+      echo INFO sending $updated_list to the Central OPS
+      #$HOME/cic_send_log.sh
+      #echo INFO checking http://xx.xx.xx.xx:8080/cmssoft/aptinstall/logs/cic_$(/bin/hostname -f).log
+   fi
+   return 0
+}
+
+function install_cms_common () {
+   status=1   
+   for cms_common_v_a in $cms_common_version_archs ; do
+      cms_common_v=$(echo $cms_common_v_a | cut -d+ -f1)
+      cms_common_a=$(echo $cms_common_v_a | cut -d+ -f2)
+      echo "$cms_common_a" | grep -q "$which_slc"
+      [ $? -eq 0 ] || { echo Warning cms_common_a=$cms_common_a vs which_slc=$which_slc ; continue ; } ;
+      grep -q "CMSSW_cms_common_1.0+${cms_common_v} $cms_common_a" $updated_list
+      if [ $? -eq 0 ] ; then
+         echo INFO cms_common_1.0 $cms_common_v $cms_common_a in the $updated_list
+         continue
+      else
+         echo INFO executing cic_install_cms_common $cms_common_a $cms_common_v
+         cic_install_cms_common $cms_common_a $cms_common_v 2>&1 | tee $HOME/cic_install_cms_common.log
+         if [ $? -eq 0 ] ; then
+            echo "CMSSW_cms_common_1.0+${cms_common_v} $cms_common_a $(/bin/date +%s) $(/bin/date -u)" >> $updated_list
+            printf "install_cms_common $(/bin/hostname -f) cms_common_1.0 $cms_common_v $cms_common_a installed\nInstallation Log:\n$(cat $HOME/cic_install_cms_common.log | sed 's#%#%%#g')\n" | /bin/mail -s "install_cms_common cms_common_1.0 $cms_common_v $cms_common_a installed" $notifytowhom
+            status=0
+         fi
+      fi
+   done
+   return $status
+}
+
+function cic_install_cms_common () {
+  if [ $# -lt 2 ] ; then
+     echo ERROR cic_install_cms_common SCRAM_ARCH version
+     return 1
+  fi
+  scram_arch=$1
+  version=$2
+  echo INFO sourcing cmsset_default.sh
+  source $VO_CMS_SW_DIR/cmsset_default.sh 2>&1
+  echo INFO setting up apt
+  #source $VO_CMS_SW_DIR/${scram_arch}/external/apt/*/etc/profile.d/init.sh 2>&1
+  source $(ls -t $VO_CMS_SW_DIR/${scram_arch}/external/apt/*/etc/profile.d/init.sh | head -1) 2>&1
+  echo INFO which apt-get
+  which apt-get 2>&1
+  echo INFO checking cms-common before installing it
+  rpm -qa | grep cms-common | grep -q ${version}
+  if [ $? -eq 0 ] ; then
+     echo INFO cms-common+1.0 version=$version is already installed
+     return 0
+  fi
+  rpm -qa | grep cms-common
+  echo INFO updating the apt repo
+  apt-get update 2>&1
+  echo INFO installing cms-common+1.0 version $version
+  apt-get install '--assume-yes' cms+cms-common+1.0
+  echo INFO checking cms-common after installing
+  rpm -qa | grep cms-common | grep -q ${version}
+  if [ $? -eq 0 ] ; then
+     echo INFO cms-common version=$version is installed
+     rpm -qa | grep cms-common
+     return 0
+  else
+     echo ERROR cms-common version=$version installation failed
+     rpm -qa | grep cms-common
+     return 1
+  fi
+  return 0
+}
+
+function install_crab2 () {
+  echo DEBUG VO_CMS_SW_DIR $VO_CMS_SW_DIR
+  echo DEBUG crab_tarball_top $crab_tarball_top
+
+  [ -d $VO_CMS_SW_DIR/crab ] || mkdir -p $VO_CMS_SW_DIR/crab
+  crab_tarballs=$(wget -O- ${crab_tarball_top} 2>/dev/null | grep tgz | cut -d\> -f6 | cut -d\" -f2 | grep ^CRAB_2_)  
+  CRABS=$(for crab in $crab_tarballs ; do echo $crab ; done | sed "s#.tgz##g")
+  for crab in $CRABS ; do
+      echo INFO crab $crab
+      [ -f $VO_CMS_SW_DIR/crab/${crab}/crab.sh ] && { echo INFO $crab already installed ; continue ; } ;
+      echo INFO "[0]" installing $crab
+      ( cd $HOME
+        wget -q -O ${crab}.tgz ${crab_tarball_top}/${crab}.tgz
+        [ $? -eq 0 ] || { echo DEBUG download failed for ${crab_tarball_top}/${crab}.tgz ; return 1 ; } ;
+        cd $VO_CMS_SW_DIR/crab
+        tar xzvf $HOME/${crab}.tgz
+        [ $? -eq 0 ] || { echo DEBUG untar failed for $HOME/${crab}.tgz under $VO_CMS_SW_DIR/crab ; return 1 ; } ;
+        cd ${crab}
+        ./configure
+        [ $? -eq 0 ] || { echo DEBUG crab configure failed under $VO_CMS_SW_DIR/crab/${crab} ; return 1 ; } ;
+        echo ${crab} | grep -q _pre        
+        if [ $? -eq 0 ] ; then
+           echo INFO it is a pre release. Creating a soft-link
+           rm -f $VO_CMS_SW_DIR/crab/crab_pre.{c,}sh
+           status=$?
+           echo DEBUG 1 status $status
+           ln -s $VO_CMS_SW_DIR/crab/${crab}/crab.sh $VO_CMS_SW_DIR/crab/crab_pre.sh
+           status=$(expr $status + $?)
+           echo DEBUG 2 status $status
+           ln -s $VO_CMS_SW_DIR/crab/${crab}/crab.csh $VO_CMS_SW_DIR/crab/crab_pre.csh
+           status=$(expr $status + $?)
+           echo DEBUG 3 status $status
+           exit $status           
+        else
+           echo INFO it is a production release. Creating a soft-link
+           rm -f $VO_CMS_SW_DIR/crab/crab.{c,}sh
+           status=$?
+           echo DEBUG 1 status $status
+           ln -s $VO_CMS_SW_DIR/crab/${crab}/crab.sh $VO_CMS_SW_DIR/crab/crab.sh
+           status=$(expr $status + $?)
+           echo DEBUG 2 status $status
+           ln -s $VO_CMS_SW_DIR/crab/${crab}/crab.csh $VO_CMS_SW_DIR/crab/crab.csh
+           status=$(expr $status + $?)
+           echo DEBUG 3 status $status
+           exit $status           
+        fi
+        exit 0
+      )
+      [ $? -eq 0 ] || return 1
+      grep -q "$crab " $updated_list
+      if [ $? -eq 0 ] ; then
+        echo Warning "[1]" $crab is already in the $updated_list
+      else
+        echo INFO "[1]" adding $crab noarch to $updated_list
+        echo $crab noarch $(/bin/date +%s) $(/bin/date -u) >> $updated_list
+      fi
+      echo INFO "[2]" adding nested catalog
+      if [ -d $VO_CMS_SW_DIR/crab/$crab ] ; then
+         ls -al $VO_CMS_SW_DIR/crab/$crab/.cvmfscatalog 2>/dev/null 1>/dev/null ;
+         if [ $? -eq 0 ] ; then
+            echo INFO "[3]" $VO_CMS_SW_DIR/crab/$crab/.cvmfscatalog exists
+         else
+            echo INFO "[3]" creating $VO_CMS_SW_DIR/crab/$crab/.cvmfscatalog
+            touch $VO_CMS_SW_DIR/crab/$crab/.cvmfscatalog
+         fi
+      fi
+
+      echo INFO "[4]" publishing cvmfs
+      publish_cmssw_cvmfs install_crab2
+
+      printf "$(basename $0): $crab installed successfully on $VO_CMS_SW_DIR/crab/${crab}; \n" | mail -s "[4] $(basename $0) $crab Installed " $notifytowhom
+
+  done
+
+  soft_link_update_needed=no
+  random_string=XXYYZZ8907
+  for ocrab in new old ; do
+     ocrab_release=${random_string}$(wget -q -O- ${crab_tarball_top}/crab_${ocrab}.sh | grep "^export CRABDIR=" | sed 's#/# #g' | awk '{print $NF}')
+     #echo DEBUG ocrab=$ocrab ocrab_release=$ocrab_release
+     crab2_release=$(echo ${ocrab_release} | sed "s#$random_string##")
+     ls -al /cvmfs/cms.cern.ch/crab/crab_${ocrab}.sh 2>&1 | grep -q "$crab2_release"
+     if [ $? -eq 0 ] ; then
+        echo INFO /cvmfs/cms.cern.ch/crab/crab_${ocrab}.sh link is correct
+     else
+        newlink=/cvmfs/cms.cern.ch/crab/${crab2_release}/crab.sh
+        echo INFO linking /cvmfs/cms.cern.ch/crab/crab_${ocrab}.sh to $newlink
+        rm -f /cvmfs/cms.cern.ch/crab/crab_${ocrab}.sh
+        ( cd /cvmfs/cms.cern.ch/crab ; ln -s $newlink crab_${ocrab}.sh ; )
+        ls -al /cvmfs/cms.cern.ch/crab/crab_${ocrab}.sh
+
+        newlink=/cvmfs/cms.cern.ch/crab/${crab2_release}/crab.csh
+        rm -f /cvmfs/cms.cern.ch/crab/crab_${ocrab}.csh
+        ( cd /cvmfs/cms.cern.ch/crab ; ln -s $newlink crab_${ocrab}.csh ; )
+        ls -al /cvmfs/cms.cern.ch/crab/crab_${ocrab}.csh  
+        soft_link_update_needed=yes
+     fi
+  done
+  if [ "$soft_link_update_needed" == "yes" ] ; then
+      echo INFO "[5]" publishing cvmfs
+      publish_cmssw_cvmfs install_crab2+other+setup
+  fi
+  return 0
+}
+
+function install_crab3 () {
+  releases="3.2.0pre5 3.2.0pre5-comp 3.2.0pre16 3.2.0pre16-comp 3.3.0.pre3 3.3.0.pre3-comp"
+  for release in $releases ; do
+     grep -q "crabclient $release " $updated_list
+     if [ $? -eq 0 ] ; then
+        echo Warning crabclient $release installed according to $updated_list
+        #return 0
+     else
+        echo INFO adding crabclient $release to $updated_list
+        echo crabclient $release $(/bin/date +%s) $(/bin/date -u) >> $updated_list
+     fi
+  done
+
+  crab3s=$(wget -O- $crab3_RPMS 2>/dev/null | grep cms+crabclient+ | cut -d\> -f7 | cut -d\< -f1 | sed 's#slc# slc#g' | sed 's#cms+crabclient+# #g' | sed 's#-1-1.# #g' | sed 's#.rpm##g' | awk '{print $1}')
+
+  for release in $crab3s ; do
+     grep -q "crabclient $release " $updated_list
+     if [ $? -eq 0 ] ; then
+        echo Warning crabclient $release installed according to $updated_list
+        continue
+     fi
+     echo INFO installing $release under $VO_CMS_SW_DIR
+     $HOME/install_crab3.sh $VO_CMS_SW_DIR $release
+     if [ $? -eq 0 ] ; then
+        grep -q "crabclient $release " $updated_list
+        if [ $? -eq 0 ] ; then
+           echo Warning crabclient $release installed
+        else
+           echo INFO adding crabclient $release to $updated_list
+           echo crabclient $release $(/bin/date +%s) $(/bin/date -u) >> $updated_list
+        fi
+     fi
+  done
+  return 0
+}
+
+
+function cvmfs_server_transaction_check () {
+   status=$1
+   what="$2"
+   ntry=10
+   itry=0
+   currdir=$(pwd)
+   cd
+   while [ $itry -lt $ntry ] ; do
+     if [ $status -eq 0 ] ; then
+      cd $currdir
+      return 0
+     else
+      
+      if [ $itry -eq $(expr $ntry - 1) ] ; then
+         cvmfs_server abort -f
+         cvmfs_server transaction 2>&1 | tee $HOME/cvmfs_server+transaction.log
+         [ $? -eq 0 ] && { cd $currdir ; return 0 ; } ;
+         printf "$what at $(pwd) cvmfs_server transaction Failing\n$(cat $HOME/cvmfs_server+transaction.log | sed 's#%#%%#g')\n" | mail -s "ERROR cvmfs_server transaction Failed" $notifytowhom
+         #cvmfs_server abort -f
+      fi
+      echo INFO retrying $itry
+      cvmfs_server abort -f
+      cvmfs_server transaction
+      status=$?
+      [ $status -eq 0 ] && { cd $currdir ; return 0 ; } ;
+     fi
+     itry=$(expr $itry + 1)
+   done
+   cd $currdir
+   return 1
+}
+
+function update_CMS_at_Home () {
+   cvmfs_server transaction
+   status=$?
+   what="update_CMS_at_Home ()"
+   cvmfs_server_transaction_check $status $what
+   if [ $? -eq 0 ] ; then
+      echo INFO transaction OK for $what
+   else
+      printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+      cd $currdir
+      return 1
+   fi
+   # ls /cvmfs/cms.cern.ch/CMS@Home
+   [ -d /cvmfs/cms.cern.ch/CMS@Home ] || mkdir /cvmfs/cms.cern.ch/CMS@Home
+   #wget -q -O /cvmfs/cms.cern.ch/CMS@Home/CMSJobAgent.py http://lfield.web.cern.ch/lfield/CMS/CMSJobAgent.py
+
+   #wget -q -O /cvmfs/cms.cern.ch/CMS@Home/CMSJobAgent.sh http://lfield.web.cern.ch/lfield/CMS/CMSJobAgent.sh
+   printf "update_CMS_at_Home 0 starting the update check\n" | mail -s "update_CMS_at_Home" $notifytowhom
+   update_needed=
+   /usr/bin/wget -q -O $workdir/CMS@HOME_CMSJobAgent.py http://lfield.web.cern.ch/lfield/CMS/CMSJobAgent.py
+   if [ $? -eq 0 ] ; then
+      diff $workdir/CMS@HOME_CMSJobAgent.py /cvmfs/cms.cern.ch/CMS@Home/CMSJobAgent.py
+      if [ $? -ne 0 ] ; then
+         update_needed="$update_needed $workdir/CMS@HOME_CMSJobAgent.py"
+         printf "update_CMS_at_Home 1 update needed for $update_needed\n" | mail -s "update_CMS_at_Home" $notifytowhom
+      fi
+   fi
+   /usr/bin/wget -q -O $workdir/CMS@HOME_CMSJobAgent.sh http://lfield.web.cern.ch/lfield/CMS/CMSJobAgent.sh
+   if [ $? -eq 0 ] ; then
+      diff $workdir/CMS@HOME_CMSJobAgent.sh /cvmfs/cms.cern.ch/CMS@Home/CMSJobAgent.sh
+      if [ $? -ne 0 ] ; then
+         update_needed="$update_needed $workdir/CMS@HOME_CMSJobAgent.sh"
+         printf "update_CMS_at_Home 2 update needed for $update_needed\n" | mail -s "update_CMS_at_Home" $notifytowhom
+      fi
+   fi
+   echo DEBUG update_needed: $update_needed
+   for f in $update_needed ; do
+       echo DEBUG /usr/bin/wget -q -O /cvmfs/cms.cern.ch/CMS@Home/$(basename $f | cut -d_ -f2-) http://lfield.web.cern.ch/lfield/CMS/$(basename $f | cut -d_ -f2-)
+       #cp $f /cvmfs/cms.cern.ch/CMS@Home/
+       /usr/bin/wget -q -O /cvmfs/cms.cern.ch/CMS@Home/$(basename $f | cut -d_ -f2-) http://lfield.web.cern.ch/lfield/CMS/$(basename $f | cut -d_ -f2-)
+       echo DEBUG status=$?
+   done
+   echo DEBUG return 1
+      cvmfs_server abort -f
+   return 1
+   if [ "x$update_needed" == "x" ] ; then
+      printf "update_CMS_at_Home update not needed\n" | mail -s "update_CMS_at_Home" $notifytowhom
+      cvmfs_server abort -f
+   else
+      n=$(grep ^CMS@HOME $updated_list | tail -1 | awk '{print $1}' | cut -d_ -f2)
+      [ "x$n" == "x" ] && n=-1
+      n=$(expr $n + 1)
+      echo CMS@HOME_${n} noarch $(date +%s) $(/bin/date -u) >> $updated_list
+      printf "update_CMS_at_Home CMS@HOME_${n} noarch $(date +%s) $(/bin/date -u)\n" | mail -s "update_CMS_at_Home" $notifytowhom
+
+      cvmfs_server publish
+   fi
+   #
+   return 0
+}
