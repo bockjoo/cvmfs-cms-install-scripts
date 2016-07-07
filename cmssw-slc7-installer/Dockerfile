@@ -17,7 +17,7 @@ RUN yum update -y && yum install -y HEP_OSlibs_CC7 finger screen libXpm-devel li
 # RUN groupadd -g 101 shared
 # RUN adduser -u 101 -g 101 shared
 RUN groupadd -g 314 cvcms
-RUN adduser -u 314 -g 304 cvcms
+RUN adduser -u 314 -g 314 cvcms
 USER cvcms
 # RUN groupadd -g 5000 avery
 # RUN adduser -u 4575 -g 5000 bockjoo
