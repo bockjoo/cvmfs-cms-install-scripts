@@ -1,7 +1,7 @@
 #!/bin/sh
 # References 
 # http://cms-sw.github.io/cmssw/advanced-usage.html#how_do_i_setup_a_local_mirror
-# v=0.2.7
+# v=0.2.8
 workdir=$HOME
 notifytowhom=bockjoo@phys.ufl.edu
 git_fetch_time_out=40
@@ -47,7 +47,7 @@ rm -f $functions
 # Doing the one suggested by Shahzad
 echo INFO Doing the one suggested by Shahzad
 create_local_workspace_patch
-
+exit 0
 #printf "$(basename $0) Starting cvmfs_server transaction \n" | mail -s "cvmfs_server transaction started" $notifytowhom
 cvmfs_server transaction
 status=$?
@@ -192,7 +192,7 @@ function create_local_workspace_patch () {
 
 WORKSPACE=/tmp/cvcms
 GH_REPO=cmssw
-MIRROR=/cvmfs/cms.cern.ch/${GH_REPO}.git.new
+MIRROR=/cvmfs/cms.cern.ch/${GH_REPO}.git.daily
 [ -d $WORKSPACE ] || mkdir -p $WORKSPACE
 cd $WORKSPACE
 echo INFO starting all over again
@@ -200,7 +200,7 @@ rm -rf ${GH_REPO}.git
 echo INFO creating git config
 git config --global http.postBuffer 209715200
 echo INFO creating local worksapce patch
-(git clone --bare https://github.com/cms-sw/${GH_REPO}.git && cvmfs_server transaction && mkdir -p ${MIRROR} && rsync -a --delete ${GH_REPO}.git/ ${MIRROR}/  && cvmfs_server publish) || true
+(git clone --bare https://github.com/cms-sw/${GH_REPO}.git && cvmfs_server transaction && mkdir -p ${MIRROR} && rsync -a --delete ${GH_REPO}.git/ ${MIRROR}/  && cvmfs_server publish) || printf "ERROR create_local_workspace_patch failed\n" | mail -s "ERROR cmssw git create_local_workspace_patch failed" $notifytowhom
 rm -rf ${GH_REPO}.git
 
 }
