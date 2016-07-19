@@ -194,13 +194,17 @@ WORKSPACE=/tmp/cvcms
 GH_REPO=cmssw
 MIRROR=/cvmfs/cms.cern.ch/${GH_REPO}.git.daily
 [ -d $WORKSPACE ] || mkdir -p $WORKSPACE
+if [ ! -d ${MIRROR} ] ; then
+   echo INFO creating ${MIRROR}
+   cvmfs_server transaction && mkdir -p ${MIRROR} && cvmfs_server publish
+fi
 cd $WORKSPACE
 echo INFO starting all over again
 rm -rf ${GH_REPO}.git
 echo INFO creating git config
 git config --global http.postBuffer 209715200
 echo INFO creating local worksapce patch
-(git clone --bare https://github.com/cms-sw/${GH_REPO}.git && cvmfs_server transaction && mkdir -p ${MIRROR} && rsync -a --delete ${GH_REPO}.git/ ${MIRROR}/  && cvmfs_server publish) || printf "ERROR create_local_workspace_patch failed\n" | mail -s "ERROR cmssw git create_local_workspace_patch failed" $notifytowhom
+(git clone --bare https://github.com/cms-sw/${GH_REPO}.git && cvmfs_server transaction && rsync -a --delete ${GH_REPO}.git/ ${MIRROR}/  && cvmfs_server publish) || printf "ERROR create_local_workspace_patch failed\n" | mail -s "ERROR cmssw git create_local_workspace_patch failed" $notifytowhom
 rm -rf ${GH_REPO}.git
 
 }
