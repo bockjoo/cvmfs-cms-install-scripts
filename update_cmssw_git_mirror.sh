@@ -1,7 +1,8 @@
 #!/bin/sh
 # References 
 # http://cms-sw.github.io/cmssw/advanced-usage.html#how_do_i_setup_a_local_mirror
-# v=0.2.6
+# v=0.2.7
+workdir=$HOME
 notifytowhom=bockjoo@phys.ufl.edu
 git_fetch_time_out=40
 git_repack_time_out=40
@@ -30,6 +31,179 @@ CMSSW_MIRROR_PATH_NEW=$HOME/cmssw.git # cvmfs-cms
 CMSSW_MIRROR_PATH_BACKUP=$HOME/cmssw.git.old
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
 
+functions=$workdir/$(basename $0 | sed "s#\.sh##g")-functions # .$(date -u +%s)
+
+perl -n -e 'print if /^####### BEGIN Functions 12345/ .. /^####### ENDIN Functions 12345/' < $0 | grep -v "Functions 12345" > $functions
+
+if [ ! -f $functions ] ; then
+   echo ERROR $functions does not exist
+   printf "$(basename $0) ERROR failed to create $functions\nfunctions does not exist\n" | mail -s "ERROR failed to create the functions" $notifytowhom
+   exit 1
+fi
+
+source $functions
+rm -f $functions
+
+# Doing the one suggested by Shahzad
+echo INFO Doing the one suggested by Shahzad
+create_local_workspace_patch
+
+#printf "$(basename $0) Starting cvmfs_server transaction \n" | mail -s "cvmfs_server transaction started" $notifytowhom
+cvmfs_server transaction
+status=$?
+what="$(basename $0)"
+cvmfs_server_transaction_check $status $what
+if [ $? -eq 0 ] ; then
+   echo INFO transaction OK for $what
+else
+   printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+   exit 1
+fi
+
+if [ -f $HOME/stop.mirror.cmssw.git ] ; then
+   printf "$(basename $0) -max-pack-size 20m failed \n" | mail -s "create_mirror_bare_cmssw_git_tmp git repack failed" $notifytowhom
+   ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
+   exit 1
+fi
+
+if [ -d $CMSSW_MIRROR_PATH ] ; then
+   i=0
+   i=$(expr $i + 1)
+   echo INFO "[ $i ]" $CMSSW_MIRROR_PATH exists: Executing create_mirror_bare_cmssw_git_tmp Updating the mirror.....
+   #read ans
+   #result=$(create_mirror_bare_cmssw_git_tmp 2>&1)
+   create_mirror_bare_cmssw_git_tmp > /tmp/create_mirror_bare_cmssw_git_tmp.log 2>&1
+   status=$?
+   cat /tmp/create_mirror_bare_cmssw_git_tmp.log
+   if [ $status -ne 0 ] ; then
+      error_message="ERROR failed: create_mirror_bare_cmssw_git_tmp"
+      echo $error_message >> $HOME/stop.mirror.cmssw.git
+      echo $error_message
+      printf "$(basename $0) create_mirror_bare_cmssw_git_tmp failed \n$(cat /tmp/create_mirror_bare_cmssw_git_tmp.log)\n" | mail -s "$(basename $0) create_mirror_bare_cmssw_git_tmp failed" $notifytowhom
+      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
+      exit 1
+   fi
+   echo INFO "[ $i ]" $CMSSW_MIRROR_PATH_NEW created
+   ls -al $CMSSW_MIRROR_PATH_NEW
+
+   echo INFO "[ $i ]" copying the newest mirror to the cvmfs area: time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH}
+   time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH}
+   if [ $? -ne 0 ] ; then
+      error_message="ERROR failed: time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH} failed"
+      echo $error_message >> $HOME/stop.mirror.cmssw.git
+      echo $error_message
+      printf "$(basename $0) time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH} failed failed \n" | mail -s "$(basename $0) time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH} failed" $notifytowhom
+      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
+      exit 1
+   fi
+
+
+   echo INFO check $CMSSW_MIRROR_PATH
+   echo INFO check $CMSSW_MIRROR_PATH_NEW
+   #echo INFO cehck $CMSSW_MIRROR_PATH_BACKUP
+   #exit 0
+
+   i=$(expr $i + 1)
+   echo INFO "[ $i ]" all move in place. Publishing the cvmfs now....
+
+else
+   echo DEBUG cloning bare mirror
+   git clone --mirror --bare https://github.com/cms-sw/cmssw.git $CMSSW_MIRROR_PATH
+   if [ $? -ne 0 ] ; then
+      echo ERROR failed: git clone --mirror --bare https://github.com/cms-sw/cmssw.git $CMSSW_MIRROR_PATH
+      printf "$(basename $0) git repack -a -d --max-pack-size 20m failed \n" | mail -s "$(basename $0) git clone failed" $notifytowhom
+      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
+      exit 1
+   fi
+   # [1] Split the chunk for the better cvmfs performance
+   echo DEBUG splitting chunks
+   ( cd $CMSSW_MIRROR_PATH
+     #git repack -a -d --window-memory 10m --max-pack-size 20m
+     git repack -a -d --max-pack-size 20m
+     exit $?
+   )
+   status=$?
+
+   if [ $status -ne 0 ] ; then
+      echo ERROR failed: git repack -a -d --max-pack-size 20m
+      printf "$(basename $0) git repack -a -d --max-pack-size 20m failed \n" | mail -s "$(basename $0) git repack failed" $notifytowhom
+      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
+      exit 1
+   fi
+
+   echo DEBUG git repack status=$status
+
+   #[2] then, from time to time, I would execute this
+   ( cd $CMSSW_MIRROR_PATH
+     echo DEBUG executing git remote update origin
+     git remote update origin
+     status=$?
+     if [ $status -ne 0 ] ; then
+        echo ERROR failed: git remote update origin
+        printf "$(basename $0) git remote update origin failed \n" | mail -s "$(basename $0) git remote update origin failed" $notifytowhom
+        exit $status
+     fi
+     echo DEBUG executing git repack -a -d --max-pack-size 20m
+     git repack -a -d --max-pack-size 20m
+     exit $?
+   )
+   if [ $? -ne 0 ] ; then
+      echo ERROR failed: git repack -a -d --max-pack-size 20m
+      printf "$(basename $0) git repack -a -d --max-pack-size 20m failed\n" | mail -s "$(basename $0) git repack -a -d --max-pack-size 20m failed" $notifytowhom
+      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
+      exit 1
+   fi
+
+   echo DEBUG writing a README file
+   echo /cvmfs/cms.cern.ch/cmssw.git: manually updated on demand > $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
+   echo "(See /cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates)" >> $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
+   echo /cvmfs/cms.cern.ch/cmssw.git.daily: daily updated >> $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
+   echo "(See /cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates)" >> $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
+   echo "Also," >> $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
+   echo Please refer to >> $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
+   echo http://cms-sw.github.io/cmssw/advanced-usage.html >> $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
+   
+   echo DEBUG executing time cvmfs_server publish
+
+fi
+
+# echo "$(basename $CMSSW_MIRROR_PATH) noarch $(/bin/date +%s) $(/bin/date -u)" >> $updated_list
+
+echo INFO executing time cvmfs_server publish
+
+currdir=$(pwd)
+cd
+time cvmfs_server publish 2>&1 |  tee $HOME/cvmfs_server+publish.log
+status=$?
+cd $currdir
+
+if [ $status -ne 0 ] ; then
+   echo ERROR failed: cvmfs_server publish
+   printf "$(basename $0) time cvmfs_server publish failed \n" | mail -s "$(basename $0) git repack -a -d --max-pack-size 20m" $notifytowhom
+   ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
+   exit 1
+fi
+#printf "$(basename $0) $(basename $0) $1 executed \n$(cat $HOME/update_cmssw_git_mirror.daily.log)\n" | mail -s "$(basename $0) $(basename $0) $1 executed" $notifytowhom
+exit 0
+
+####### BEGIN Functions 12345
+# Functions
+function create_local_workspace_patch () {
+
+WORKSPACE=/tmp/cvcms
+GH_REPO=cmssw
+MIRROR=/cvmfs/cms.cern.ch/${GH_REPO}.git.new
+[ -d $WORKSPACE ] || mkdir -p $WORKSPACE
+cd $WORKSPACE
+echo INFO starting all over again
+rm -rf ${GH_REPO}.git
+echo INFO creating git config
+git config --global http.postBuffer 209715200
+echo INFO creating local worksapce patch
+(git clone --bare https://github.com/cms-sw/${GH_REPO}.git && cvmfs_server transaction && mkdir -p ${MIRROR} && rsync -a --delete ${GH_REPO}.git/ ${MIRROR}/  && cvmfs_server publish) || true
+rm -rf ${GH_REPO}.git
+
+}
 
 function create_mirror_bare_cmssw_git_tmp () {
    #[ -d $CMSSW_MIRROR_PATH_NEW ] && return 1
@@ -192,199 +366,4 @@ function cvmfs_server_transaction_check () {
    done
    return 1
 }
-
-#printf "$(basename $0) Starting cvmfs_server transaction \n" | mail -s "cvmfs_server transaction started" $notifytowhom
-cvmfs_server transaction
-status=$?
-what="$(basename $0)"
-cvmfs_server_transaction_check $status $what
-if [ $? -eq 0 ] ; then
-   echo INFO transaction OK for $what
-else
-   printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
-   exit 1
-fi
-
-if [ -f $HOME/stop.mirror.cmssw.git ] ; then
-   printf "$(basename $0) -max-pack-size 20m failed \n" | mail -s "create_mirror_bare_cmssw_git_tmp git repack failed" $notifytowhom
-   ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-   exit 1
-fi
-
-if [ -d $CMSSW_MIRROR_PATH ] ; then
-   i=0
-   i=$(expr $i + 1)
-   echo INFO "[ $i ]" $CMSSW_MIRROR_PATH exists: Executing create_mirror_bare_cmssw_git_tmp Updating the mirror.....
-   #read ans
-   #result=$(create_mirror_bare_cmssw_git_tmp 2>&1)
-   create_mirror_bare_cmssw_git_tmp 2>&1 | tee /tmp/create_mirror_bare_cmssw_git_tmp.log
-   if [ $? -ne 0 ] ; then
-      error_message="ERROR failed: create_mirror_bare_cmssw_git_tmp"
-      echo $error_message >> $HOME/stop.mirror.cmssw.git
-      echo $error_message
-      printf "$(basename $0) create_mirror_bare_cmssw_git_tmp failed \n$(cat /tmp/create_mirror_bare_cmssw_git_tmp.log)\n" | mail -s "$(basename $0) create_mirror_bare_cmssw_git_tmp failed" $notifytowhom
-      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-      exit 1
-   fi
-   echo INFO "[ $i ]" $CMSSW_MIRROR_PATH_NEW created
-   ls -al $CMSSW_MIRROR_PATH_NEW
-
-   if [ ] ; then # 15MAY2015
-
-   i=$(expr $i + 1)
-   echo INFO "[ $i ]" backing up the cvmfs cmssw.git: time rsync -arzuvp $CMSSW_MIRROR_PATH/  $CMSSW_MIRROR_PATH_BACKUP
-   #read ans
-   rm -rf $CMSSW_MIRROR_PATH_BACKUP/*
-   time rsync -arzuvp $CMSSW_MIRROR_PATH/  $CMSSW_MIRROR_PATH_BACKUP
-   if [ $? -ne 0 ] ; then
-      error_message="ERROR failed: rsynching the production cmssw.git failed"
-      echo $error_message >> $HOME/stop.mirror.cmssw.git
-      echo $error_message
-      printf "$(basename $0) rsynching the production cmssw.git failed failed \ntime rsync -arzuvp $CMSSW_MIRROR_PATH/  $CMSSW_MIRROR_PATH_BACKUP\n" | mail -s "$(basename $0) rsynching the production cmssw.git failed" $notifytowhom
-      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-      exit 1
-   fi
-
-   i=$(expr $i + 1)
-   echo INFO "[ $i ]" copying the newest mirror to the cvmfs area: time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH}.tmp
-   #read ans
-   # put the newest mirror to the cvmfs tmp area
-   rm -rf ${CMSSW_MIRROR_PATH}.tmp/*
-   time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH}.tmp
-   if [ $? -ne 0 ] ; then
-      error_message="ERROR failed: time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH}.tmp failed"
-      echo $error_message >> $HOME/stop.mirror.cmssw.git
-      echo $error_message
-      printf "$(basename $0) time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH}.tmp failed failed \n" | mail -s "$(basename $0) time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH}.tmp failed" $notifytowhom
-      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-      exit 1
-   fi
-
-   i=$(expr $i + 1)
-   echo INFO "[ $i ]" switching from old to new cmssw.git step 1: mv $CMSSW_MIRROR_PATH ${CMSSW_MIRROR_PATH}.old
-   mv $CMSSW_MIRROR_PATH ${CMSSW_MIRROR_PATH}.old
-   if [ $? -ne 0 ] ; then
-      echo ERROR failed: switching from old to new cmssw.git step 1 failed
-      printf "$(basename $0) switching from old to new cmssw.git step 1 failed failed \n" | mail -s "$(basename $0) switching from old to new cmssw.git step 1 failed" $notifytowhom
-     ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-     exit 1
-   fi
-
-   i=$(expr $i + 1)
-   echo INFO "[ $i ]" switching from old to new cmssw.git step 2: mv ${CMSSW_MIRROR_PATH}.tmp $CMSSW_MIRROR_PATH
-   #read ans
-   mv ${CMSSW_MIRROR_PATH}.tmp $CMSSW_MIRROR_PATH
-   if [ $? -ne 0 ] ; then
-      echo ERROR failed: switching from old to new cmssw.git step 2
-      printf "$(basename $0) switching from old to new cmssw.git step 2\n" | mail -s "$(basename $0) switching from old to new cmssw.git step 2" $notifytowhom
-      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-      exit 1
-   fi
-
-   i=$(expr $i + 1)
-   echo INFO "[ $i ]" Removing ${CMSSW_MIRROR_PATH}.old
-   ( cd /cvmfs/cms.cern.ch
-     echo PWD=$(pwd)
-     echo Warning removing $(basename ${CMSSW_MIRROR_PATH}.old)
-     rm -rf $(basename ${CMSSW_MIRROR_PATH}.old)
-   )
-   fi # if [ ] ; then
-   echo INFO "[ $i ]" copying the newest mirror to the cvmfs area: time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH}
-   time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH}
-   if [ $? -ne 0 ] ; then
-      error_message="ERROR failed: time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH} failed"
-      echo $error_message >> $HOME/stop.mirror.cmssw.git
-      echo $error_message
-      printf "$(basename $0) time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH} failed failed \n" | mail -s "$(basename $0) time rsync -arzuvp $CMSSW_MIRROR_PATH_NEW/ ${CMSSW_MIRROR_PATH} failed" $notifytowhom
-      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-      exit 1
-   fi
-
-
-   echo INFO check $CMSSW_MIRROR_PATH
-   echo INFO check $CMSSW_MIRROR_PATH_NEW
-   #echo INFO cehck $CMSSW_MIRROR_PATH_BACKUP
-   #exit 0
-
-   i=$(expr $i + 1)
-   echo INFO "[ $i ]" all move in place. Publishing the cvmfs now....
-
-else
-   echo DEBUG cloning bare mirror
-   git clone --mirror --bare https://github.com/cms-sw/cmssw.git $CMSSW_MIRROR_PATH
-   if [ $? -ne 0 ] ; then
-      echo ERROR failed: git clone --mirror --bare https://github.com/cms-sw/cmssw.git $CMSSW_MIRROR_PATH
-      printf "$(basename $0) git repack -a -d --max-pack-size 20m failed \n" | mail -s "$(basename $0) git clone failed" $notifytowhom
-      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-      exit 1
-   fi
-   # [1] Split the chunk for the better cvmfs performance
-   echo DEBUG splitting chunks
-   ( cd $CMSSW_MIRROR_PATH
-     #git repack -a -d --window-memory 10m --max-pack-size 20m
-     git repack -a -d --max-pack-size 20m
-     exit $?
-   )
-   status=$?
-
-   if [ $status -ne 0 ] ; then
-      echo ERROR failed: git repack -a -d --max-pack-size 20m
-      printf "$(basename $0) git repack -a -d --max-pack-size 20m failed \n" | mail -s "$(basename $0) git repack failed" $notifytowhom
-      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-      exit 1
-   fi
-
-   echo DEBUG git repack status=$status
-
-   #[2] then, from time to time, I would execute this
-   ( cd $CMSSW_MIRROR_PATH
-     echo DEBUG executing git remote update origin
-     git remote update origin
-     status=$?
-     if [ $status -ne 0 ] ; then
-        echo ERROR failed: git remote update origin
-        printf "$(basename $0) git remote update origin failed \n" | mail -s "$(basename $0) git remote update origin failed" $notifytowhom
-        exit $status
-     fi
-     echo DEBUG executing git repack -a -d --max-pack-size 20m
-     git repack -a -d --max-pack-size 20m
-     exit $?
-   )
-   if [ $? -ne 0 ] ; then
-      echo ERROR failed: git repack -a -d --max-pack-size 20m
-      printf "$(basename $0) git repack -a -d --max-pack-size 20m failed\n" | mail -s "$(basename $0) git repack -a -d --max-pack-size 20m failed" $notifytowhom
-      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-      exit 1
-   fi
-
-   echo DEBUG writing a README file
-   echo /cvmfs/cms.cern.ch/cmssw.git: manually updated on demand > $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
-   echo "(See /cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates)" >> $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
-   echo /cvmfs/cms.cern.ch/cmssw.git.daily: daily updated >> $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
-   echo "(See /cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates)" >> $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
-   echo "Also," >> $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
-   echo Please refer to >> $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
-   echo http://cms-sw.github.io/cmssw/advanced-usage.html >> $(dirname $CMSSW_MIRROR_PATH)/README.cmssw.git
-   
-   echo DEBUG executing time cvmfs_server publish
-
-fi
-
-# echo "$(basename $CMSSW_MIRROR_PATH) noarch $(/bin/date +%s) $(/bin/date -u)" >> $updated_list
-
-echo INFO executing time cvmfs_server publish
-
-currdir=$(pwd)
-cd
-time cvmfs_server publish 2>&1 |  tee $HOME/cvmfs_server+publish.log
-status=$?
-cd $currdir
-
-if [ $status -ne 0 ] ; then
-   echo ERROR failed: cvmfs_server publish
-   printf "$(basename $0) time cvmfs_server publish failed \n" | mail -s "$(basename $0) git repack -a -d --max-pack-size 20m" $notifytowhom
-   ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-   exit 1
-fi
-#printf "$(basename $0) $(basename $0) $1 executed \n$(cat $HOME/update_cmssw_git_mirror.daily.log)\n" | mail -s "$(basename $0) $(basename $0) $1 executed" $notifytowhom
-exit 0
+####### ENDIN Functions 12345
