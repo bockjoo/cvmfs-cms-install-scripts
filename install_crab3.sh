@@ -2,8 +2,8 @@
 # 0.2.6 : curl
 # 0.2.7 : clean up
 # 0.2.8 : fix crab_init.sh and crab_init.csh linking
-# version=0.2.8
-install_crab3_version=0.2.8
+# version=0.2.9
+install_crab3_version=0.2.9
 ###################################################################
 #                                                                 #
 export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
@@ -155,20 +155,37 @@ if [ $? -eq 0 ] ; then
   i=$(expr $i + 1)
   echo "${RELEASE}" | grep -q -e "pre\|rc"
   [ $? -eq 0 ] && pre_or_not="_pre"
-  for sh_type in sh csh ; do
-     for thetype in "" _light ; do
-       echo "[ $i ]" sh=$sh_type thetype=$thetype
-       echo DEBUG removing $MYTESTAREA/crab${gccv}${pre_or_not}${thetype}.${sh_type}
-       rm -f $MYTESTAREA/crab${gccv}${pre_or_not}${thetype}.${sh_type}
+  #0.2.8 for sh_type in sh csh ; do
+  #   for thetype in "" _light ; do
+  #     echo "[ $i ]" sh=$sh_type thetype=$thetype
+  #     echo DEBUG removing $MYTESTAREA/crab${gccv}${pre_or_not}${thetype}.${sh_type}
+  #     rm -f $MYTESTAREA/crab${gccv}${pre_or_not}${thetype}.${sh_type}
+  #     ( cd $MYTESTAREA
+  #       if [ "x$thetype" == "x" ] ; then
+  #            ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${RELEASE}/etc/profile.d/init$(echo "${thetype}" | sed 's#_#-#').${sh_type} crab${gccv}${pre_or_not}${thetype}.${sh_type}
+  #       else
+  #            ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${RELEASE}/etc/init$(echo "${thetype}" | sed 's#_#-#').${sh_type} crab${gccv}${pre_or_not}${thetype}.${sh_type}
+  #       fi
+  #     )
+  #     echo INFO "[$i]" Check $MYTESTAREA/crab${gccv}${pre_or_not}${thetype}.${sh_type}
+  #     ls -al $MYTESTAREA/crab${gccv}${pre_or_not}${thetype}.${sh_type}
+  #     echo ; echo
+  #   done
+  #done
+  for what in "" _standalone ; do
+     for f in /cvmfs/cms.cern.ch/crab3/crab${pre_or_not}${what}.*sh ; do
+       echo "[ $i ]" f=$f
+       real_file=$(ls -al $f | awk '{print $NF}')
+       PREVIOUS_RELEASE=$(echo $real_file | cut -d/ -f8)
+       echo DEBUG PREVIOUS_RELEASE=$PREVIOUS_RELEASE RELEASE=$RELEASE
+       echo DEBUG removing $f
+       rm -f $f       
        ( cd $MYTESTAREA
-         if [ "x$thetype" == "x" ] ; then
-              ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${RELEASE}/etc/profile.d/init$(echo "${thetype}" | sed 's#_#-#').${sh_type} crab${gccv}${pre_or_not}${thetype}.${sh_type}
-         else
-              ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${RELEASE}/etc/init$(echo "${thetype}" | sed 's#_#-#').${sh_type} crab${gccv}${pre_or_not}${thetype}.${sh_type}
-         fi
+         real_file=$(ls -al $f | awk '{print $NF}')
+         ln -s $(echo $real_file | sed "s#$PREVIOUS_RELEASE#$RELEASE#") $(basename $f)
        )
-       echo INFO "[$i]" Check $MYTESTAREA/crab${gccv}${pre_or_not}${thetype}.${sh_type}
-       ls -al $MYTESTAREA/crab${gccv}${pre_or_not}${thetype}.${sh_type}
+       echo INFO "[$i]" Check $f
+       ls -al $f
        echo ; echo
      done
   done

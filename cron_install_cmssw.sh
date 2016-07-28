@@ -49,8 +49,9 @@
 # 1.7.2: use cmspkg instead of apt-get
 # 1.7.3: Cleanup OSX stuffs
 # 1.7.4: Docker for slc7
-# version 1.7.4
-version=1.7.4
+# 1.7.5: CRAB3 client installation is sent to the email
+# version 1.7.5
+version=1.7.5
 
 # Basic Configs
 WORKDIR=/cvmfs/cms.cern.ch
@@ -3368,8 +3369,9 @@ function install_crab3 () {
            return 1
         fi
         echo INFO installing $release under $VO_CMS_SW_DIR : install_crab3.sh $VO_CMS_SW_DIR $release ${crab3_REPO}
-        $HOME/install_crab3.sh $VO_CMS_SW_DIR $release ${crab3_REPO}
+        $HOME/install_crab3.sh $VO_CMS_SW_DIR $release ${crab3_REPO} > $HOME/logs/install_crab3.${release}.log 2>&1
         status=$?
+        printf "New CRAB3 Client Installed\n$(cat $HOME/logs/install_crab3.${release}.log | sed 's#%#%%#g')\n" | mail -s "INFO: New CRAB3 Client Installed" $notifytowhom
         if [ $status -eq 0 ] ; then
            grep -q "crabclient $release " $updated_list
            if [ $? -eq 0 ] ; then
