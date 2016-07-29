@@ -504,7 +504,7 @@ echo INFO Done CMSSW installation part of the script
 # [] siteconf
 echo INFO Next check_and_update_siteconf using gitlab
 echo
-check_and_update_siteconf > $HOME/check_and_update_siteconf.log 2>&1
+check_and_update_siteconf > $HOME/logs/check_and_update_siteconf.log 2>&1
 echo INFO Done check_and_update_siteconf using gitlab
 echo
 
@@ -3564,8 +3564,9 @@ function install_slc6_amd64_gcc493_crab3 () {
      fi
      printf "install_slc6_amd64_gcc493_crab3() installing crabclient ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n" | mail -s "[0] install_slc6_amd64_gcc493_crab3() installing crabclient ${release}" $notifytowhom
      echo INFO installing $release under $VO_CMS_SW_DIR : install_crab3.sh $VO_CMS_SW_DIR $release ${crab3_REPO} ${crab3_SCRAM_ARCH}
-     $HOME/install_crab3.sh $VO_CMS_SW_DIR $release ${crab3_REPO} ${crab3_SCRAM_ARCH} > $HOME/install_crab3.log 2>&1
+     $HOME/install_crab3.sh $VO_CMS_SW_DIR $release ${crab3_REPO} ${crab3_SCRAM_ARCH} > $HOME/logs/install_crab3.${release}.log 2>&1
      status=$?
+     printf "New CRAB3 Client Installed with status=$?\n$(cat $HOME/logs/install_crab3.${release}.log | sed 's#%#%%#g')\n" | mail -s "INFO: New CRAB3 Client Installed" $notifytowhom
      #cp /dev/null $HOME/install_crab3.log
      echo DEBUG status=$status at install_slc6_amd64_gcc493_crab3
      if [ $status -eq 0 ] ; then
@@ -3596,11 +3597,11 @@ function install_slc6_amd64_gcc493_crab3 () {
              grep -q "CMSSW_crabclient ${release}+${crab3_SCRAM_ARCH}" "$HOME/${crab3_SCRAM_ARCH}.rsync.ready"
              [ $? -eq 0 ] || echo "CMSSW_crabclient ${release}+${crab3_SCRAM_ARCH}" >> "$HOME/${crab3_SCRAM_ARCH}.rsync.ready"
            fi
-           printf "install_slc6_amd64_gcc493_crab3() crabclient ${release}+${crab3_SCRAM_ARCH} installed from $(/bin/hostname -f)\n$(cat $HOME/install_crab3.log | sed 's#%#%%#g')\n" | mail -s "[1] install_slc6_amd64_gcc493_crab3() crabclient INSTALLED" $notifytowhom
+           printf "install_slc6_amd64_gcc493_crab3() crabclient ${release}+${crab3_SCRAM_ARCH} installed from $(/bin/hostname -f)\n$(cat $HOME/install_crab3.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] install_slc6_amd64_gcc493_crab3() crabclient INSTALLED" $notifytowhom
            #echo INFO no cvmfs server. will tell the main script not to publish
         fi
      else
-           printf "FAILED: install_slc6_amd64_gcc493_crab3() crabclient ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/install_crab3.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_crab3() crabclient installation" $notifytowhom
+           printf "FAILED: install_slc6_amd64_gcc493_crab3() crabclient ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/install_crab3.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_crab3() crabclient installation" $notifytowhom
      fi
      #break
   done
@@ -3963,7 +3964,7 @@ function check_and_update_siteconf () {
       return 1
    fi
    rm -f $HOME/cvmfs_check_and_update_siteconf.log
-   $HOME/cvmfs_check_and_update_siteconf.sh $rsync_source $HOME/.AUTH_TKN $notifytowhom > $HOME/cvmfs_check_and_update_siteconf.log 2>&1
+   $HOME/cvmfs_check_and_update_siteconf.sh $rsync_source $HOME/.AUTH_TKN $notifytowhom > $HOME/logs/cvmfs_check_and_update_siteconf.log 2>&1
    status=$?
    if [ $status -ne 0 ] ; then
       printf "$what failed  $HOME/cvmfs_check_and_update_siteconf.sh\n$(cat $HOME/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "ERROR: $what cvmfs_check_and_update_siteconf.sh execution failed" $notifytowhom

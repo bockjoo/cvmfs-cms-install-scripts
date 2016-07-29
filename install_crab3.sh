@@ -177,12 +177,13 @@ if [ $? -eq 0 ] ; then
        echo "[ $i ]" f=$f
        real_file=$(ls -al $f | awk '{print $NF}')
        PREVIOUS_RELEASE=$(echo $real_file | cut -d/ -f8)
+       FILE_TO_LINK=$(echo $real_file | sed "s#$PREVIOUS_RELEASE#$RELEASE#")
+       echo DEBUG f=$f real_file=$real_file
        echo DEBUG PREVIOUS_RELEASE=$PREVIOUS_RELEASE RELEASE=$RELEASE
        echo DEBUG removing $f
-       rm -f $f       
+       rm -f $f
        ( cd $MYTESTAREA
-         real_file=$(ls -al $f | awk '{print $NF}')
-         ln -s $(echo $real_file | sed "s#$PREVIOUS_RELEASE#$RELEASE#") $(basename $f)
+         ln -s $FILE_TO_LINK $(basename $f)
        )
        echo INFO "[$i]" Check $f
        ls -al $f
@@ -263,3 +264,18 @@ fi # if [ "x$cvmfs_server_yes" == "xyes" ] ; then
 #fi # if $updated_list exists thus cvmfs server
 
 exit $status
+if [ ] ; then
+cvmfs_server transaction
+cd /cvmfs/cms.cern.ch/crab3
+rm -f crab.sh 
+ln -s /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1607.patch2/etc/init-light.sh crab.sh
+rm -f crab.csh 
+ln -s /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1607.patch2/etc/init-light.csh crab.csh
+rm -f crab_standalone.sh
+ln -s  /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1607.patch2/etc/profile.d/init.sh crab_standalone.sh
+rm -f crab_standalone.csh
+ln -s  /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1607.patch2/etc/profile.d/init.csh crab_standalone.csh
+vi /cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
+cd
+cvmfs_server publish
+fi # if [ ] ; then
