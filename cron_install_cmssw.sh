@@ -488,8 +488,8 @@ for arch in $archs ; do
 done
 
 # [] install power arch
-echo INFO "executing install_cmssw_power_archs 2>&1 | tee  $HOME/install_cmssw_power_archs.log"
-install_cmssw_power_archs 2>&1 | tee  $HOME/install_cmssw_power_archs.log
+echo INFO "executing install_cmssw_power_archs 2>&1 | tee  $HOME/logs/install_cmssw_power_archs.log"
+install_cmssw_power_archs 2>&1 | tee  $HOME/logs/install_cmssw_power_archs.log
 
 # [] install slc aarch
 echo INFO executing "install_cmssw_aarch64_archs 2>&1 | tee $HOME/logs/cvmfs_install_aarch64.log"
