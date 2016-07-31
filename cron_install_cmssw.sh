@@ -521,12 +521,12 @@ echo INFO Next LHAPDF update will be checked and updated as needed
 echo
 
 # [] lhapdf
-$HOME/cron_download_lhapdf.sh 2>&1 | tee $HOME/cron_download_lhapdf.log
+$HOME/cron_download_lhapdf.sh 2>&1 | tee $HOME/logs/cron_download_lhapdf.log
 lha_pdfsets_version=$(grep ^lhapdfweb_updates= $HOME/cron_download_lhapdf.sh | awk '{print $NF}' | cut -d\" -f1)
-grep -q "INFO publishing" $HOME/cron_download_lhapdf.log
+grep -q "INFO publishing" $HOME/logs/cron_download_lhapdf.log
 if [ $? -eq 0 ] ; then
-   if [ ! -f $HOME/cron_download_lhapdf.${lha_pdfsets_version}.log ] ; then
-      cp $HOME/cron_download_lhapdf.log $HOME/logs/cron_download_lhapdf.${lha_pdfsets_version}.log
+   if [ ! -f $HOME/logs/cron_download_lhapdf.${lha_pdfsets_version}.log ] ; then
+      cp $HOME/logs/cron_download_lhapdf.log $HOME/logs/cron_download_lhapdf.${lha_pdfsets_version}.log
    fi
 fi
 echo

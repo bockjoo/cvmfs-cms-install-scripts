@@ -119,15 +119,15 @@ function create_lhapdf_softlink () {
    cp ${lhapdf_top}/checksum_pdfsets_${installed}.txt ${lhapdf_top}/checksum_pdfsets_${what}.txt
    return 0
 }
-
-echo INFO LOG $HOME/cron_download_lhapdf.log
+THELOG=$HOME/logs/cron_download_lhapdf.log
+echo INFO LOG $THELOG
 echo INFO db $db
 echo INFO updated_list $VO_CMS_SW_DIR/cvmfs-cms.cern.ch-updates
 #$(wget --no-check-certificate -q -O- ${lhapdfweb}/pdfsets/ | grep folder.gif | grep -v current | sed 's#href="#|#g' | cut -d\| -f2 | cut -d/ -f1)
 
 #printf "$(basename $0) Starting cvmfs_server transaction for cron_download_lhapdf.sh\n" | mail -s "cvmfs_server transaction started" $notifytowhom
 cvmfs_server transaction 2>&1
-[ $? -eq 0 ] || { printf "$(basename $0) ERROR cvmfs_server transaction failed\n$(cat $HOME/cron_download_lhapdf.log | sed 's#%#%%#g')\nChecking ps\n$(ps auxwww | sed 's#%#%%#g' | grep $(/usr/bin/whoami) | grep -v grep)\n" | mail -s "$(basename $0) cvmfs_server transaction lock failed" $notifytowhom ; exit 1 ; } ;
+[ $? -eq 0 ] || { printf "$(basename $0) ERROR cvmfs_server transaction failed\n$(cat $THELOG | sed 's#%#%%#g')\nChecking ps\n$(ps auxwww | sed 's#%#%%#g' | grep $(/usr/bin/whoami) | grep -v grep)\n" | mail -s "$(basename $0) cvmfs_server transaction lock failed" $notifytowhom ; exit 1 ; } ;
 if [ ] ; then
 status=$?
 what="$(basename $0)"
@@ -148,7 +148,7 @@ for v in $releases $lhapdfweb_updates ; do
    if [ $begin_transaction -eq 0 ] ; then
      #printf "$(basename $0) Starting cvmfs_server transaction for cron_download_lhapdf.sh $v\n" | mail -s "cvmfs_server transaction started" $notifytowhom
      cvmfs_server transaction 2>&1
-     [ $? -eq 0 ] || { printf "$(basename $0) ERROR cvmfs_server transaction failed while doing lhapdf v=$v\n$(cat $HOME/cron_download_lhapdf.log | sed 's#%#%%#g')\nChecking ps\n$(ps auxwww | sed 's#%#%%#g' | grep $(/usr/bin/whoami) | grep -v grep)\n" | mail -s "$(basename $0) cvmfs_server transaction lock failed" $notifytowhom ; exit 1 ; } ;
+     [ $? -eq 0 ] || { printf "$(basename $0) ERROR cvmfs_server transaction failed while doing lhapdf v=$v\n$(cat $THELOG | sed 's#%#%%#g')\nChecking ps\n$(ps auxwww | sed 's#%#%%#g' | grep $(/usr/bin/whoami) | grep -v grep)\n" | mail -s "$(basename $0) cvmfs_server transaction lock failed" $notifytowhom ; exit 1 ; } ;
 if [ ] ; then
      status=$?
      what="$(basename $0) for $v"
@@ -301,7 +301,7 @@ fi # if [ ]
         exit $status        
       )
       if [ $? -ne 0 ] ; then
-          printf "$(basename $0) ERROR failed : $f\nTry wget -q --no-check-certificate -O $lhapdf_top/${dest_nested_catalog}/$f  ${lhapdfweb}/$dest/$f\n$(cat $HOME/cron_download_lhapdf.log | sed 's#%#%%#g')" | mail -s "$(basename $0) Unpacking failed" $notifytowhom
+          printf "$(basename $0) ERROR failed : $f\nTry wget -q --no-check-certificate -O $lhapdf_top/${dest_nested_catalog}/$f  ${lhapdfweb}/$dest/$f\n$(cat $THELOG | sed 's#%#%%#g')" | mail -s "$(basename $0) Unpacking failed" $notifytowhom
 
          # 0.1.6 20NOV2014 soft-link manipulation
          if [ "x$dest_temp" != "x" ] ; then
@@ -511,16 +511,16 @@ fi # if [ ]
    
    currdir=$(pwd)
    cd
-   time cvmfs_server publish 2>&1 |  tee $HOME/cvmfs_server+publish+lhapdf.log
+   time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish+lhapdf.log
    status=$?
    cd $currdir
    if [ $status -eq 0 ] ; then
-      printf "$(basename $0) cvmfs_server_publish OK \n$(cat $HOME/cvmfs_server+publish+lhapdf.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish for $dest OK" $notifytowhom
+      printf "$(basename $0) cvmfs_server_publish OK \n$(cat $HOME/logs/cvmfs_server+publish+lhapdf.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish for $dest OK" $notifytowhom
       begin_transaction=0
-      cp $HOME/cron_download_lhapdf.log $HOME/cron_download_lhapdf+${dest_nested_catalog}.log
+      cp $THELOG $HOME/logs/cron_download_lhapdf+${dest_nested_catalog}.log
    else
       echo ERROR failed cvmfs_server publish
-      printf "$(basename $0) cvmfs_server publish failed\n$(cat $HOME/cvmfs_server+publish+lhapdf.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish failed" $notifytowhom
+      printf "$(basename $0) cvmfs_server publish failed\n$(cat $HOME/logs/cvmfs_server+publish+lhapdf.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish failed" $notifytowhom
       ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
       exit 1
    fi
