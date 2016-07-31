@@ -78,7 +78,7 @@ echo INFO $(basename $0) going to cvmfs write mode cvmfs_server transaction
 cvmfs_server transaction
 if [ $? -ne 0 ] ; then
    echo ERROR cvmfs_server transaction failed. Exiting $(basename $0)...
-   printf "$(basename $0): cvfms_server transaction failed to install $CMSSW_RELEASE ${SCRAM_ARCH}\n$(cat $HOME/cvmfs_install_aarch64.log | sed 's#%#%%#g')\n" | mail -s "ERROR installation of $CMSSW_RELEASE ${SCRAM_ARCH} failed " $notifytowhom
+   printf "$(basename $0): cvfms_server transaction failed to install $CMSSW_RELEASE ${SCRAM_ARCH}\n$(cat $HOME/logs/cvmfs_install_aarch64.log | sed 's#%#%%#g')\n" | mail -s "ERROR installation of $CMSSW_RELEASE ${SCRAM_ARCH} failed " $notifytowhom
    exit 1
 fi
 
@@ -129,7 +129,7 @@ echo INFO executing cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+
 cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+$CMSSW_RELEASE > $HOME/logs/cmspkg_install.log 2>&1 ; \
 [ \$? -eq 0 ] || { echo cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+$CMSSW_RELEASE failed ; cat $HOME/logs/cmspkg_install.log ; echo proot_status=1 ; exit 1 ; } ; \
 cat $HOME/logs/cmspkg_install.log ; \
-echo proot_status=0" > $HOME/POWER8/proot.aarch64.log 2>&1 &
+echo proot_status=0" > $HOME/logs/proot.aarch64.log 2>&1 &
 job_pid=$!
 
 second_plus=
@@ -140,7 +140,7 @@ n=10800 # 180 minues
 i=0
 nkill=0
 while [ $i -lt $n ] ;do
-   status=$(grep proot_status= $HOME/POWER8/proot.aarch64.log | cut -d= -f2)
+   status=$(grep proot_status= $HOME/logs/proot.aarch64.log | cut -d= -f2)
    if [ "x$status" != "x" ] ; then
       [ $status -eq 0 ] || break
    fi 
@@ -172,7 +172,7 @@ wait $job_pid
 status_job_pid=$?
 if [ $nkill -eq 2 ] ; then
    #echo INFO after killing  projectAreaRename.pl executing it from x86_64
-   build_hash=$(grep BUILDROOT $HOME/POWER8/proot.aarch64.log | head -1 | awk '{print $(NF-2)}' | sed 's#/# #g' | awk '{print $(NF-2)}')
+   build_hash=$(grep BUILDROOT $HOME/logs/proot.aarch64.log | head -1 | awk '{print $(NF-2)}' | sed 's#/# #g' | awk '{print $(NF-2)}')
    echo INFO after killing  projectAreaRename.pl executing it from x86_64 $HOME/cvmfs_postinstall_POWER8.sh $CMSSW_RELEASE $SCRAM_ARCH $build_hash
    $HOME/cvmfs_postinstall_POWER8.sh $CMSSW_RELEASE $SCRAM_ARCH $build_hash > $HOME/cvmfs_postinstall_POWER8.${CMSSW_RELEASE}.${SCRAM_ARCH}.${build_hash}.log 2>&1
 fi
@@ -182,7 +182,7 @@ wait $job_pid
 status_job_pid=$?
 
 
-status=$(grep proot_status= $HOME/POWER8/proot.aarch64.log | cut -d= -f2) 
+status=$(grep proot_status= $HOME/logs/proot.aarch64.log | cut -d= -f2) 
 echo status=$status status_job_pid=$status_job_pid
 
 echo INFO proot install status=$status

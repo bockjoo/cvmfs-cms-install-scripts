@@ -492,8 +492,8 @@ echo INFO "executing install_cmssw_power_archs 2>&1 | tee  $HOME/install_cmssw_p
 install_cmssw_power_archs 2>&1 | tee  $HOME/install_cmssw_power_archs.log
 
 # [] install slc aarch
-echo INFO executing "install_cmssw_aarch64_archs 2>&1 | tee $HOME/cvmfs_install_aarch64.log"
-install_cmssw_aarch64_archs 2>&1 | tee $HOME/cvmfs_install_aarch64.log
+echo INFO executing "install_cmssw_aarch64_archs 2>&1 | tee $HOME/logs/cvmfs_install_aarch64.log"
+install_cmssw_aarch64_archs 2>&1 | tee $HOME/logs/cvmfs_install_aarch64.log
 
 echo
 echo INFO Done CMSSW installation part of the script
@@ -889,7 +889,7 @@ function install_cmssw_aarch64_archs_apt () {
             [ $? -eq 0 ] && { echo INFO $cmssw_release $a installed according to the $updated_list ; continue ; } ;
             echo INFO $cmssw_release $a needs to be installed
             echo INFO executing $HOME/cvmfs_install_aarch64.sh "$a" "$cmssw_release"
-            $HOME/cvmfs_install_aarch64_apt.sh "$a" "$cmssw_release" 2>&1 | tee $HOME/POWER8/cvmfs_install_POWER8.${a}.${cmssw_release}.log
+            $HOME/cvmfs_install_aarch64_apt.sh "$a" "$cmssw_release" 2>&1 | tee $HOME/logs/cvmfs_install_POWER8.${a}.${cmssw_release}.log
         done
     done
     return 0
