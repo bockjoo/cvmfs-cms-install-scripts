@@ -1,7 +1,7 @@
 #!/bin/bash
-# versiono 0.1.4
-version=0.1.4
-notifytowhom=bockjoo@phys.ufl.edu
+# versiono 0.1.5
+version=0.1.5
+source $HOME/cron_install_cmssw.config # notifytowhom
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
 
 #
@@ -223,14 +223,15 @@ echo DEBUG check point will execute
 #rm -f $HOME/rsync+generator+package+from+eos.log
 #rsync -arzuvp $rsync_source $(dirname $rsync_name) 2>&1 | tee $HOME/rsync+generator+package+from+eos.log
 echo rsync -arzuvp --delete $rsync_source $(dirname $rsync_name)
-rm -f $HOME/rsync+generator+package+from+eos.log
-rsync -arzuvp --delete $rsync_source $(dirname $rsync_name) > $HOME/rsync+generator+package+from+eos.log 2>&1
+thelog=$HOME/logs/rsync+generator+package+from+eos.log
+rm -f $thelog
+rsync -arzuvp --delete $rsync_source $(dirname $rsync_name) > $thelog 2>&1
 status=$?
-cat $HOME/rsync+generator+package+from+eos.log
+cat $thelog
 if [ $status -eq 0 ] ; then
    publish_needed=0
    i=0
-   for f in $(grep ^$(basename $rsync_source) $HOME/rsync+generator+package+from+eos.log 2>/dev/null) ; do
+   for f in $(grep ^$(basename $rsync_source) $thelog 2>/dev/null) ; do
       i=$(expr $i + 1)
       [ -f "$(dirname $rsync_name)/$f" ] || { echo "[ $i ] " $(dirname $rsync_name)/$f is not a file $publish_needed ; continue ; } ;
       publish_needed=1
@@ -276,16 +277,16 @@ if [ $status -eq 0 ] ; then
       echo INFO publishing $rsync_name
       currdir=$(pwd)
       cd
-      time cvmfs_server publish 2>&1 |  tee $HOME/cvmfs_server+publish+rsync+generator+package+from+eos.log
+      time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log
       status=$?
       cd $currdir
       if [ $status -eq 0 ] ; then
          #printf "$(basename $0) cvmfs_server_publish OK \n$(cat $HOME/cvmfs_server+publish+rsync+generator+package+from+eos.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish for $package OK" $notifytowhom
-         printf "$(basename $0) cvmfs_server_publish OK \n$(cat $HOME/cvmfs_server+publish+rsync+generator+package+from+eos.log | sed 's#%#%%#g')\n"
+         printf "$(basename $0) cvmfs_server_publish OK \n$(cat $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log | sed 's#%#%%#g')\n"
       else
          ( cd ; echo Warning deleting "$thestring" from $updated_list ; cic_del_line "$thestring" $updated_list ; ) ;
          echo ERROR failed cvmfs_server publish
-         printf "$(basename $0) cvmfs_server publish failed\n$(cat $HOME/cvmfs_server+publish+rsync+generator+package+from+eos.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish failed" $notifytowhom
+         printf "$(basename $0) cvmfs_server publish failed\n$(cat $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish failed" $notifytowhom
          ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
       fi
    fi

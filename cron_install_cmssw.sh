@@ -50,13 +50,13 @@
 # 1.7.3: Cleanup OSX stuffs
 # 1.7.4: Docker for slc7
 # 1.7.5: CRAB3 client installation is sent to the email
-# version 1.7.5
-version=1.7.5
+# 1.7.6: use config variables in the config
+# version 1.7.6
+version=1.7.6
 
 # Basic Configs
 WORKDIR=/cvmfs/cms.cern.ch
 cvmfs_server_yes=yes
-notifytowhom=bockjoo@phys.ufl.edu
 workdir=$HOME
 export THISDIR=$workdir
 
@@ -64,6 +64,7 @@ export THISDIR=$workdir
 #aarch64_tarball_web=http://davidlt.web.cern.ch/davidlt/vault/aarch64
 db=$HOME/$(basename $0 | sed "s#\.sh##g").db.txt
 [ -d $HOME/logs ] || mkdir -p $HOME/logs
+lock=$workdir/$(basename $0 | sed "s#\.sh##g").lock
 
 # This is a hack to add dev archs and cmssws to be installed
 # Add archs whenever a new cmssw is installed by checking extra archs for the cmssw
@@ -72,8 +73,8 @@ dev_arch_rpm_list=$HOME/$(basename $0 | sed "s#\.sh##g").dev.arch.rpm
 
 # More configs from the file
 if [ ! -f $HOME/cron_install_cmssw.config ] ; then
-   printf "$(basename $0) $HOME/cron_install_cmssw.confg not found\n" | mail -s "ERROR cron_install_cmssw.config not found" $notifytowhom
-   exit 1
+   #printf "$(basename $0) $HOME/cron_install_cmssw.confg not found\n" | mail -s "ERROR cron_install_cmssw.config not found" $notifytowhom
+   echo "$(basename $0) $HOME/cron_install_cmssw.confg not found" >> $lock
 fi
 cvmfs_server_name=$(grep cvmfs_server_name= $HOME/cron_install_cmssw.config | grep -v \# | cut -d= -f2)
 rpmdb_local_dir=$(grep rpmdb_local_dir= $HOME/cron_install_cmssw.config | grep -v \# | cut -d= -f2)
@@ -173,7 +174,7 @@ uname -a  | grep ^Linux | grep GNU/Linux | grep -q .el6
 uname -a  | grep ^Linux | grep GNU/Linux | grep -q .el7
 [ $? -eq 0 ] && which_slc=slc7
 
-lock=$workdir/$(basename $0 | sed "s#\.sh##g").lock
+#lock=$workdir/$(basename $0 | sed "s#\.sh##g").lock
 date_ymdhs=$(date +%Y-%m-%d_%H:%M)
 
 export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
@@ -244,7 +245,7 @@ else
 fi
 
 echo INFO creating $lock
-echo $(date -u) > $lock
+echo $(date -u) >> $lock
 [ -f $db ] || touch $db
 
 # [] Make sure this script run only on SL
