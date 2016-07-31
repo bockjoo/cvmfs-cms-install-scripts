@@ -18,13 +18,15 @@
 # versions Description
 # 0.1      Original
 # 0.2      Add more debug
-# version=0.2
+# 0.3      Use date command to calculate epochs timestamp
+# version=0.3
 # 
 # #############################################################################
 SKIP_SITES="T3_US_ANL"
 EXC_LOCK=""
 TMP_AREA="/tmp/cvmfs_tmp"
 ERR_FILE="/tmp/stcnf_$$.err"
+echo DEBUG TMP_AREA=$TMP_AREA
 trap 'exit 1' 1 2 3 15
 trap '(/bin/rm -rf ${EXC_LOCK} ${TMP_AREA} ${ERR_FILE}) 1> /dev/null 2>&1' 0
 
@@ -217,12 +219,14 @@ BEGIN{now=systime();brcs=0}
                   }
                   if(index(a[i],"\"last_activity_at\":")>0){
                      ts=substr(a[i],21,19)
+                     ts2=substr(a[i],21,19)
                      gsub("-"," ",ts);gsub("T"," ",ts);gsub(":"," ",ts)
+                     gsub("-","",ts2);gsub("T"," ",ts2)
                      tzn=substr(a[i],44,3)
                      last=mktime(ts)-3600*tzn
                   }
                }
-               if(site!="")printf "%s:%s\n",site,last
+               if(site!="")printf "%s:%s:%s\n",site,last,ts2
             }
             if(brcs==2)eobj=length(keys)-length(todo)
             brcs-=1
@@ -356,8 +360,37 @@ if [ ${SUCC} -eq 0 ]; then
 fi
 /bin/rm ${ERR_FILE} 1>/dev/null 2>&1
 #
+#echo DEBUG /bin/rm -f ${TMP_AREA}/.timestamp
 /bin/rm -f ${TMP_AREA}/.timestamp
-/usr/bin/awk -f ${TMP_AREA}/gitlab.awk ${TMP_AREA}/gitlab_*.json 1>${TMP_AREA}/.timestamp
+#echo DEBUG ${TMP_AREA}/gitlab_\*.json
+#for f in ${TMP_AREA}/gitlab_\*.json ; do
+#   echo DEBUG $f
+#done
+#echo DEBUG /usr/bin/awk -f ${TMP_AREA}/gitlab.awk ${TMP_AREA}/gitlab_\*.json
+#/usr/bin/awk -f ${TMP_AREA}/gitlab.awk ${TMP_AREA}/gitlab_*.json 1>${TMP_AREA}/.timestamp
+/usr/bin/awk -f ${TMP_AREA}/gitlab.awk ${TMP_AREA}/gitlab_*.json 1>${TMP_AREA}/.timestamp1
+
+while read line ; do
+   site=$(echo $line | cut -d: -f1)
+   t1=$(echo $line | cut -d: -f2)
+   t2=$(echo $line | cut -d: -f3-)
+   #[ "x$site" == "xT2_CH_CERN_HLT" ] && { t2cern=$(expr $(date --date "$t2" +%s) + 3600) ; echo ${site}:$t2cern ; continue ; }
+   echo ${site}:$(date --date "$t2" +%s)
+done < ${TMP_AREA}/.timestamp1 > ${TMP_AREA}/.timestamp
+#cp ${TMP_AREA}/.timestamp2 ${TMP_AREA}/.timestamp
+echo DEBUG timestamp1
+cat ${TMP_AREA}/.timestamp1
+echo DEBUG timestamp
+cat ${TMP_AREA}/.timestamp
+
+#echo DEBUG content of timestamp at $(date)
+#ls -al ${TMP_AREA}/.timestamp
+
+#cat ${TMP_AREA}/.timestamp
+#cp ${TMP_AREA}/gitlab_*.json $HOME/
+#cp ${TMP_AREA}/gitlab.awk $HOME/
+
+#echo DEBUG /bin/rm ${TMP_AREA}/gitlab_\*.json
 /bin/rm ${TMP_AREA}/gitlab_*.json
 # #############################################################################
 
@@ -368,8 +401,9 @@ echo "[4] loop over SYNC_DIR ${SYNC_DIR} CMS sites and remove sites no longer in
 # ==================================================================
 /bin/cp /dev/null ${ERR_FILE} 1>/dev/null 2>&1
 FAIL=0
-SYC_LIST=`(cd ${SYNC_DIR}/SITECONF; /bin/ls -d1 T?_??_*) 2>/dev/null`
-for SITE in ${SYC_LIST}; do
+SYNC_LIST=`(cd ${SYNC_DIR}/SITECONF; /bin/ls -d1 T?_??_*) 2>/dev/null`
+for SITE in ${SYNC_LIST}; do
+   echo DEBUG site=$SITE checking /bin/grep "^${SITE}\$" ${TMP_AREA}/sitedb.list
    /bin/grep "^${SITE}\$" ${TMP_AREA}/sitedb.list 1>/dev/null 2>&1
    if [ $? -ne 0 ]; then
       echo "Site \"${SITE}\" no longer in SiteDB, removing site area"
@@ -412,15 +446,18 @@ echo "[5] loop over SiteDB sites and update SYNC_DIR as needed"
 list_sites_updated=""
 FAIL=0
 for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
+   echo DEBUG doing SITE=$SITE
    NEWT=`/usr/bin/awk -F: '{if($1=="'${SITE}'"){print $2}}' ${TMP_AREA}/.timestamp 2>/dev/null`
    if [ -z "${NEWT}" ]; then
       # no repository for this SiteDB site
+      echo DEBUG SITE=$SITE no repository for this SiteDB site. Continuing...      
       continue
    fi
    if [ -f ${SYNC_DIR}/SITECONF/.timestamp ]; then
       OLDT=`/usr/bin/awk -F: '{if($1=="'${SITE}'"){print $2}}' ${SYNC_DIR}/SITECONF/.timestamp 2>/dev/null`
       if [ "${NEWT}" = "${OLDT}" ]; then
          # SYNC_DIR up-to-date
+         echo DEBUG SITE=$SITE SYNC_DIR up-to-date. Continuing... OLDT=$OLDT NEWT=$NEWT
          continue
       fi
    fi
@@ -436,7 +473,7 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
    echo "[5-1] Updating area of site \"${SITE}\":"
    UPPER=`echo ${SITE} | /usr/bin/tr '[:lower:]' '[:upper:]'`
    /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz 'https://gitlab.cern.ch/SITECONF/'${UPPER}'/repository/archive.tar.gz?ref=master' 1>>${ERR_FILE} 2>&1
-   RC=$?   
+   RC=$?
    if [ ${RC} -ne 0 ]; then
       /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz 'https://gitlab.cern.ch/SITECONF/'${UPPER}'/repository/archive.tar.gz?ref=master' 2>&1 | grep -q "Authorization failed"
       if [ $? -eq 0 ] ; then
@@ -475,11 +512,21 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
       fi
       continue
    fi
+   #[ "$SITE" == "T2_CH_CERN_HLT" ] && cp ${TMP_AREA}/archive_${SITE}.tgz $HOME/
    /bin/rm ${TMP_AREA}/archive_${SITE}.tgz
    #
    # avoid directory file update in case extracted files did not change
    /usr/bin/diff -r ${SYNC_DIR}/SITECONF/${SITE} ${SYNC_DIR}/SITECONF/${TAR_DIR} 1>/dev/null 2>&1
-   if [ $? -eq 0 ]; then
+   status=$?
+   echo DEBUG status=$status checking /usr/bin/diff -r ${SYNC_DIR}/SITECONF/${SITE} ${SYNC_DIR}/SITECONF/${TAR_DIR}
+   /usr/bin/diff -r ${SYNC_DIR}/SITECONF/${SITE} ${SYNC_DIR}/SITECONF/${TAR_DIR}
+   if [ "$SITE" == "T2_CH_CERN_HLT" ] ; then
+      echo cat ${SYNC_DIR}/SITECONF/${SITE}/JobConfig/site-local-config.xml 
+      cat ${SYNC_DIR}/SITECONF/${SITE}/JobConfig/site-local-config.xml 
+      echo cat ${SYNC_DIR}/SITECONF/${TAR_DIR}JobConfig/site-local-config.xml 
+      cat ${SYNC_DIR}/SITECONF/${TAR_DIR}JobConfig/site-local-config.xml 
+   fi
+   if [ $status -eq 0 ]; then
       # no file difference, keep old area
       echo "   no change to CVMFS files, keeping old area"
       /bin/rm -rf ${SYNC_DIR}/SITECONF/${TAR_DIR} 1>>${ERR_FILE} 2>&1

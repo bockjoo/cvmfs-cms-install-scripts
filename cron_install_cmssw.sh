@@ -3963,17 +3963,18 @@ function check_and_update_siteconf () {
       printf "check_and_update_siteconf() ERROR  $HOME/.AUTH_TKN does not exist \n" | mail -s "$what ERROR No Auth Token Found" $notifytowhom
       return 1
    fi
-   rm -f $HOME/cvmfs_check_and_update_siteconf.log
-   $HOME/cvmfs_check_and_update_siteconf.sh $rsync_source $HOME/.AUTH_TKN $notifytowhom > $HOME/logs/cvmfs_check_and_update_siteconf.log 2>&1
+   thelog=$HOME/logs/cvmfs_check_and_update_siteconf.log
+   rm -f $thelog
+   $HOME/cvmfs_check_and_update_siteconf.sh $rsync_source $HOME/.AUTH_TKN $notifytowhom > $thelog 2>&1
    status=$?
    if [ $status -ne 0 ] ; then
-      printf "$what failed  $HOME/cvmfs_check_and_update_siteconf.sh\n$(cat $HOME/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "ERROR: $what cvmfs_check_and_update_siteconf.sh execution failed" $notifytowhom
+      printf "$what failed  $HOME/cvmfs_check_and_update_siteconf.sh\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "ERROR: $what cvmfs_check_and_update_siteconf.sh execution failed" $notifytowhom
       return 1
    fi
    UPDATED_SITES=
-   eval $(grep UPDATED_SITES= $HOME/cvmfs_check_and_update_siteconf.log 2>/dev/null)
+   eval $(grep UPDATED_SITES= $thelog 2>/dev/null)
    if [ "x$UPDATED_SITES" == "x" ] ; then
-      echo INFO nothing to do
+      echo INFO nothing to do thelog=$thelog
       #printf "$what Nothing to update after executing $HOME/cvmfs_check_and_update_siteconf.sh\n$(cat $HOME/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "DEBUG : $what cvmfs_check_and_update_siteconf.sh execution shows no updated site" $notifytowhom
       return 0
    fi
@@ -3988,26 +3989,17 @@ function check_and_update_siteconf () {
       cd $currdir
       return 1
    fi
-   #if [ $(date +%Y%m%d%H) -ge 2016060102 ] ;  then
-   #   [ -d /cvmfs/cms.cern.ch/SITECONF.git ] || mv /cvmfs/cms.cern.ch/SITECONF /cvmfs/cms.cern.ch/SITECONF.git
-   #   [ -d /cvmfs/cms.cern.ch/SITECONF.gitlab ] && rm -rf /cvmfs/cms.cern.ch/SITECONF.gitlab
-   #   printf "check_and_update_siteconf() YmdH=$(date +%Y%m%d%H) -ge 2016060102? now Switching from git.cern.ch to gitlab.cern.ch\n"
-
-   #   printf "check_and_update_siteconf() YmdH=$(date +%Y%m%d%H) -ge 2016060102? now Switching from git.cern.ch to gitlab.cern.ch\n" | mail -s "check_and_update_siteconf() Warning Switching from git.cern.ch to gitlab for siteconf" $notifytowhom
-   #else
-   #   printf "check_and_update_siteconf() YmdH=$(date +%Y%m%d%H) -ge 2016060102? not Switching from git.cern.ch to gitlab.cern.ch yet for siteconf\n"
-   #   printf "check_and_update_siteconf() YmdH=$(date +%Y%m%d%H) -ge 2016060102? not Switching from git.cern.ch to gitlab.cern.ch yet for siteconf\n" | mail -s "check_and_update_siteconf() Warning not Switching from git.cern.ch to gitlab yet" $notifytowhom
-   #fi
    
    echo rsync -arzuvp ${rsync_source}/SITECONF/ $rsync_name
    #printf "$what rsync -arzuvp ${rsync_source}/SITECONF/ $rsync_name\n" | mail -s "DEBUG : $what rsync" $notifytowhom
    # rsync -arzuvp --delete ${rsync_source}/SITECONF/ $rsync_name > $HOME/cvmfs_check_and_update_siteconf_rsync.log 2>&1
-   rsync -arzuvp ${rsync_source}/SITECONF/ $rsync_name > $HOME/cvmfs_check_and_update_siteconf_rsync.log 2>&1
+   thelog=$HOME/logs/cvmfs_check_and_update_siteconf_rsync.log 
+   rsync -arzuvp ${rsync_source}/SITECONF/ $rsync_name > $thelog 2>&1
    if [ $? -eq 0 ] ; then
       publish_needed=0
       i=0
       #for f in $(grep ^$(basename $rsync_source) $HOME/cvmfs_check_and_update_siteconf_rsync.log | grep -v .git/ 2>/dev/null) ; do
-      for f in $(grep ^T[0-9] $HOME/cvmfs_check_and_update_siteconf_rsync.log | grep -v .git/ 2>/dev/null) ; do
+      for f in $(grep ^T[0-9] $thelog | grep -v .git/ 2>/dev/null) ; do
          i=$(expr $i + 1)
          #[ -f "$(dirname $rsync_name)/$f" ] || { echo "[ $i ] " $(dirname $rsync_name)/$f is not a file $publish_needed ; continue ; } ;
          [ -f "$rsync_name/$f" ] || { echo "[ $i ] " $rsync_name/$f is not a file $publish_needed ; continue ; } ;
@@ -4020,7 +4012,7 @@ function check_and_update_siteconf () {
       if [ $publish_needed -eq 0 ] ; then
          echo INFO publish was not needed, So ending the transaction
          ( cd ; cvmfs_server abort -f ; ) ;
-         printf "$what publish was not needed, though there are $UPDATED_SITES\nCheck $HOME/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "ERROR $what publish was not needed but with updated sites" $notifytowhom
+         printf "$what publish was not needed, though there are $UPDATED_SITES\nCheck $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/logs/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "ERROR $what publish was not needed but with updated sites" $notifytowhom
       else
          echo INFO publish necessary
          #printf "$what publish is needed UPDATED_SITES=$UPDATED_SITES\nCheck $HOME/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "DEBUG $what publish is necessary" $notifytowhom
@@ -4042,7 +4034,7 @@ function check_and_update_siteconf () {
             #printf "$what cvmfs_server_publish OK UPDATED_SITES=$UPDATED_SITES\nCheck $HOME/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "DEBUG $what cvmfs_server_publish OK" $notifytowhom
          else
             echo ERROR failed cvmfs_server publish
-            printf "$what cvmfs_server_publish failed UPDATED_SITES=$UPDATED_SITES\nCheck $HOME/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "ERROR $what cvmfs_server_publish failed" $notifytowhom
+            printf "$what cvmfs_server_publish failed UPDATED_SITES=$UPDATED_SITES\nCheck $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/logs/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "ERROR $what cvmfs_server_publish failed" $notifytowhom
             ( cd ; cvmfs_server abort -f ; ) ;
             return 1
          fi
