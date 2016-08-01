@@ -51,8 +51,9 @@
 # 1.7.4: Docker for slc7
 # 1.7.5: CRAB3 client installation is sent to the email
 # 1.7.6: use config variables in the config
-# version 1.7.6
-version=1.7.6
+# 1.7.7: log relocation
+# version 1.7.7
+version=1.7.7
 
 # Basic Configs
 WORKDIR=/cvmfs/cms.cern.ch
@@ -322,9 +323,9 @@ for thedir in $VO_CMS_SW_DIR/slc* ; do
  
       currdir=$(pwd)
       cd
-      time cvmfs_server publish 2>&1 |  tee $HOME/cvmfs_server+publish.log
+      time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
       cd $currdir
-      printf "install_crab3 () published  \n$(cat $HOME/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
+      printf "install_crab3 () published  \n$(cat $HOME/logs/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
    fi
 done
 
@@ -482,7 +483,7 @@ for arch in $archs ; do
           cd $currdir_1
         fi
      else
-        printf "$(basename $0): cvmfs_server publish failed for $cmssw $arch \n$(cat $HOME/cvmfs_server+publish+cmssw+install.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0): cvmfs_server publish failed" $notifytowhom
+        printf "$(basename $0): cvmfs_server publish failed for $cmssw $arch \n$(cat $HOME/logs/cvmfs_server+publish+cmssw+install.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0): cvmfs_server publish failed" $notifytowhom
      fi
   done
 done
@@ -2884,15 +2885,15 @@ function publish_cmssw_cvmfs () {
    fi
    #time cvmfs_server publish -r ${publish_release} 2>&1 | tee $HOME/cvmfs_server+publish+cmssw+install.log
    #export CVMFS_SERVER_DEBUG=3 
-   time cvmfs_server publish > $HOME/cvmfs_server+publish+cmssw+install.log 2>&1 # 2>&1 | tee $HOME/cvmfs_server+publish+cmssw+install.log
+   time cvmfs_server publish > $HOME/logs/cvmfs_server+publish+cmssw+install.log 2>&1 # 2>&1 | tee $HOME/cvmfs_server+publish+cmssw+install.log
    status=$?
    unset CVMFS_SERVER_DEBUG
    cd $currdir
    if [ $status -eq 0 ] ; then
-      printf "publish_cmssw_cvmfs () cvmfs_server_publish OK for $for_what \n$(cat $HOME/cvmfs_server+publish+cmssw+install.log | sed 's#%#%%#g')\n" | mail -s "publish_cmssw_cvmfs () cvmfs_server publish for cmssw install OK" $notifytowhom
+      printf "publish_cmssw_cvmfs () cvmfs_server_publish OK for $for_what \n$(cat $HOME/logs/cvmfs_server+publish+cmssw+install.log | sed 's#%#%%#g')\n" | mail -s "publish_cmssw_cvmfs () cvmfs_server publish for cmssw install OK" $notifytowhom
    else
       echo ERROR failed cvmfs_server publish
-      printf "publish_cmssw_cvmfs () cvmfs_server publish failed for $for_what\n$(cat $HOME/cvmfs_server+publish+cmssw+install.log | sed 's#%#%%#g')\nCheck ldd which curl\n$(ldd $(which curl))\n" | mail -s "publish_cmssw_cvmfs () failed" $notifytowhom
+      printf "publish_cmssw_cvmfs () cvmfs_server publish failed for $for_what\n$(cat $HOME/logs/cvmfs_server+publish+cmssw+install.log | sed 's#%#%%#g')\nCheck ldd which curl\n$(ldd $(which curl))\n" | mail -s "publish_cmssw_cvmfs () failed" $notifytowhom
       ( cd ; cvmfs_server abort -f ; ) ;
       return 1
    fi
@@ -2962,7 +2963,7 @@ function install_cms_common () {
             fi
             echo "CMSSW_cms_common_1.0+${cms_common_v} $cms_common_a $(/bin/date +%s) $(/bin/date -u)" >> $updated_list
             #cvmfs_server abort -f
-            time cvmfs_server publish > $HOME/cvmfs_server+publish.log 2>&1
+            time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
             status=$?
             cd $currdir
             if [ $status -eq 0 ] ; then
@@ -2975,7 +2976,7 @@ function install_cms_common () {
                  status=1
                fi
             else
-               printf "install_cms_common $(/bin/hostname -f) cms_common_1.0 $cms_common_v $cms_common_a installed\nInstallation Log:\n$(cat $HOME/cic_install_cms_common.log | sed 's#%#%%#g')\n$(cat $HOME/cvmfs_server+publish.log)\n" | /bin/mail -s "ERROR publish failed:install_cms_common cms_common_1.0 $cms_common_v $cms_common_a installed" $notifytowhom
+               printf "install_cms_common $(/bin/hostname -f) cms_common_1.0 $cms_common_v $cms_common_a installed\nInstallation Log:\n$(cat $HOME/cic_install_cms_common.log | sed 's#%#%%#g')\n$(cat $HOME/logs/cvmfs_server+publish.log)\n" | /bin/mail -s "ERROR publish failed:install_cms_common cms_common_1.0 $cms_common_v $cms_common_a installed" $notifytowhom
                 
             fi # if [ $status -eq 0 ] ; then
 
@@ -3071,7 +3072,7 @@ function cic_install_cms_common () {
      grep -q "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
      if [ $? -eq 0 ] ; then
         echo INFO $version found
-        time cvmfs_server publish > $HOME/cvmfs_server+publish.log 2>&1
+        time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
         status=$?
         cd $currdir
         return $status
@@ -3084,7 +3085,7 @@ function cic_install_cms_common () {
            grep -q "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
            status=$?
            if [ $status -eq 0 ] ; then
-              time cvmfs_server publish > $HOME/cvmfs_server+publish.log 2>&1
+              time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
               status=$?
               cd $currdir
               return $status
@@ -3103,7 +3104,7 @@ function cic_install_cms_common () {
      fi
 
      #cd $currdir
-     #time cvmfs_server publish > $HOME/cvmfs_server+publish.log 2>&1
+     #time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
      #return $?
   else
      echo ERROR cms-common version=$version installation failed
@@ -3127,7 +3128,7 @@ function cic_install_cms_common () {
   #cd $currdir
 
   #if [ $status -eq 0 ] ; then
-    #time cvmfs_server publish > $HOME/cvmfs_server+publish.log 2>&1
+    #time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
     #status=$?
     #rpm -qa | grep cms-common | grep -q ${version}
     #if [ $? -eq 0 ] ; then
@@ -3138,7 +3139,7 @@ function cic_install_cms_common () {
     #      echo INFO $version found
     #      #status=0
     #      #cd $currdir
-    #      time cvmfs_server publish > $HOME/cvmfs_server+publish.log 2>&1
+    #      time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
     #      return $?
     #   fi          
     #   cvmfs_server abort -f
@@ -3394,9 +3395,9 @@ function install_crab3 () {
               echo crabclient $release $(/bin/date +%s) $(/bin/date -u) >> $updated_list
               currdir=$(pwd)
               cd
-              time cvmfs_server publish 2>&1 |  tee $HOME/cvmfs_server+publish.log
+              time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
               cd $currdir
-              printf "install_crab3 () published  \n$(cat $HOME/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
+              printf "install_crab3 () published  \n$(cat $HOME/logs/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
            fi
         fi
      done
@@ -3435,9 +3436,9 @@ function install_slc6_crab3 () {
         echo crabclient $release ${crab3_SCRAM_ARCH} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
         currdir=$(pwd)
         cd
-        time cvmfs_server publish 2>&1 |  tee $HOME/cvmfs_server+publish.log
+        time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
         cd $currdir
-        printf "install_crab3 () published  \n$(cat $HOME/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
+        printf "install_crab3 () published  \n$(cat $HOME/logs/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
      fi
   done
 
@@ -3502,9 +3503,9 @@ function install_slc6_crab3 () {
            echo crabclient ${release} ${crab3_SCRAM_ARCH} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
            currdir=$(pwd)
            cd
-           time cvmfs_server publish 2>&1 |  tee $HOME/cvmfs_server+publish.log
+           time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
            cd $currdir
-           printf "install_crab3 () published  \n$(cat $HOME/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
+           printf "install_crab3 () published  \n$(cat $HOME/logs/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
            if [ "x$cvmfs_server_yes" == "xno" ] ; then # if [ ! -x /usr/bin/cvmfs_server ] ; then
              grep -q "CMSSW_crabclient ${release}+${crab3_SCRAM_ARCH}" "$HOME/${crab3_SCRAM_ARCH}.rsync.ready"
              [ $? -eq 0 ] || echo "CMSSW_crabclient ${release}+${crab3_SCRAM_ARCH}" >> "$HOME/${crab3_SCRAM_ARCH}.rsync.ready"
@@ -3591,9 +3592,9 @@ function install_slc6_amd64_gcc493_crab3 () {
            echo crabclient ${release} ${crab3_SCRAM_ARCH} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
            currdir=$(pwd)
            cd
-           time cvmfs_server publish 2>&1 |  tee $HOME/cvmfs_server+publish.log
+           time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
            cd $currdir
-           printf "install_crab3 () published  \n$(cat $HOME/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
+           printf "install_crab3 () published  \n$(cat $HOME/logs/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
            if [ "x$cvmfs_server_yes" == "xno" ] ; then # if [ ! -x /usr/bin/cvmfs_server ] ; then
              grep -q "CMSSW_crabclient ${release}+${crab3_SCRAM_ARCH}" "$HOME/${crab3_SCRAM_ARCH}.rsync.ready"
              [ $? -eq 0 ] || echo "CMSSW_crabclient ${release}+${crab3_SCRAM_ARCH}" >> "$HOME/${crab3_SCRAM_ARCH}.rsync.ready"
@@ -3640,9 +3641,9 @@ if [ ] ;  then
         echo COMP+python+$release ${thearch} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
         currdir=$(pwd)
         cd
-        time cvmfs_server publish 2>&1 |  tee $HOME/cvmfs_server+publish.log
+        time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
         cd $currdir
-        printf "install_comp_python () published  \n$(cat $HOME/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
+        printf "install_comp_python () published  \n$(cat $HOME/logs/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
      fi
   done
 fi # if [ ] ; then
@@ -3671,7 +3672,7 @@ fi # if [ ] ; then
         return 1
      fi
      echo INFO installing $release under $VO_CMS_SW_DIR : install_comp_python.sh $VO_CMS_SW_DIR $release ${therepo} ${thearch}
-     $HOME/install_comp_python.sh $VO_CMS_SW_DIR $release ${therepo} ${thearch} > $HOME/install_comp_python.log 2>&1 # | tee $HOME/install_comp_python.log
+     $HOME/install_comp_python.sh $VO_CMS_SW_DIR $release ${therepo} ${thearch} > $HOME/logs/install_comp_python.log 2>&1 # | tee $HOME/install_comp_python.log
      if [ $? -eq 0 ] ; then
         grep -q "COMP+python+$release ${thearch} " $updated_list
         if [ $? -eq 0 ] ; then
@@ -3681,12 +3682,12 @@ fi # if [ ] ; then
            echo COMP+python+${release} ${thearch} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
            currdir=$(pwd)
            cd
-           time cvmfs_server publish 2>&1 |  tee $HOME/cvmfs_server+publish.log
+           time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
            cd $currdir
-           printf "install_comp_python () installed from $(/bin/hostname -f)\n$(cat $HOME/install_comp_python.log | sed 's#%#%%#g')\n and published  \n$(cat $HOME/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "INFO install_comp_python () COMP+python+$release $thearch INSTALLED/PUBLISHED" $notifytowhom
+           printf "install_comp_python () installed from $(/bin/hostname -f)\n$(cat $HOME/logs/install_comp_python.log | sed 's#%#%%#g')\n and published  \n$(cat $HOME/logs/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "INFO install_comp_python () COMP+python+$release $thearch INSTALLED/PUBLISHED" $notifytowhom
         fi
      else
-        printf "FAILED: install_comp_python () COMP+python+${release}+${thearch} from $(/bin/hostname -f)\n$(cat $HOME/install_comp_python.log | sed 's#%#%%#g')\n" | mail -s "FAILED: install_comp_python () COMP+python installation" $notifytowhom
+        printf "FAILED: install_comp_python () COMP+python+${release}+${thearch} from $(/bin/hostname -f)\n$(cat $HOME/logs/install_comp_python.log | sed 's#%#%%#g')\n" | mail -s "FAILED: install_comp_python () COMP+python installation" $notifytowhom
      fi
   done
 
@@ -4027,7 +4028,7 @@ function check_and_update_siteconf () {
          echo INFO publishing $rsync_name
          currdir=$(pwd)
          cd
-         time cvmfs_server publish > $HOME/cvmfs_server+publish.log 2>&1
+         time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
          status=$?
          cd $currdir
          if [ $status -eq 0 ] ; then
