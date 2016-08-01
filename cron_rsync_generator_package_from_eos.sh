@@ -197,6 +197,16 @@ echo INFO looks good TOTAL_RSYNC_SIZE "<" TOTAL_RSYNC_SIZE_LIMIT
 # Check Point 1
 #echo rsync -arzuvp --delete $rsync_source $(dirname $rsync_name)
 #exit 0
+cvmfs_server list  | grep stratum0 | grep -q transaction
+if [ $? -eq 0 ] ; then
+   #if [ ! -f $lock ] ; then
+   #   echo INFO $lock does not exist
+      #need_to_fix_mount_issue=2
+      #printf "$(basename $0) cvmfs mount issue\n$lock does not exist\ncvmfs_server list\n$(cvmfs_server list)\n" | mail -s "$(basename $0) needs to fix the mount issue" $notifytowhom
+   echo ERROR cvmfs server already in transaction
+   exit 1
+   #fi
+fi
 
 echo INFO Doing cvmfs_server transaction
 cvmfs_server transaction

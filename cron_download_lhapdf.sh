@@ -126,6 +126,15 @@ echo INFO updated_list $VO_CMS_SW_DIR/cvmfs-cms.cern.ch-updates
 #$(wget --no-check-certificate -q -O- ${lhapdfweb}/pdfsets/ | grep folder.gif | grep -v current | sed 's#href="#|#g' | cut -d\| -f2 | cut -d/ -f1)
 
 #printf "$(basename $0) Starting cvmfs_server transaction for cron_download_lhapdf.sh\n" | mail -s "cvmfs_server transaction started" $notifytowhom
+cvmfs_server list  | grep stratum0 | grep -q transaction
+if [ $? -eq 0 ] ; then
+   #if [ ! -f $lock ] ; then
+   #   echo INFO $lock does not exist
+      #printf "$(basename $0) cvmfs mount issue\n$lock does not exist\ncvmfs_server list\n$(cvmfs_server list)\n" | mail -s "$(basename $0) needs to fix the mount issue" $notifytowhom
+   echo ERROR cvfsm server already in transaction
+   exit 1
+   #fi
+fi
 cvmfs_server transaction 2>&1
 [ $? -eq 0 ] || { printf "$(basename $0) ERROR cvmfs_server transaction failed\n$(cat $THELOG | sed 's#%#%%#g')\nChecking ps\n$(ps auxwww | sed 's#%#%%#g' | grep $(/usr/bin/whoami) | grep -v grep)\n" | mail -s "$(basename $0) cvmfs_server transaction lock failed" $notifytowhom ; exit 1 ; } ;
 if [ ] ; then
