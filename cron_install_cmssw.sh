@@ -51,7 +51,7 @@
 # 1.7.4: Docker for slc7
 # 1.7.5: CRAB3 client installation is sent to the email
 # 1.7.6: use config variables in the config
-# 1.7.7: log relocation
+# 1.7.7: Relocate logs to $HOME/logs directory
 # version 1.7.7
 version=1.7.7
 
