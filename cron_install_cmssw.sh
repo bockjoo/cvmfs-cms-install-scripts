@@ -431,7 +431,8 @@ for arch in $archs ; do
         if [ $? -eq 0 ] ; then
            install_cmssw_function=docker_install_nn_cmssw
            printf "$(basename $0) INFO: using docker_install_nn_cmssw to install $cmssw  $arch\n" | mail -s "$(basename $0) INFO: using docker_install_nn_cmssw" $notifytowhom
-
+        else
+           printf "$(basename $0) INFO: it seems docker is installed but $DOCKER_TAG not found\n$(docker images | sed 's#%#%%#g')\n" | mail -s "$(basename $0) INFO: $DOCKER_TAG not found" $notifytowhom
         fi
      else
         echo "$arch" | grep -q ${which_slc}_
@@ -1471,7 +1472,7 @@ function docker_install_nn_cmssw () {
    # 4.2 Check the second argument
    echo "$SCRAM_ARCH" | grep -q slc[0-9]
    if [ $? -ne 0 ] ; then
-      echo ERROR install_cmssw"()" SCRAM_ARCH=$SCRAM_ARCH does not start with slc
+      echo ERROR docker_install_nn_cmssw"()" SCRAM_ARCH=$SCRAM_ARCH does not start with slc
       printf "docker_install_nn_cmssw() SCRAM_ARCH=$SCRAM_ARCH does not start with slc\n" | mail -s "docker_install_nn_cmssw() failed" $notifytowhom
       return 1
    fi
