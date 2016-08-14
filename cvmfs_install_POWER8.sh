@@ -112,6 +112,8 @@ fi ; \
 which cmspkg 2>/dev/null 1>/dev/null ; \
 [ \$? -eq 0 ] || { export PATH=\$PATH:/cvmfs/cms.cern.ch/common ; } ; \
 echo INFO executing cmspkg -a ${SCRAM_ARCH} update ; \
+cmspkg -a ${SCRAM_ARCH} -y upgrade ; \
+[ \$? -eq 0 ] || { echo cmspkg -a ${SCRAM_ARCH} -y upgrade failed ; echo proot_status=1 ; exit 1 ; } ; \
 cmspkg -a ${SCRAM_ARCH} update ; \
 [ \$? -eq 0 ] || { echo cmspkg -a ${SCRAM_ARCH} update failed ; echo proot_status=1 ; exit 1 ; } ; \
 second_plus= ; \
