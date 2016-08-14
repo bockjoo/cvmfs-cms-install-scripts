@@ -429,9 +429,9 @@ for arch in $archs ; do
         #[ $? -eq 0 ] && install_cmssw_function=docker_install_nn_cmssw
         docker images 2>/dev/null | grep $(echo $DOCKER_TAG | cut -d: -f1) | grep -q $(echo $DOCKER_TAG | cut -d: -f2)
         if [ $? -eq 0 ] ; then
-           #Uncomment this to run it under docker install_cmssw_function=docker_install_nn_cmssw
-           #Uncomment this to run it under docker printf "$(basename $0) INFO: using docker_install_nn_cmssw to install $cmssw  $arch\n" | mail -s "$(basename $0) INFO: using docker_install_nn_cmssw" $notifytowhom
-           printf "$(basename $0) INFO: Could have used the docker_install_nn_cmssw to install $cmssw  $arch\n" | mail -s "$(basename $0) INFO: Could have used the docker_install_nn_cmssw" $notifytowhom
+           install_cmssw_function=docker_install_nn_cmssw
+           printf "$(basename $0) INFO: using docker_install_nn_cmssw to install $cmssw  $arch\n" | mail -s "$(basename $0) INFO: using docker_install_nn_cmssw" $notifytowhom
+           #printf "$(basename $0) INFO: Could have used the docker_install_nn_cmssw to install $cmssw  $arch\n" | mail -s "$(basename $0) INFO: Could have used the docker_install_nn_cmssw" $notifytowhom
         else
            printf "$(basename $0) INFO: it seems docker is installed but $DOCKER_TAG not found\n$(docker images | sed 's#%#%%#g')\n" | mail -s "$(basename $0) INFO: $DOCKER_TAG not found" $notifytowhom
         fi
