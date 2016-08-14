@@ -1377,7 +1377,7 @@ function install_cmssw () {
    if [ "x$cvmfs_server_yes" == "xyes" ] ; then
         echo INFO rpmdb needs to be small/local on the cvmfs server, create a softlink that is backed up
    fi
-   cmspkg -y upgrade
+   cmspkg -a ${SCRAM_ARCH} -y upgrade
    #echo INFO executing apt-get --assume-yes -c=$apt_config update for $cmssw_release ${SCRAM_ARCH}
    #apt-get --assume-yes -c=$apt_config update > $HOME/apt_get_update.log 2>&1
    echo INFO executing cmspkg -a ${SCRAM_ARCH} update for $cmssw_release ${SCRAM_ARCH}
