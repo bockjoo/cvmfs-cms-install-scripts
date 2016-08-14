@@ -52,8 +52,9 @@
 # 1.7.5: CRAB3 client installation is sent to the email
 # 1.7.6: use config variables in the config
 # 1.7.7: Relocate the log directory to $HOME/logs
-# version 1.7.7
-version=1.7.7
+# 1.7.8: cmspkg -y upgrade added to install_cmssw
+# version 1.7.8
+version=1.7.8
 
 # Basic Configs
 WORKDIR=/cvmfs/cms.cern.ch
@@ -1376,6 +1377,7 @@ function install_cmssw () {
    if [ "x$cvmfs_server_yes" == "xyes" ] ; then
         echo INFO rpmdb needs to be small/local on the cvmfs server, create a softlink that is backed up
    fi
+   cmspkg -y upgrade
    #echo INFO executing apt-get --assume-yes -c=$apt_config update for $cmssw_release ${SCRAM_ARCH}
    #apt-get --assume-yes -c=$apt_config update > $HOME/apt_get_update.log 2>&1
    echo INFO executing cmspkg -a ${SCRAM_ARCH} update for $cmssw_release ${SCRAM_ARCH}
