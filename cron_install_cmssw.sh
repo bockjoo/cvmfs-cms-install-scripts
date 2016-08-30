@@ -625,7 +625,10 @@ function dockerrun()
       docker images 2>/dev/null | grep $(echo $DOCKER_TAG | cut -d: -f1) | grep -q $(echo $DOCKER_TAG | cut -d: -f2)
       [ $? -eq 0 ] || { echo ERROR docker image $DOCKER_TAG not found ; return 1 ; } ;
       #docker run --rm -it -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} -u $(id -u $(whoami)):$(id -g $(whoami)) cmssw/slc7-installer:latest sh -c "$ARGS"
-      docker run --rm -it -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} -u $(whoami) $DOCKER_TAG sh -c "$ARGS"
+      echo INFO running docker run --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} $DOCKER_TAG sh -c "$ARGS"
+      #docker run --rm -it -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} -u $(whoami) $DOCKER_TAG sh -c "$ARGS"
+      #docker run --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} -u $(whoami) $DOCKER_TAG sh -c "$ARGS"
+      docker run --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} $DOCKER_TAG sh -c "$ARGS"
       return $?
       ;;
     * )
@@ -1378,6 +1381,19 @@ function install_cmssw () {
         echo INFO rpmdb needs to be small/local on the cvmfs server, create a softlink that is backed up
    fi
    cmspkg -a ${SCRAM_ARCH} -y upgrade
+   echo DEBUG which rpm
+   which rpm
+   rpm -qa --queryformat '%{NAME} %{RELEASE}' > $HOME/logs/rpm_qa_NAME_RELEASE.${SCRAM_ARCH}.log 2>&1
+   grep -i "^error: " $HOME/logs/rpm_qa_NAME_RELEASE.${SCRAM_ARCH}.log | grep "unable to allocate memory for mutex" | grep -q "resize mutex region"
+   if [ $? -eq 0 ] ; then
+      grep -q "mutex_set_max 10000000" /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+      if [ $? -ne 0 ] ; then
+         echo INFO adding mutex_set_max 1000000 to /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         echo mutex_set_max 10000000 >> /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         echo INFO rebuilding the DB
+         rpmdb --define "_rpmlock_path /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/lock" --rebuilddb --dbpath /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm 2>&1 | tee $HOME/logs/rpmdb_rebuild.${SCRAM_ARCH}.log
+      fi
+   fi    
    #echo INFO executing apt-get --assume-yes -c=$apt_config update for $cmssw_release ${SCRAM_ARCH}
    #apt-get --assume-yes -c=$apt_config update > $HOME/apt_get_update.log 2>&1
    echo INFO executing cmspkg -a ${SCRAM_ARCH} update for $cmssw_release ${SCRAM_ARCH}
@@ -1528,17 +1544,24 @@ function docker_install_nn_cmssw () {
    fi
    fi # if [ "$cvmfs_server_yes" == "yes" ] ; then
    CMSPKG="$VO_CMS_SW_DIR/common/cmspkg -a $SCRAM_ARCH"
+   echo INFO executing $CMSPKG -y upgrade
    $CMSPKG -y upgrade
    echo INFO executing cmspkg -a ${SCRAM_ARCH} update and install cms-common for $cmssw_release ${SCRAM_ARCH}
-   dockerrun "${CMSPKG} update > $workdir/logs/cmspkg_update_${SCRAM_ARCH}.log 2>&1 ; status=\$? ; ${CMSPKG} -f install cms+cms-common+1.0 > $workdir/logs/cmspkg_install_cms-common_${SCRAM_ARCH}+$cmssw_release.log 2>&1 ; exit \`expr $? + \$status\`" ;
-   if [ $? -ne 0 ] ; then
+   dockerrun "${CMSPKG} update > $workdir/logs/cmspkg_update_${SCRAM_ARCH}.log 2>&1 ; status=\$? ; ${CMSPKG} -f install cms+cms-common+1.0 > $workdir/logs/cmspkg_install_cms-common_${SCRAM_ARCH}+$cmssw_release.log 2>&1 ; exit \`expr $? + \$status\`" > $HOME/logs/dockerrun.log 2>&1
+   status=$?
+   echo INFO content of $HOME/logs/dockerrun.log
+   cat $HOME/logs/dockerrun.log
+   if [ $status -ne 0 ] ; then
       printf "docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} update or install cms-common failed\nContent of $workdir/logs/cmspkg_update_${SCRAM_ARCH}.log\n$(cat $HOME/logs/cmspkg_update_${SCRAM_ARCH}.log | sed 's#%#%%#g')\nContent of $workdir/logs/cmspkg_install_cms-common_${SCRAM_ARCH}+$cmssw_release.log\n$(cat $workdir/logs/cmspkg_install_cms-common_${SCRAM_ARCH}+$cmssw_release.log | sed 's#%#%%#g')\n" | mail -s "docker_install_nn_cmssw() ERROR cmspkg update or install cms-common failed" $notifytowhom
       [ "$cvmfs_server_yes" == "yes" ] && ( cd ; cvmfs_server abort -f ; ) ;
       return 1
    fi
    echo INFO installing $cmssw_release ${SCRAM_ARCH} via dockerrun cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw${second_plus}+$cmssw_release
-   dockerrun "${CMSPKG} install -y cms+cmssw${second_plus}+$cmssw_release > $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log 2>&1 ; exit \$?"
-   if [ $? -eq 0 ] ; then
+   dockerrun "${CMSPKG} install -y cms+cmssw${second_plus}+$cmssw_release > $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log 2>&1 ; exit \$?" > $HOME/logs/dockerrun.install.log 2>&1
+   status=$?
+   echo INFO content of $HOME/logs/dockerrun.install.log
+   cat $HOME/logs/dockerrun.install.log
+   if [ $status -eq 0 ] ; then
       printf "docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release failed\nContent of $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log\n$(cat $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log | sed 's#%#%%#g')\n" | mail -s "docker_install_nn_cmssw() ERROR cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release failed" $notifytowhom
       [ "$cvmfs_server_yes" == "yes" ] && ( cd ; cvmfs_server abort -f ; ) ;
       return 1
