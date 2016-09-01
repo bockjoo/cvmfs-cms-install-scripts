@@ -2955,7 +2955,6 @@ function install_cms_common () {
               echo Warning this machine cannot handle cms_common for arch=$cms_common_a We pass this arch.
               continue
            fi
-      Ghdrlfehd071^
 
            echo "$cms_common_a" | grep -q "$which_slc"
            [ $? -eq 0 ] || { echo Warning cms_common_a=$cms_common_a vs which_slc=$which_slc ; continue ; } ;
