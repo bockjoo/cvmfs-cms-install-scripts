@@ -2,8 +2,10 @@
 # 0.2.6 : curl
 # 0.2.7 : clean up
 # 0.2.8 : fix crab_init.sh and crab_init.csh linking
-# version=0.2.9
-install_crab3_version=0.2.9
+# 0.2.9 : last one with apt-get
+# 0.3.0 : cmspkg instead of apt-get
+# version=0.3.0
+install_crab3_version=0.3.0
 ###################################################################
 #                                                                 #
 export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
@@ -89,7 +91,9 @@ fi
    
 i=$(expr $i + 1)
 # Check if bootstrap is needed for $arch
-ls -al $MYTESTAREA/$SCRAM_ARCH/external/apt/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
+#Because of cmspkg
+#ls -al $MYTESTAREA/$SCRAM_ARCH/external/apt/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
+ls -al $MYTESTAREA/$SCRAM_ARCH/external/rpm/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
 if [ $? -eq 0 ] ; then
    echo INFO "[$i]" bootstratp unnecessary for ${SCRAM_ARCH} in crab3
    #exit 0
@@ -110,41 +114,48 @@ else
       exit 1
    fi
 fi
+# v 0.3.0 use cmspkg instead of apt-get
+CMSPKG="$MYTESTAREA/common/cmspkg -a $SCRAM_ARCH"
+if [ ! -f $MYTESTAREA/common/cmspkg ] ; then
+   printf "$(basename $0) $MYTESTAREA/common/cmspkg does not exist\n" | mail -s "ERROR: $MYTESTAREA/common/cmspkg does not exist" $notifytowhom
+   exit 1
+fi
 
-echo DEBUG using $(ls -t $MYTESTAREA/$SCRAM_ARCH/external/apt/*/etc/profile.d/init.sh | head -1)
-source $(ls -t $MYTESTAREA/$SCRAM_ARCH/external/apt/*/etc/profile.d/init.sh | head -1)
+#Because of cmspkg, we should not need this
+#echo DEBUG using $(ls -t $MYTESTAREA/$SCRAM_ARCH/external/apt/*/etc/profile.d/init.sh | head -1)
+#source $(ls -t $MYTESTAREA/$SCRAM_ARCH/external/apt/*/etc/profile.d/init.sh | head -1)
 source $(ls -t $MYTESTAREA/$SCRAM_ARCH/external/curl/*/etc/profile.d/init.sh | head -1) # cvmfs_server
 
 i=$(expr $i + 1)
-echo INFO "[$i]" executing apt-get upgrade
-apt-get --assume-yes upgrade
+echo INFO "[$i]" executing $CMSPKG -y upgrade # apt-get upgrade
+$CMSPKG -y upgrade # apt-get --assume-yes upgrade
 status=$?
 if [ $status -ne 0 ] ; then
-   echo ERROR apt-get upgrade failed
+   echo ERROR $CMSPKG -y upgrade upgrade failed
    exit 1
 fi
 
 i=$(expr $i + 1)
-echo INFO "[$i]" executing apt-get update
-apt-get --assume-yes update
+echo INFO "[$i]" executing $CMSPKG update # apt-get update
+$CMSPKG update 2>&1 # apt-get --assume-yes update
 status=$?
 if [ $status -ne 0 ] ; then
-   echo ERROR apt-get update failed
+   echo ERROR $CMSPKG update failed
    exit 1
 fi
 
 i=$(expr $i + 1)
-echo INFO "[$i]" executing apt-get install cms+crabclient+$RELEASE
-apt-get install --assume-yes cms+crabclient+$RELEASE
+echo INFO "[$i]" executing $CMSPKG -y install cms+crabclient+$RELEASE
+$CMSPKG -y install cms+crabclient+$RELEASE 2>&1
 status=$?
 if [ $status -ne 0 ] ; then
-   echo ERROR apt-get install cms+crabclient+$RELEASE failed
+   echo ERROR $CMSPKG -y install cms+crabclient+$RELEASE failed
    echo Exiting from $(basename $0)
    exit 1
 fi
 
 i=$(expr $i + 1)
-echo INFO "[$i]" succefully executed apt-get install cms+crabclient+$RELEASE
+echo INFO "[$i]" succefully executed $CMSPKG -y install cms+crabclient+$RELEASE
 
 echo INFO checking $SCRAM_ARCH
 
@@ -155,23 +166,6 @@ if [ $? -eq 0 ] ; then
   i=$(expr $i + 1)
   echo "${RELEASE}" | grep -q -e "pre\|rc"
   [ $? -eq 0 ] && pre_or_not="_pre"
-  #0.2.8 for sh_type in sh csh ; do
-  #   for thetype in "" _light ; do
-  #     echo "[ $i ]" sh=$sh_type thetype=$thetype
-  #     echo DEBUG removing $MYTESTAREA/crab${gccv}${pre_or_not}${thetype}.${sh_type}
-  #     rm -f $MYTESTAREA/crab${gccv}${pre_or_not}${thetype}.${sh_type}
-  #     ( cd $MYTESTAREA
-  #       if [ "x$thetype" == "x" ] ; then
-  #            ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${RELEASE}/etc/profile.d/init$(echo "${thetype}" | sed 's#_#-#').${sh_type} crab${gccv}${pre_or_not}${thetype}.${sh_type}
-  #       else
-  #            ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${RELEASE}/etc/init$(echo "${thetype}" | sed 's#_#-#').${sh_type} crab${gccv}${pre_or_not}${thetype}.${sh_type}
-  #       fi
-  #     )
-  #     echo INFO "[$i]" Check $MYTESTAREA/crab${gccv}${pre_or_not}${thetype}.${sh_type}
-  #     ls -al $MYTESTAREA/crab${gccv}${pre_or_not}${thetype}.${sh_type}
-  #     echo ; echo
-  #   done
-  #done
   for what in "" _standalone ; do
      for f in /cvmfs/cms.cern.ch/crab3/crab${pre_or_not}${what}.*sh ; do
        echo "[ $i ]" f=$f
@@ -264,18 +258,3 @@ fi # if [ "x$cvmfs_server_yes" == "xyes" ] ; then
 #fi # if $updated_list exists thus cvmfs server
 
 exit $status
-if [ ] ; then
-cvmfs_server transaction
-cd /cvmfs/cms.cern.ch/crab3
-rm -f crab.sh 
-ln -s /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1607.patch2/etc/init-light.sh crab.sh
-rm -f crab.csh 
-ln -s /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1607.patch2/etc/init-light.csh crab.csh
-rm -f crab_standalone.sh
-ln -s  /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1607.patch2/etc/profile.d/init.sh crab_standalone.sh
-rm -f crab_standalone.csh
-ln -s  /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1607.patch2/etc/profile.d/init.csh crab_standalone.csh
-vi /cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
-cd
-cvmfs_server publish
-fi # if [ ] ; then

@@ -82,7 +82,7 @@ if [ $? -ne 0 ] ; then
    exit 1
 fi
 
-if [ $(ls -al $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null ; echo $? ; ) -eq 0 ] ; then
+if [ $(ls -al $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null ; echo $? ; ) -eq 0 ] ; then
      echo INFO arch ${SCRAM_ARCH} seems to be already bootstrapped
 else
      echo INFO downloading bootstrap.sh for ${SCRAM_ARCH}
@@ -95,7 +95,7 @@ echo INFO installing $CMSSW_RELEASE ${SCRAM_ARCH} in the proot env
 
 ./proot -R $PWD/centos-7.2.1511-aarch64-rootfs -b /cvmfs:/cvmfs -q "$PWD/qemu-aarch64 -cpu cortex-a57" /bin/sh -c "\
 star='*' ; \
-init_sh=\`ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh -t | head -1\` ; \
+init_sh=\`ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh -t | head -1\` ; \
 if [ -f \"\$init_sh\" ] ; then \
    echo INFO sourcing \$init.sh ; \
    source \$init_sh ; \
@@ -103,7 +103,7 @@ else \
    echo INFO bootstrapping ${SCRAM_ARCH} ; \
    sh -x $VO_CMS_SW_DIR/bootstrap.sh -repository cms setup -path $VO_CMS_SW_DIR -a ${SCRAM_ARCH} ; \
    [ \$? -eq 0 ] || { echo proot_status=1 ; exit 1 ; } ; \
-   init_sh=\`ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh -t | head -1\` ; \
+   init_sh=\`ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh -t | head -1\` ; \
    if [ -f \"\$init_sh\" ] ; then \
       echo INFO sourcing \$init.sh ; \
       source \$init_sh ; \

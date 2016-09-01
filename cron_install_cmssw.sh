@@ -53,8 +53,9 @@
 # 1.7.6: use config variables in the config
 # 1.7.7: Relocate the log directory to $HOME/logs
 # 1.7.8: cmspkg -y upgrade added to install_cmssw
-# version 1.7.8
-version=1.7.8
+# 1.7.9: update cms-common install with cmspkg
+# version 1.7.9
+version=1.7.9
 
 # Basic Configs
 WORKDIR=/cvmfs/cms.cern.ch
@@ -1003,7 +1004,9 @@ function bootstrap_arch () {
    [ $? -eq 0 ] || { echo Warning not suitable for $SCRAM_ARCH bootstrapping on $which_slc ; return 1 ; } ;
    
    # 3.1 Check if bootstrap is needed for $arch
-   ls -al $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
+   # Because of cmspkg, check rpm instead of apt
+   #ls -al $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
+   ls -al $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
    if [ $? -eq 0 ] ; then
       echo INFO bootstratp unnecessary ${SCRAM_ARCH}
       return 1
@@ -1080,7 +1083,9 @@ function bootstrap_arch_slc7 () {
    #[ $? -eq 0 ] || { echo Warning not suitable for $SCRAM_ARCH bootstrapping on $which_slc ; return 1 ; } ;
    
    # 3.1 Check if bootstrap is needed for $arch
-   ls -al $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
+   #Because of cmspkg
+   #ls -al $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
+   ls -al $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
    if [ $? -eq 0 ] ; then
       echo INFO bootstratp unnecessary ${SCRAM_ARCH}
       return 1
@@ -1324,9 +1329,11 @@ function install_cmssw () {
 
    echo "$cmssw_release_last_string" | grep -q patch && second_plus=-patch
 
-   apt_config=$(ls -t $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/apt.conf | head -1)
-
    cd $VO_CMS_SW_DIR
+
+   # Because of cmspkg, we should not need this
+if [ ] ; then
+   apt_config=$(ls -t $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/apt.conf | head -1)
 
    if [ -f "$(ls -t ${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh | head -1)" ] ; then
       source $(ls -t ${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh | head -1)
@@ -1337,6 +1344,7 @@ function install_cmssw () {
       printf "install_cmssw() apt init.sh does not exist: ${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh\n" | mail -s "$(basename $0) failed" $notifytowhom
       return 1
    fi
+fi # if [ ] ; then
 
    if [ -f "$(ls -t ${SCRAM_ARCH}/external/curl/*/etc/profile.d/init.sh | head -1)" ] ; then
       # for cvmfs_server
@@ -1943,7 +1951,7 @@ function install_cmssw_non_native () {
    return 0
 }
 
-function docker_install_cmssw_slc7 () {
+function docker_install_cmssw_slc7 () { # not used any more
    
    # 4.0 Check number of arguments
    if [ $# -lt 2 ] ; then
@@ -2975,8 +2983,10 @@ function install_cms_common () {
            fi
            ( printf "install_cms_common() locking installation for  $cms_common_v $cms_common_a\n" | mail -s "[0] install_cms_common() LOCK installation" $notifytowhom ; cd ; touch ${cms_common_a}.lock ; )
          fi
-         echo INFO executing cic_install_cms_common $cms_common_a $cms_common_v
-         cic_install_cms_common $cms_common_a $cms_common_v > $HOME/cic_install_cms_common.log 2>&1
+         #echo INFO executing cic_install_cms_common $cms_common_a $cms_common_v
+         #cic_install_cms_common $cms_common_a $cms_common_v > $HOME/cic_install_cms_common.log 2>&1
+         echo INFO executing cmspkg_install_cms_common $cms_common_a $cms_common_v
+         cmspkg_install_cms_common $cms_common_a $cms_common_v > $HOME/logs/cmspkg_install_cms_common.log 2>&1
          if [ $? -eq 0 ] ; then
             currdir=$(pwd)
             cd
@@ -2993,7 +3003,7 @@ function install_cms_common () {
             status=$?
             cd $currdir
             if [ $status -eq 0 ] ; then
-               printf "install_cms_common $(/bin/hostname -f) cms_common_1.0 $cms_common_v $cms_common_a installed\nInstallation Log:\n$(cat $HOME/cic_install_cms_common.log | sed 's#%#%%#g')\n" | /bin/mail -s "published and install_cms_common cms_common_1.0 $cms_common_v $cms_common_a installed" $notifytowhom
+               printf "install_cms_common $(/bin/hostname -f) cms_common_1.0 $cms_common_v $cms_common_a installed\nInstallation Log:\n$(cat $HOME/logs/cmspkg_install_cms_common.log | sed 's#%#%%#g')\n" | /bin/mail -s "published and install_cms_common cms_common_1.0 $cms_common_v $cms_common_a installed" $notifytowhom
                status=0
                if [ "x$cvmfs_server_yes" == "xno" ] ; then # if [ ! -x /usr/bin/cvmfs_server ] ; then
                  grep -q CMSSW_cms_common_1.0+${cms_common_v} "$HOME/${cms_common_a}.rsync.ready"
@@ -3002,7 +3012,7 @@ function install_cms_common () {
                  status=1
                fi
             else
-               printf "install_cms_common $(/bin/hostname -f) cms_common_1.0 $cms_common_v $cms_common_a installed\nInstallation Log:\n$(cat $HOME/cic_install_cms_common.log | sed 's#%#%%#g')\n$(cat $HOME/logs/cvmfs_server+publish.log)\n" | /bin/mail -s "ERROR publish failed:install_cms_common cms_common_1.0 $cms_common_v $cms_common_a installed" $notifytowhom
+               printf "install_cms_common $(/bin/hostname -f) cms_common_1.0 $cms_common_v $cms_common_a installed\nInstallation Log:\n$(cat $HOME/logs/cmspkg_install_cms_common.log | sed 's#%#%%#g')\n$(cat $HOME/logs/cvmfs_server+publish.log)\n" | /bin/mail -s "ERROR publish failed:install_cms_common cms_common_1.0 $cms_common_v $cms_common_a installed" $notifytowhom
                 
             fi # if [ $status -eq 0 ] ; then
 
@@ -3012,7 +3022,7 @@ function install_cms_common () {
    return $status
 }
 
-function cic_install_cms_common () {
+function cic_install_cms_common () { # not used any more
   if [ $# -lt 2 ] ; then
      echo ERROR cic_install_cms_common SCRAM_ARCH version
      return 1
@@ -3140,48 +3150,147 @@ function cic_install_cms_common () {
      return 1
   fi
 
-  #status=0
-  #grep -q "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
-  #if [ $? -eq 0 ] ; then
-  #   echo INFO $version found
-  #   status=0
-  #else
-  #   echo INFO $version not found
-  #   echo INFO executing apt-get reinstall cms+cms-common+1.0
-  #   apt-get '--assume-yes' reinstall cms+cms-common+1.0
-  #   status=$?
-  #fi
-  #cd $currdir
+}
 
-  #if [ $status -eq 0 ] ; then
-    #time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
-    #status=$?
-    #rpm -qa | grep cms-common | grep -q ${version}
-    #if [ $? -eq 0 ] ; then
-    #   echo INFO cms-common version=$version is installed
-    #   rpm -qa | grep cms-common
-    #   grep -q "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
-    #   if [ $? -eq 0 ] ; then
-    #      echo INFO $version found
-    #      #status=0
-    #      #cd $currdir
-    #      time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
-    #      return $?
-    #   fi          
-    #   cvmfs_server abort -f
-    #   return 1
-    #else
-    #   echo ERROR cms-common version=$version installation failed
-    #   rpm -qa | grep cms-common
-    #   #cd $currdir
-    #   cvmfs_server abort -f
-    #   return 1
-    #fi
-  #else
-  #  cvmfs_server abort -f
-  #fi
-  #cd $currdir
-  #return $status
+function cmspkg_install_cms_common () {
+  if [ $# -lt 2 ] ; then
+     echo ERROR cmspkg_install_cms_common SCRAM_ARCH version
+     return 1
+  fi
+  scram_arch=$1
+  version=$2
+  CMSPKG="$VO_CMS_SW_DIR/common/cmspkg -a $SCRAM_ARCH"
+
+  # because of cmspkg, we should not need to set up apt
+if [ ] ; then
+  echo INFO sourcing cmsset_default.sh
+  source $VO_CMS_SW_DIR/cmsset_default.sh 2>&1
+
+  echo INFO setting up apt
+  #source $VO_CMS_SW_DIR/${scram_arch}/external/apt/*/etc/profile.d/init.sh 2>&1
+  source $(ls -t $VO_CMS_SW_DIR/${scram_arch}/external/apt/*/etc/profile.d/init.sh | head -1) 2>&1
+  source $(ls -t $VO_CMS_SW_DIR/${scram_arch}/external/curl/*/etc/profile.d/init.sh | head -1)
+
+  echo INFO checking ldd $(which curl)
+  ldd $(which curl)
+  ldd $(which curl) 2>&1 | grep OPENSSL | grep -q "not found"
+  if [ $? -eq 0 ] ; then
+     source $(ls -t $VO_CMS_SW_DIR/${scram_arch}/external/openssl/*/etc/profile.d/init.sh | head -1)
+  fi
+
+  echo INFO which apt-get
+  which apt-get 2>&1
+fi # if [ ] ; then
+
+  echo INFO checking cms-common before installing it
+  rpm -qa | grep cms-common | grep -q ${version}
+  if [ $? -eq 0 ] ; then
+     grep -q "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
+     if [ $? -eq 0 ] ; then
+        echo INFO cms-common+1.0 version=$version is already installed
+        return 0
+     fi
+  fi
+
+  rpm -qa | grep cms-common
+  printf "cmspkg_install_cms_common () Starting cvmfs_server transaction\n" | mail -s "cvmfs_server transaction started" $notifytowhom
+
+  echo INFO starting server transaction
+  #echo which apt-get
+  #which apt-get
+
+  #echo which curl
+  #which curl
+
+  #echo ldd $(which curl) #"curl $(get_follow_http_redirects_flag)" "$url"
+  #ldd $(which curl)
+
+  #echo which openssl
+  #which openssl
+
+  #echo which cvmfs_server
+  #which cvmfs_server
+
+  
+  currdir=$(pwd)
+  cd
+  cvmfs_server transaction
+  status=$?
+  what="cmspkg_install_cms_common ()"
+  cvmfs_server_transaction_check $status $what
+  if [ $? -eq 0 ] ; then
+     echo INFO transaction OK for $what
+  else
+     echo Warning transaction again
+     sh -x cvmfs_server transaction
+     echo Warning abort transaction
+     cvmfs_server abort -f
+     printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom
+     cd $currdir
+     return 1
+  fi
+
+  $CMSPKG -y upgrade
+
+  echo INFO updating the repo
+  $CMSPKG update 2>&1 # apt-get update 2>&1
+
+  echo INFO installing cms-common+1.0 version $version
+  $CMSPKG -f install cms+cms-common+1.0 #apt-get install '--assume-yes' cms+cms-common+1.0
+
+  echo INFO checking cms-common after installing
+  rpm -qa | grep cms-common | grep -q ${version}
+  if [ $? -eq 0 ] ; then
+     echo INFO cms-common version=$version is installed
+     rpm -qa | grep cms-common
+     status=0
+     grep -q "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
+     if [ $? -eq 0 ] ; then
+        echo INFO $version found
+        time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
+        status=$?
+        cd $currdir
+        return $status
+     else
+        echo INFO $version not found
+        echo INFO reinstalling it # executing apt-get reinstall cms+cms-common+1.0
+        #apt-get '--assume-yes' reinstall cms+cms-common+1.0
+        ${CMSPKG} --reinstall -y cms+cms-common+1.0
+        status=$?
+        if [ $status -eq 0 ] ; then
+           grep -q "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
+           status=$?
+           if [ $status -eq 0 ] ; then
+              time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
+              status=$?
+              cd $currdir
+              return $status
+           else
+              echo ERROR $version still not found after reinstalling it # apt-get '--assume-yes' reinstall cms+cms-common+1.0
+              printf "cmspkg_install_cms_common: cms-common reinstall  failed\n" | mail -s "ERROR: cms-common resintall failed" $notifytowhom
+              cvmfs_server abort -f
+              cd $currdir
+              return 1
+           fi
+        else
+           echo ERROR FAILED: reinstall failed # apt-get '--assume-yes' reinstall cms+cms-common+1.0
+           cvmfs_server abort -f
+           cd $currdir
+           return 1
+        fi
+     fi
+
+     #cd $currdir
+     #time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
+     #return $?
+  else
+     echo ERROR cms-common version=$version installation failed
+     rpm -qa | grep cms-common
+     cvmfs_server abort -f
+     cd $currdir
+     return 1
+  fi
+
 }
 
 # not used any more
