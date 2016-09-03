@@ -123,8 +123,9 @@ fi
 #Because of cmspkg, we should not need this
 #echo DEBUG using $(ls -t $MYTESTAREA/$SCRAM_ARCH/external/apt/*/etc/profile.d/init.sh | head -1)
 #source $(ls -t $MYTESTAREA/$SCRAM_ARCH/external/apt/*/etc/profile.d/init.sh | head -1)
-source $(ls -t $MYTESTAREA/$SCRAM_ARCH/external/curl/*/etc/profile.d/init.sh | head -1) # cvmfs_server
-
+#if [ -f $MYTESTAREA/$SCRAM_ARCH/external/curl/*/etc/profile.d/init.sh ] ; then
+#   source $(ls -t $MYTESTAREA/$SCRAM_ARCH/external/curl/*/etc/profile.d/init.sh | head -1) # cvmfs_server
+#fi
 i=$(expr $i + 1)
 echo INFO "[$i]" executing $CMSPKG -y upgrade # apt-get upgrade
 $CMSPKG -y upgrade # apt-get --assume-yes upgrade

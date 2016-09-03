@@ -118,7 +118,7 @@ else
 fi
 
 #
-source $(ls -t $MYTESTAREA/$SCRAM_ARCH/external/curl/*/etc/profile.d/init.sh | head -1) # cvmfs_server
+#source $(ls -t $MYTESTAREA/$SCRAM_ARCH/external/curl/*/etc/profile.d/init.sh | head -1) # cvmfs_server
 
 i=$(expr $i + 1)
 echo INFO "[$i]" executing $CMSPKG -y upgrade # apt-get upgrade
