@@ -135,6 +135,28 @@ if [ $status -ne 0 ] ; then
    exit 1
 fi
 
+# Check if mutex error exists
+echo INFO check if mutex error exists
+# First pick the right rpm
+rpm_init_env=$(ls -t $MYTESTAREA/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh | head -1)
+if [ -f $rpm_init_env ] ; then
+   source $rpm_init_env
+else
+   echo Warning $rpm_init_env does not exist
+fi
+echo INFO first which rpm"?: " $(which rpm) 
+rpm -qa --queryformat '%{NAME} %{RELEASE}' > $HOME/logs/rpm_qa_NAME_RELEASE.crab3.${SCRAM_ARCH}.log 2>&1
+grep "unable to allocate memory for mutex" $HOME/logs/rpm_qa_NAME_RELEASE.crab3.${SCRAM_ARCH}.log | grep -q "resize mutex region"
+if [ $? -eq 0 ] ; then
+      grep -q "mutex_set_max 10000000" $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+      if [ $? -ne 0 ] ; then
+         echo INFO adding mutex_set_max 1000000 to $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         echo mutex_set_max 10000000 >> $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         echo INFO rebuilding the DB
+         rpmdb --define "_rpmlock_path $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/lock" --rebuilddb --dbpath $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm 2>&1 | tee $HOME/logs/rpmdb_rebuild.crab3.${SCRAM_ARCH}.log
+      fi
+fi    
+
 i=$(expr $i + 1)
 echo INFO "[$i]" executing $CMSPKG update # apt-get update
 $CMSPKG update 2>&1 # apt-get --assume-yes update
@@ -146,8 +168,26 @@ fi
 
 i=$(expr $i + 1)
 echo INFO "[$i]" executing $CMSPKG -y install cms+crabclient+$RELEASE
-$CMSPKG -y install cms+crabclient+$RELEASE 2>&1
+$CMSPKG -y install cms+crabclient+$RELEASE > $HOME/logs/cmspkg_install_cms_crabclient_${SCRAM_ARCH}_$RELEASE.log 2>&1
 status=$?
+grep "unable to allocate memory for mutex" $HOME/logs/cmspkg_install_cms_crabclient_${SCRAM_ARCH}_$RELEASE.log | grep -q "resize mutex region"
+if [ $? -eq 0 ] ; then
+      grep -q "mutex_set_max 10000000" $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+      if [ $? -ne 0 ] ; then
+         echo INFO adding mutex_set_max 1000000 to $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         echo mutex_set_max 10000000 >> $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         echo INFO rebuilding the DB
+         rpmdb --define "_rpmlock_path $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/lock" --rebuilddb --dbpath $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm 2>&1 | tee $HOME/logs/rpmdb_rebuild.crab3.${SCRAM_ARCH}.log
+      fi
+      if [ $status -ne 0 ] ; then
+         echo INFO "[$i]" executing $CMSPKG -y install cms+crabclient+$RELEASE again after rebuilding the rpmdb after the mutex error
+         $CMSPKG -y install cms+crabclient+$RELEASE > $HOME/logs/cmspkg_install_cms_crabclient_${SCRAM_ARCH}_$RELEASE.log 2>&1
+         status=$?
+      fi
+fi    
+
+cat $HOME/logs/cmspkg_install_cms_crabclient_${SCRAM_ARCH}_$RELEASE.log
+
 if [ $status -ne 0 ] ; then
    echo ERROR $CMSPKG -y install cms+crabclient+$RELEASE failed
    echo Exiting from $(basename $0)
