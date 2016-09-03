@@ -522,6 +522,15 @@ install_slc6_amd64_gcc493_crab3
 echo
 echo INFO Done CRAB3 EL6 gcc493 check and update part of the script
 echo
+
+# [] PHEDEX
+echo INFO Next PhEDEXAgents EL6 gcc493 update will be checked and updated as needed
+echo
+echo INFO installing slc6 gcc493 phedexagents
+#install_slc6_amd64_gcc493_phedexagents
+echo
+echo INFO Done PhEDExAgents EL6 gcc493 check and update part of the script
+echo
 echo INFO Next LHAPDF update will be checked and updated as needed
 echo
 
@@ -1131,7 +1140,7 @@ function bootstrap_arch_slc7 () {
      #sh -x $VO_CMS_SW_DIR/bootstrap.sh -repository cms setup -path $VO_CMS_SW_DIR -a ${SCRAM_ARCH} > $VO_CMS_SW_DIR/bootstrap_${SCRAM_ARCH}.log 2>&1 # | tee $VO_CMS_SW_DIR/bootstrap_${SCRAM_ARCH}.log
      #echo INFO executing dockerrun
      #return 0
-     dockerrun "sh -ex $workdir/bootstrap.sh -repository cms setup -path $VO_CMS_SW_DIR -a $SCRAM_ARCH -y >& $workdir/logs/bootstrap_${SCRAM_ARCH}.log" || (cat $workdir/logs/bootstrap_${SCRAM_ARCH}.log && exit 1)
+     dockerrun "sh -ex $workdir/bootstrap.sh -repository cms setup -path $VO_CMS_SW_DIR -a $SCRAM_ARCH -y " || (cat $workdir/logs/bootstrap_${SCRAM_ARCH}.log && exit 1)
      status=$?
    else
      /usr/bin/wget -q -O $workdir/${SCRAM_ARCH}.tar.gz --connect-timeout=360 --read-timeout=360 http://oo.ihepa.ufl.edu:8080/cmssoft/${SCRAM_ARCH}.tar.gz 2>/dev/null
@@ -1163,7 +1172,7 @@ function bootstrap_arch_slc7 () {
 
 }
 
-function bootstrap_arch_slc7_old () {
+function bootstrap_arch_slc7_old () { # not used any more
    
    if [ $# -lt 1 ] ; then
       echo ERROR bootstrap_arch_slc7"()" scram_arch
@@ -1555,20 +1564,24 @@ function docker_install_nn_cmssw () {
    echo INFO executing $CMSPKG -y upgrade
    $CMSPKG -y upgrade
    echo INFO executing cmspkg -a ${SCRAM_ARCH} update and install cms-common for $cmssw_release ${SCRAM_ARCH}
-   dockerrun "${CMSPKG} update > $workdir/logs/cmspkg_update_${SCRAM_ARCH}.log 2>&1 ; status=\$? ; ${CMSPKG} -f install cms+cms-common+1.0 > $workdir/logs/cmspkg_install_cms-common_${SCRAM_ARCH}+$cmssw_release.log 2>&1 ; exit \`expr $? + \$status\`" > $HOME/logs/dockerrun.log 2>&1
+   #dockerrun "${CMSPKG} update > $workdir/logs/cmspkg_update_${SCRAM_ARCH}.log 2>&1 ; status=\$? ; ${CMSPKG} -f install cms+cms-common+1.0 > $workdir/logs/cmspkg_install_cms-common_${SCRAM_ARCH}+$cmssw_release.log 2>&1 ; exit \`expr $? + \$status\`" > $HOME/logs/dockerrun.log 2>&1
+   dockerrun "${CMSPKG} update ; status=\$? ; ${CMSPKG} -f install cms+cms-common+1.0 ; exit \`expr $? + \$status\`" > $HOME/logs/dockerrun_install_cms_commong.log 2>&1
    status=$?
-   echo INFO content of $HOME/logs/dockerrun.log
-   cat $HOME/logs/dockerrun.log
+   echo INFO content of $HOME/logs/dockerrun_install_cms_commong.log
+   cat $HOME/logs/dockerrun_install_cms_commong.log
+   cp $HOME/logs/dockerrun_install_cms_commong.log $workdir/logs/cmspkg_update_${SCRAM_ARCH}.log
+   cp $HOME/logs/dockerrun_install_cms_commong.log $workdir/logs/cmspkg_install_cms-common_${SCRAM_ARCH}+$cmssw_release.log
    if [ $status -ne 0 ] ; then
       printf "docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} update or install cms-common failed\nContent of $workdir/logs/cmspkg_update_${SCRAM_ARCH}.log\n$(cat $HOME/logs/cmspkg_update_${SCRAM_ARCH}.log | sed 's#%#%%#g')\nContent of $workdir/logs/cmspkg_install_cms-common_${SCRAM_ARCH}+$cmssw_release.log\n$(cat $workdir/logs/cmspkg_install_cms-common_${SCRAM_ARCH}+$cmssw_release.log | sed 's#%#%%#g')\n" | mail -s "docker_install_nn_cmssw() ERROR cmspkg update or install cms-common failed" $notifytowhom
       [ "$cvmfs_server_yes" == "yes" ] && ( cd ; cvmfs_server abort -f ; ) ;
       return 1
    fi
    echo INFO installing $cmssw_release ${SCRAM_ARCH} via dockerrun cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw${second_plus}+$cmssw_release
-   dockerrun "${CMSPKG} install -y cms+cmssw${second_plus}+$cmssw_release > $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log 2>&1 ; exit \$?" > $HOME/logs/dockerrun.install.log 2>&1
+   dockerrun "${CMSPKG} install -y cms+cmssw${second_plus}+$cmssw_release ; exit \$?" > $HOME/logs/dockerrun.install.log 2>&1
    status=$?
    echo INFO content of $HOME/logs/dockerrun.install.log
    cat $HOME/logs/dockerrun.install.log
+   cp $HOME/logs/dockerrun.install.log $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log
    if [ $status -eq 0 ] ; then
       printf "docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release failed\nContent of $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log\n$(cat $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log | sed 's#%#%%#g')\n" | mail -s "docker_install_nn_cmssw() ERROR cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release failed" $notifytowhom
       [ "$cvmfs_server_yes" == "yes" ] && ( cd ; cvmfs_server abort -f ; ) ;
@@ -3739,6 +3752,84 @@ function install_slc6_amd64_gcc493_crab3 () {
         fi
      else
            printf "FAILED: install_slc6_amd64_gcc493_crab3() crabclient ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/install_crab3.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_crab3() crabclient installation" $notifytowhom
+     fi
+     #break
+  done
+  #done
+
+  return 0
+}
+
+function install_slc6_amd64_gcc493_phedexagents () {
+  export phedexagents_REPO=comp
+  export phedexagents_SCRAM_ARCH=slc6_amd64_gcc493  
+  
+  phedexagents_RPMS=http://cmsrep.cern.ch/cmssw/${phedexagents_REPO}/RPMS/${phedexagents_SCRAM_ARCH}/
+  echo INFO checking ${phedexagents_RPMS}
+
+  phedexagentss=$(wget -O- $phedexagents_RPMS 2>/dev/null | grep cms+PHEDEX+ | cut -d\> -f7 | cut -d\< -f1 | sed 's#slc# slc#g' | sed 's#cms+PHEDEX+# #g' | sed 's#-1-1.# #g' | sed 's#.rpm##g' | awk '{print $1}')
+
+  currdir=$(pwd)
+  cd
+  for release in $phedexagentss ; do
+     echo $release | grep -q "4.1.4\|4.1.5\|4.1.7\|4.1.7-comp\|4.1.8\|4.2.0pre2"
+     [ $? -eq 0 ] && continue
+     #echo "$release" | grep -q pre
+     #[ $? -eq 0 ] && { echo INFO skipping pre release per Marco\'s request ; continue ; } ;
+     ##grep -q "crabclient$release ${phedexagents_SCRAM_ARCH} " $updated_list
+     grep -q "PhEDExAgents $release ${phedexagents_SCRAM_ARCH} " $updated_list
+     if [ $? -eq 0 ] ; then
+        echo Warning PhEDExAgents $release ${phedexagents_SCRAM_ARCH} installed according to $updated_list
+        continue
+     fi
+     printf "install_slc6_amd64_gcc493_phedexagents () Starting cvmfs_server transaction\n" | mail -s "cvmfs_server transaction started" $notifytowhom
+     cvmfs_server transaction
+     status=$?
+     what="install_slc6_amd64_gcc493_phedexagents ()"
+     cvmfs_server_transaction_check $status $what
+     if [ $? -eq 0 ] ; then
+        echo INFO transaction OK for $what
+     else
+        printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+        cd $currdir
+        return 1
+     fi
+     printf "install_slc6_amd64_gcc493_phedexagents() installing PhEDExAgents ${release}+${phedexagents_SCRAM_ARCH} from $(/bin/hostname -f)\n" | mail -s "[0] install_slc6_amd64_gcc493_phedexagents() installing PhEDExAgents ${release}" $notifytowhom
+     echo INFO installing $release under $VO_CMS_SW_DIR : install_phedexagents.sh $VO_CMS_SW_DIR $release ${phedexagents_REPO} ${phedexagents_SCRAM_ARCH}
+     $HOME/install_phedexagents.sh $VO_CMS_SW_DIR $release ${phedexagents_REPO} ${phedexagents_SCRAM_ARCH} > $HOME/logs/install_phedexagents.${release}.log 2>&1
+     status=$?
+     printf "New PHEDEXAGENTS Client Installed with status=$?\n$(cat $HOME/logs/install_phedexagents.${release}.log | sed 's#%#%%#g')\n" | mail -s "INFO: New PHEDEXAGENTS Client Installed" $notifytowhom
+     
+     echo DEBUG status=$status at install_slc6_amd64_gcc493_phedexagents
+     if [ $status -eq 0 ] ; then
+        grep -q "PhEDExAgents $release ${phedexagents_SCRAM_ARCH} " $updated_list
+        if [ $? -eq 0 ] ; then
+           echo Warning PhEDExAgents $release for ${phedexagents_SCRAM_ARCH} installed
+        else
+           printf "install_slc6_amd64_gcc493_phedexagents () Starting cvmfs_server transaction\n" | mail -s "cvmfs_server transaction started" $notifytowhom
+           cvmfs_server transaction
+           status=$?
+           what="install_slc6_amd64_gcc493_phedexagents ()"
+           cvmfs_server_transaction_check $status $what
+           if [ $? -eq 0 ] ; then
+              echo INFO transaction OK for $what
+           else
+              printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+              cd $currdir
+              return 1
+           fi
+           echo INFO adding PhEDExAgents $release for ${phedexagents_SCRAM_ARCH} to local $updated_list
+           echo PhEDExAgents ${release} ${phedexagents_SCRAM_ARCH} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
+           currdir=$(pwd)
+           cd
+           time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
+           cd $currdir
+           #printf "install_phedexagents () published  \n$(cat $HOME/logs/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
+           printf "install_slc6_amd64_gcc493_phedexagents() PhEDExAgents ${release}+${phedexagents_SCRAM_ARCH} installed/published from $(/bin/hostname -f)\n$(cat $HOME/logs/install_phedexagents.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] install_slc6_amd64_gcc493_phedexagents() PhEDExAgents INSTALLED" $notifytowhom
+           #echo INFO no cvmfs server. will tell the main script not to publish
+        fi
+     else
+           printf "FAILED: install_slc6_amd64_gcc493_phedexagents() PhEDExAgents ${release}+${phedexagents_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/logs/install_phedexagents.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_phedexagents() PhEDExAgents installation" $notifytowhom
      fi
      #break
   done

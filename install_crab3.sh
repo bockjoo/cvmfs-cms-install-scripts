@@ -16,7 +16,6 @@ export RELEASE=3.3.0.rc1-comp2
 export REPO=comp.pre.bbockelm
 export REPO=comp
 export SCRAM_ARCH=slc5_amd64_gcc461
-notifytowhom=bockjoo@phys.ufl.edu
 cvmfs_server_name=$(grep cvmfs_server_name= $HOME/cron_install_cmssw.config | grep -v \# | cut -d= -f2)
 cvmfs_server_name=$(eval echo $cvmfs_server_name)
 notifytowhom=$(grep notifytowhom= $HOME/cron_install_cmssw.config | grep -v \# | cut -d= -f2)
