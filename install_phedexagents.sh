@@ -129,6 +129,21 @@ if [ $status -ne 0 ] ; then
    exit 1
 fi
 
+# Check if mutex error exists
+echo INFO check if mutex error exists
+echo INFO first which rpm"?: " $(which rpm) 
+rpm -qa --queryformat '%{NAME} %{RELEASE}' > $HOME/logs/rpm_qa_NAME_RELEASE.phedex.${SCRAM_ARCH}.log 2>&1
+grep "unable to allocate memory for mutex" $HOME/logs/rpm_qa_NAME_RELEASE.phedex.${SCRAM_ARCH}.log | grep -q "resize mutex region"
+if [ $? -eq 0 ] ; then
+      grep -q "mutex_set_max 10000000" $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+      if [ $? -ne 0 ] ; then
+         echo INFO adding mutex_set_max 1000000 to $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         echo mutex_set_max 10000000 >> $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         echo INFO rebuilding the DB
+         rpmdb --define "_rpmlock_path $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/lock" --rebuilddb --dbpath $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm 2>&1 | tee $HOME/logs/rpmdb_rebuild.phedex.${SCRAM_ARCH}.log
+      fi
+fi    
+
 i=$(expr $i + 1)
 echo INFO "[$i]" executing $CMSPKG update # apt-get update
 $CMSPKG update 2>&1 # apt-get --assume-yes update
@@ -152,42 +167,6 @@ i=$(expr $i + 1)
 echo INFO "[$i]" succefully executed $CMSPKG -y install cms+PHEDEX+$RELEASE
 
 echo INFO checking $SCRAM_ARCH
-
-#echo "${SCRAM_ARCH}" | grep -q slc6_amd64_gcc493
-#if [ $? -eq 0 ] ; then
-#  gccv=
-#  pre_or_not=
-#  i=$(expr $i + 1)
-#  echo "${RELEASE}" | grep -q -e "pre\|rc"
-#  [ $? -eq 0 ] && pre_or_not="_pre"
-#  for what in "" _standalone ; do
-#     for f in /cvmfs/cms.cern.ch/phedexagents/crab${pre_or_not}${what}.*sh ; do
-#       echo "[ $i ]" f=$f
-#       real_file=$(ls -al $f | awk '{print $NF}')
-#       PREVIOUS_RELEASE=$(echo $real_file | cut -d/ -f8)
-#       FILE_TO_LINK=$(echo $real_file | sed "s#$PREVIOUS_RELEASE#$RELEASE#")
-#       echo DEBUG f=$f real_file=$real_file
-#       echo DEBUG PREVIOUS_RELEASE=$PREVIOUS_RELEASE RELEASE=$RELEASE
-#       echo DEBUG removing $f
-#       rm -f $f
-#       ( cd $MYTESTAREA
-#         ln -s $FILE_TO_LINK $(basename $f)
-#       )
-#       echo INFO "[$i]" Check $f
-#       ls -al $f
-#       echo ; echo
-#     done
-#  done
-
-#  theconfig_py_files="ExampleConfiguration.py FullConfiguration.py"
-#  for thepy in $theconfig_py_files ; do
-#   rm -f $MYTESTAREA/$thepy
-#   ( cd $MYTESTAREA
-#     ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${RELEASE}/etc/$thepy $(echo $thepy | sed "s#\.py#${gccv}\.py#g")
-#   )
-#   echo INFO softlink created for $(echo $thepy | sed "s#\.py#${gccv}\.py#g")
-#  done
-#fi
 
 if [ "x$cvmfs_server_yes" == "xyes" ] ; then
    grep -q "PhEDExAgents $RELEASE ${SCRAM_ARCH}" $updated_list
@@ -216,7 +195,7 @@ if [ "x$cvmfs_server_yes" == "xyes" ] ; then
       fi
       i=$(expr $i + 1)
       echo INFO "[$i]" Check $thedir/.cvmfscatalog
-      echo INFO now further doing /cvmfs/cms.cern.ch/phedexagents/"<scram_arch>"/cms/PHEDEX/"<rel>"/.cvmfscatalog
+      echo INFO now further doing $phedexagents_rel_dir/.cvmfscatalog
       for phedexagents_rel_dir in $thedir/cms/PHEDEX/* ; do
           [ "x$phedexagents_rel_dir" == "x$thedir/cms/PHEDEX/*" ] && break
           [ -d $phedexagents_rel_dir ] || continue
