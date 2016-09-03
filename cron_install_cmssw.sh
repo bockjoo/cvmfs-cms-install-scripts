@@ -527,7 +527,7 @@ echo
 echo INFO Next PhEDEXAgents EL6 gcc493 update will be checked and updated as needed
 echo
 echo INFO installing slc6 gcc493 phedexagents
-#install_slc6_amd64_gcc493_phedexagents
+install_slc6_amd64_gcc493_phedexagents
 echo
 echo INFO Done PhEDExAgents EL6 gcc493 check and update part of the script
 echo
@@ -626,6 +626,36 @@ exit 0
 
 ####### BEGIN Functions 12345
 # Functions
+function deploy_cmspkg () {
+  [ $# -lt 3 ] && { echo ERROR deploy_cmspkg path arch repo ; return 1 ; } ;
+  swpath=$1 # /cvmfs/cms.cern.ch/crab3
+  ARCH=$2 # slc6_amd64_gcc493
+  REPO=$3 # comp
+
+  cd /tmp
+  echo INFO downloading cmspkg.py
+  wget https://raw.githubusercontent.com/cms-sw/cmspkg/production/client/cmspkg.py
+
+  [ $? -eq 0 ] || { echo ERROR wget cmspkg.py failed ; rm -f cmspkg.py ; cd - ; return 1 ; } ;
+
+  
+  [ -f $HOME/cron_install_cmssw.lock ] && { echo ERROR cron_install_cmssw.lock exists ; rm -f cmspkg.py ; cd - ; return 1 ; } ;
+
+  [ -f $HOME/cron_install_cmssw.lock ] || { echo INFO creating cron_install_cmssw.lock at /home/cvcms ; touch cron_install_cmssw.lock ; } ;
+
+  cvmfs_server transaction
+
+  python cmspkg.py --architecture $ARCH --path $swpath --repository comp setup
+  status=$?
+  [ -f $swpath/common/cmspkg ] || { echo ERROR cmspkg is not installed ; rm -f cmspkg.py ; return 1 ; } ;
+  rm -f cmspkg.py
+  cd
+  cvmfs_server publish
+  status=$(expr $status + $?)
+  rm -f $HOME/cron_install_cmssw.lock
+  return $status
+}
+
 function dockerrun()
 {
   case "$SCRAM_ARCH" in
@@ -3751,7 +3781,8 @@ function install_slc6_amd64_gcc493_crab3 () {
            #echo INFO no cvmfs server. will tell the main script not to publish
         fi
      else
-           printf "FAILED: install_slc6_amd64_gcc493_crab3() crabclient ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/install_crab3.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_crab3() crabclient installation" $notifytowhom
+        printf "FAILED: install_slc6_amd64_gcc493_crab3() crabclient ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/install_crab3.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_crab3() crabclient installation" $notifytowhom
+        ( cd ; cvmfs_server abort -f ; ) ;
      fi
      #break
   done
@@ -3798,7 +3829,7 @@ function install_slc6_amd64_gcc493_phedexagents () {
      echo INFO installing $release under $VO_CMS_SW_DIR : install_phedexagents.sh $VO_CMS_SW_DIR $release ${phedexagents_REPO} ${phedexagents_SCRAM_ARCH}
      $HOME/install_phedexagents.sh $VO_CMS_SW_DIR $release ${phedexagents_REPO} ${phedexagents_SCRAM_ARCH} > $HOME/logs/install_phedexagents.${release}.log 2>&1
      status=$?
-     printf "New PHEDEXAGENTS Client Installed with status=$?\n$(cat $HOME/logs/install_phedexagents.${release}.log | sed 's#%#%%#g')\n" | mail -s "INFO: New PHEDEXAGENTS Client Installed" $notifytowhom
+     [ $status -eq 0 ] && printf "New PHEDEXAGENTS Client Installed with status=$?\n$(cat $HOME/logs/install_phedexagents.${release}.log | sed 's#%#%%#g')\n" | mail -s "INFO: New PHEDEXAGENTS Client Installed" $notifytowhom
      
      echo DEBUG status=$status at install_slc6_amd64_gcc493_phedexagents
      if [ $status -eq 0 ] ; then
@@ -3829,7 +3860,8 @@ function install_slc6_amd64_gcc493_phedexagents () {
            #echo INFO no cvmfs server. will tell the main script not to publish
         fi
      else
-           printf "FAILED: install_slc6_amd64_gcc493_phedexagents() PhEDExAgents ${release}+${phedexagents_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/logs/install_phedexagents.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_phedexagents() PhEDExAgents installation" $notifytowhom
+        printf "FAILED: install_slc6_amd64_gcc493_phedexagents() PhEDExAgents ${release}+${phedexagents_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/logs/install_phedexagents.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_phedexagents() PhEDExAgents installation" $notifytowhom
+        ( cd ; cvmfs_server abort -f ; ) ;
      fi
      #break
   done
