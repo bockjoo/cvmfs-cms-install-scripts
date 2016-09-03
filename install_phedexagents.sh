@@ -100,20 +100,20 @@ CMSPKG="$MYTESTAREA/common/cmspkg -a $SCRAM_ARCH"
 if [ -f $MYTESTAREA/common/cmspkg ] ; then
    echo INFO We use cmspkg
 else
-  (
-   cd /tmp
-   echo INFO downloading cmspkg.py
-   wget -O cmspkg.py https://raw.githubusercontent.com/cms-sw/cmspkg/production/client/cmspkg.py
+   (
+    cd /tmp
+    echo INFO downloading cmspkg.py
+    wget -O cmspkg.py https://raw.githubusercontent.com/cms-sw/cmspkg/production/client/cmspkg.py
 
-   [ $? -eq 0 ] || { echo ERROR wget cmspkg.py failed ; rm -f cmspkg.py ; cd - ; exit 1 ; } ;
+    [ $? -eq 0 ] || { echo ERROR wget cmspkg.py failed ; rm -f cmspkg.py ; cd - ; exit 1 ; } ;
 
-   python cmspkg.py --architecture $SCRAM_ARCH --path $MYTESTAREA --repository comp setup
-   status=$?
-   [ -f $MYTESTAREA/common/cmspkg ] || { echo ERROR cmspkg is not installed ; rm -f cmspkg.py ; exit 1 ; } ;
-   rm -f cmspkg.py
-   cd
+    python cmspkg.py --architecture $SCRAM_ARCH --path $MYTESTAREA --repository comp setup
+    status=$?
+    [ -f $MYTESTAREA/common/cmspkg ] || { echo ERROR cmspkg is not installed ; rm -f cmspkg.py ; exit 1 ; } ;
+    rm -f cmspkg.py
+    cd
    
-  )
+   )
    [ $? -eq 0 ] || printf "$(basename $0) $MYTESTAREA/common/cmspkg does not exist\nUse \nsource $HOME/cron_install_cmssw-functions\ndeploy_cmspkg /cvmfs/cms.cern.ch/phedexagents slc6_amd64_gcc494 comp\n" | mail -s "ERROR: $MYTESTAREA/common/cmspkg does not exist" $notifytowhom
    exit 1
 fi
