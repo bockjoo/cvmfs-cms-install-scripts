@@ -1613,6 +1613,9 @@ function docker_install_nn_cmssw () {
    cat $HOME/logs/dockerrun.install.log
    cp $HOME/logs/dockerrun.install.log $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log
    if [ $status -eq 0 ] ; then
+      echo INFO docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release succeeded
+      printf "docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release succeeded\nContent of $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log\n$(cat $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log | sed 's#%#%%#g')\n" | mail -s "docker_install_nn_cmssw() INFO $cmssw_release ${SCRAM_ARCH} installed" $notifytowhom
+   else
       printf "docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release failed\nContent of $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log\n$(cat $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log | sed 's#%#%%#g')\n" | mail -s "docker_install_nn_cmssw() ERROR cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release failed" $notifytowhom
       [ "$cvmfs_server_yes" == "yes" ] && ( cd ; cvmfs_server abort -f ; ) ;
       return 1
