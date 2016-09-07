@@ -1616,9 +1616,34 @@ function docker_install_nn_cmssw () {
       echo INFO docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release succeeded
       printf "docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release succeeded\nContent of $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log\n$(cat $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log | sed 's#%#%%#g')\n" | mail -s "docker_install_nn_cmssw() INFO $cmssw_release ${SCRAM_ARCH} installed" $notifytowhom
    else
-      printf "docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release failed\nContent of $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log\n$(cat $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log | sed 's#%#%%#g')\n" | mail -s "docker_install_nn_cmssw() ERROR cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release failed" $notifytowhom
-      [ "$cvmfs_server_yes" == "yes" ] && ( cd ; cvmfs_server abort -f ; ) ;
-      return 1
+      mutex_error=
+      grep "unable to allocate memory for mutex" $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log  | grep -q "resize mutex region"
+      if [ $? -eq 0 ] ; then
+         echo "Required: echo mutex_set_max 10000000 >> /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG"
+         #mutex_error="Required: echo mutex_set_max 10000000 >> /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG"
+         echo mutex_set_max 10000000 >> /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         rpm_init_env=$(ls -t /cvmfs/cms.cern.ch/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh | head -1)
+         echo INFO rebuilding the DB
+         dockerrun "source $rpm_init_env ; rpmdb --define \"_rpmlock_path /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/lock\" '--rebuilddb' '--dbpath' /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm ; exit \$?" > $HOME/logs/dockerrun_rpmdb_rebuild.${SCRAM_ARCH}.log 2>&1
+         if [ $? -eq 0 ] ; then
+            dockerrun "${CMSPKG} install -y cms+cmssw${second_plus}+$cmssw_release ; exit \$?" > $HOME/logs/dockerrun.install.log 2>&1
+            status=$?
+            echo INFO content of $HOME/logs/dockerrun.install.log
+            cat $HOME/logs/dockerrun.install.log
+            cp $HOME/logs/dockerrun.install.log $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log
+         else
+            printf "docker_install_nn_cmssw() rpmdb rebuild failed for ${SCRAM_ARCH} $cmssw_release \n$(cat $HOME/logs/dockerrun_rpmdb_rebuild.${SCRAM_ARCH}.log | sed 's#%#%%#g')\n" | mail -s "docker_install_nn_cmssw() ERROR rpmdb rebuild failed for $cmssw_release $SCRAM_ARCH" $notifytowhom
+            [ "$cvmfs_server_yes" == "yes" ] && ( cd ; cvmfs_server abort -f ; ) ;
+            return 1
+         fi
+      fi
+      if [ $status -eq 0 ] ; then
+         printf "docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release succeeded after the mutex increase\nContent of $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log\n$(cat $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log | sed 's#%#%%#g')\n" | mail -s "docker_install_nn_cmssw() INFO $cmssw_release ${SCRAM_ARCH} installed" $notifytowhom
+      else
+         printf "docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release failed\n$mutex_error\nContent of $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log\n$(cat $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log | sed 's#%#%%#g')\n" | mail -s "docker_install_nn_cmssw() ERROR cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release failed" $notifytowhom
+         [ "$cvmfs_server_yes" == "yes" ] && ( cd ; cvmfs_server abort -f ; ) ;
+         return 1
+      fi
    fi
    [ "$cvmfs_server_yes" == "yes" ] && cp $releases_map_local /cvmfs/cms.cern.ch/
 
