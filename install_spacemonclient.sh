@@ -1,13 +1,10 @@
 #!/bin/sh
-# 0.1.0 : Request from Natalia Ratnikova
+# 0.1.0 : Adapted from install_phedexagents.sh by Natalia Ratnikova
 # version=0.1.0
 install_spacemon-client_version=0.1.0
 ###################################################################
 
 export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
-## NR overwrite hardcoded settings:
-HOME=/home/cmsspacemon/work/CVMFS/cvmfs-cms-install-scripts
-VO_CMS_SW_DIR=/home/cmsspacemon/work/CVMFS/cms.cern.ch
 
 export RELEASE=1.0.1
 export REPO=comp
