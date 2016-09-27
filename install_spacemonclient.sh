@@ -221,16 +221,16 @@ if [ "x$cvmfs_server_yes" == "xyes" ] ; then
       fi
       i=$(expr $i + 1)
       echo INFO "[$i]" Check $thedir/.cvmfscatalog
-      echo INFO now further doing $spacemon-client_rel_dir/.cvmfscatalog
-      for spacemon-client_rel_dir in $thedir/cms/spacemon-client/* ; do
-          [ "x$spacemon-client_rel_dir" == "x$thedir/cms/spacemon-client/*" ] && break
-          [ -d $spacemon-client_rel_dir ] || continue
-          ls -al $spacemon-client_rel_dir/.cvmfscatalog 2>/dev/null 1>/dev/null ;
+      echo INFO now further doing $spacemonclient_rel_dir/.cvmfscatalog
+      for spacemonclient_rel_dir in $thedir/cms/spacemon-client/* ; do
+          [ "x$spacemonclient_rel_dir" == "x$thedir/cms/spacemon-client/*" ] && break
+          [ -d $spacemonclient_rel_dir ] || continue
+          ls -al $spacemonclient_rel_dir/.cvmfscatalog 2>/dev/null 1>/dev/null ;
           if [ $? -eq 0 ] ; then
-             echo INFO $spacemon-client_rel_dir/.cvmfscatalog exists
+             echo INFO $spacemonclient_rel_dir/.cvmfscatalog exists
           else
-             echo INFO creating $spacemon-client_rel_dir/.cvmfscatalog
-             touch $spacemon-client_rel_dir/.cvmfscatalog
+             echo INFO creating $spacemonclient_rel_dir/.cvmfscatalog
+             touch $spacemonclient_rel_dir/.cvmfscatalog
           fi
       done
    done
