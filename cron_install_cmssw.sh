@@ -54,8 +54,10 @@
 # 1.7.7: Relocate the log directory to $HOME/logs
 # 1.7.8: cmspkg -y upgrade added to install_cmssw
 # 1.7.9: update cms-common install with cmspkg
-# version 1.7.9
-version=1.7.9
+# 1.7.9: phedexagents
+# 1.8.0: spacemon-client
+# version 1.8.0
+version=1.8.0
 
 # Basic Configs
 WORKDIR=/cvmfs/cms.cern.ch
@@ -531,6 +533,15 @@ install_slc6_amd64_gcc493_phedexagents
 echo
 echo INFO Done PhEDExAgents EL6 gcc493 check and update part of the script
 echo
+# [] spacemon-client
+echo INFO Next spacemon-client EL6 gcc493 update will be checked and updated as needed
+echo
+echo INFO installing slc6 gcc493 spacemonclient
+install_slc6_amd64_gcc493_spacemonclient
+echo
+echo INFO Done spacemon-client EL6 gcc493 check and update part of the script
+echo
+
 echo INFO Next LHAPDF update will be checked and updated as needed
 echo
 
@@ -3889,6 +3900,83 @@ function install_slc6_amd64_gcc493_phedexagents () {
         fi
      else
         printf "FAILED: install_slc6_amd64_gcc493_phedexagents() PhEDExAgents ${release}+${phedexagents_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/logs/install_phedexagents.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_phedexagents() PhEDExAgents installation" $notifytowhom
+        ( cd ; cvmfs_server abort -f ; ) ;
+     fi
+     #break
+  done
+  #done
+
+  return 0
+}
+
+
+function install_slc6_amd64_gcc493_spacemonclient () {
+  export spacemonclient_REPO=comp
+  export spacemonclient_SCRAM_ARCH=slc6_amd64_gcc493  
+  
+  spacemonclient_RPMS=http://cmsrep.cern.ch/cmssw/${spacemonclient_REPO}/RPMS/${spacemonclient_SCRAM_ARCH}/
+  echo INFO checking ${spacemonclient_RPMS}
+
+  spacemonclients=$(wget -O- $spacemonclient_RPMS 2>/dev/null | grep cms+spacemon-client+ | cut -d\> -f7 | cut -d\< -f1 | sed 's#slc# slc#g' | sed 's#cms+spacemon-client+# #g' | sed 's#-1-1.# #g' | sed 's#.rpm##g' | awk '{print $1}')
+
+  currdir=$(pwd)
+  cd
+  for release in $spacemonclients ; do
+     #echo $release | grep -q "4.1.4\|4.1.5\|4.1.7\|4.1.7-comp\|4.1.8\|4.2.0pre2"
+     #[ $? -eq 0 ] && continue
+     grep -q "spacemon-client $release ${spacemonclient_SCRAM_ARCH} " $updated_list
+     if [ $? -eq 0 ] ; then
+        echo Warning spacemon-client $release ${spacemonclient_SCRAM_ARCH} installed according to $updated_list
+        continue
+     fi
+     printf "install_slc6_amd64_gcc493_spacemonclient () Starting cvmfs_server transaction\n" | mail -s "cvmfs_server transaction started" $notifytowhom
+     cvmfs_server transaction
+     status=$?
+     what="install_slc6_amd64_gcc493_spacemonclient ()"
+     cvmfs_server_transaction_check $status $what
+     if [ $? -eq 0 ] ; then
+        echo INFO transaction OK for $what
+     else
+        printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+        cd $currdir
+        return 1
+     fi
+     printf "install_slc6_amd64_gcc493_spacemonclient() installing Spacemonclient ${release}+${spacemonclient_SCRAM_ARCH} from $(/bin/hostname -f)\n" | mail -s "[0] install_slc6_amd64_gcc493_spacemonclient() installing Spacemonclient ${release}" $notifytowhom
+     echo INFO installing $release under $VO_CMS_SW_DIR : install_spacemonclient.sh $VO_CMS_SW_DIR $release ${spacemonclient_REPO} ${spacemonclient_SCRAM_ARCH}
+     $HOME/install_spacemonclient.sh $VO_CMS_SW_DIR $release ${spacemonclient_REPO} ${spacemonclient_SCRAM_ARCH} > $HOME/logs/install_spacemonclient.${release}.log 2>&1
+     status=$?
+     [ $status -eq 0 ] && printf "New SPACEMONCLIENT Client Installed with status=$?\n$(cat $HOME/logs/install_spacemonclient.${release}.log | sed 's#%#%%#g')\n" | mail -s "INFO: New SPACEMONCLIENT Client Installed" $notifytowhom
+     
+     echo DEBUG status=$status at install_slc6_amd64_gcc493_spacemonclient
+     if [ $status -eq 0 ] ; then
+        grep -q "Spacemonclient $release ${spacemonclient_SCRAM_ARCH} " $updated_list
+        if [ $? -eq 0 ] ; then
+           echo Warning Spacemonclient $release for ${spacemonclient_SCRAM_ARCH} installed
+        else
+           printf "install_slc6_amd64_gcc493_spacemonclient () Starting cvmfs_server transaction\n" | mail -s "cvmfs_server transaction started" $notifytowhom
+           cvmfs_server transaction
+           status=$?
+           what="install_slc6_amd64_gcc493_spacemonclient ()"
+           cvmfs_server_transaction_check $status $what
+           if [ $? -eq 0 ] ; then
+              echo INFO transaction OK for $what
+           else
+              printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+              cd $currdir
+              return 1
+           fi
+           echo INFO adding spacemon-client $release for ${spacemonclient_SCRAM_ARCH} to local $updated_list
+           echo spacemon-client ${release} ${spacemonclient_SCRAM_ARCH} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
+           currdir=$(pwd)
+           cd
+           time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
+           cd $currdir
+           #printf "install_spacemonclient () published  \n$(cat $HOME/logs/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
+           printf "install_slc6_amd64_gcc493_spacemonclient() Spacemonclient ${release}+${spacemonclient_SCRAM_ARCH} installed/published from $(/bin/hostname -f)\n$(cat $HOME/logs/install_spacemonclient.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] install_slc6_amd64_gcc493_spacemonclient() Spacemonclient INSTALLED" $notifytowhom
+           #echo INFO no cvmfs server. will tell the main script not to publish
+        fi
+     else
+        printf "FAILED: install_slc6_amd64_gcc493_spacemonclient() Spacemonclient ${release}+${spacemonclient_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/logs/install_spacemonclient.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_spacemonclient() Spacemonclient installation" $notifytowhom
         ( cd ; cvmfs_server abort -f ; ) ;
      fi
      #break
