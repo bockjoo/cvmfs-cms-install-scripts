@@ -56,8 +56,9 @@
 # 1.7.9: update cms-common install with cmspkg
 # 1.7.9: phedexagents
 # 1.8.0: spacemon-client
-# version 1.8.0
-version=1.8.0
+# 1.8.1: Changed the way the new PHEDEX package is discovered
+# version 1.8.1
+version=1.8.1
 
 # Basic Configs
 WORKDIR=/cvmfs/cms.cern.ch
@@ -3832,12 +3833,58 @@ function install_slc6_amd64_gcc493_crab3 () {
 
 function install_slc6_amd64_gcc493_phedexagents () {
   export phedexagents_REPO=comp
-  export phedexagents_SCRAM_ARCH=slc6_amd64_gcc493  
+  export phedexagents_SCRAM_ARCH=slc6_amd64_gcc493
+  export SCRAM_ARCH=$phedexagents_SCRAM_ARCH
   
+  cvmfs_server transaction
+  [ $? -eq 0 ] || { printf "ERROR: function install_slc6_amd64_gcc493_phedexagents cvmfs_server transaction failed\n" | mail -s "ERROR: cvmfs_server transaction failed for the phedexagent installation" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+  status=$?
+  export MYTESTAREA=$VO_CMS_SW_DIR/phedex
+  CMSPKG="$MYTESTAREA/common/cmspkg -a $SCRAM_ARCH"
+  if [ -f $MYTESTAREA/common/cmspkg ] ; then
+     echo INFO We use cmspkg
+  else
+     (
+      cd /tmp
+      echo INFO downloading cmspkg.py
+      wget -O cmspkg.py https://raw.githubusercontent.com/cms-sw/cmspkg/production/client/cmspkg.py
+
+      [ $? -eq 0 ] || { echo ERROR wget cmspkg.py failed ; rm -f cmspkg.py ; cd - ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+
+      python cmspkg.py --architecture $SCRAM_ARCH --path $MYTESTAREA --repository $phedexagents_REPO setup
+      status=$?
+      [ -f $MYTESTAREA/common/cmspkg ] || { echo ERROR cmspkg is not installed ; rm -f cmspkg.py ; return 1 ; } ;
+      rm -f cmspkg.py
+      cd
+      return $status
+     )
+     [ $? -eq 0 ] || { printf "$(basename $0) $MYTESTAREA/common/cmspkg does not exist\nUse \nsource $HOME/cron_install_cmssw-functions\ndeploy_cmspkg /cvmfs/cms.cern.ch/phedexagents slc6_amd64_gcc494 comp\n" | mail -s "ERROR: $MYTESTAREA/common/cmspkg does not exist" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ;return 1 ; } ;
+  fi
+  echo INFO executing $CMSPKG -y upgrade
+  $CMSPKG -y upgrade
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG -y upgrade upgrade failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+  $CMSPKG update 2>&1
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG update failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+
+  if [ ] ; then
   phedexagents_RPMS=http://cmsrep.cern.ch/cmssw/${phedexagents_REPO}/RPMS/${phedexagents_SCRAM_ARCH}/
   echo INFO checking ${phedexagents_RPMS}
 
   phedexagentss=$(wget -O- $phedexagents_RPMS 2>/dev/null | grep cms+PHEDEX+ | cut -d\> -f7 | cut -d\< -f1 | sed 's#slc# slc#g' | sed 's#cms+PHEDEX+# #g' | sed 's#-1-1.# #g' | sed 's#.rpm##g' | awk '{print $1}')
+
+  fi
+  phedexagentss=$($CMSPKG search cms+PHEDEX+ | awk '{print $1}' | sed 's#cms+PHEDEX+##g')
+  ( cd ; cvmfs_server abort -f ; ) ; # do not apply the change yet
 
   currdir=$(pwd)
   cd
