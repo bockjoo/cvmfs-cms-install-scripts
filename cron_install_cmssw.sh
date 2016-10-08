@@ -56,7 +56,7 @@
 # 1.7.9: update cms-common install with cmspkg
 # 1.7.9: phedexagents
 # 1.8.0: spacemon-client
-# 1.8.1: Changed the way the new PHEDEX package is discovered
+# 1.8.1: Changed the way the new package is discovered
 # version 1.8.1
 version=1.8.1
 
@@ -3744,11 +3744,55 @@ function install_slc6_crab3 () {
 function install_slc6_amd64_gcc493_crab3 () {
   export crab3_REPO=comp # $crab3repos 
   export crab3_SCRAM_ARCH=slc6_amd64_gcc493  
+  export SCRAM_ARCH=$crab3_SCRAM_ARCH
   
-  crab3_RPMS=http://cmsrep.cern.ch/cmssw/${crab3_REPO}/RPMS/${crab3_SCRAM_ARCH}/
-  echo INFO checking ${crab3_RPMS}
+  #crab3_RPMS=http://cmsrep.cern.ch/cmssw/${crab3_REPO}/RPMS/${crab3_SCRAM_ARCH}/
+  #echo INFO checking ${crab3_RPMS}
 
-  crab3s=$(wget -O- $crab3_RPMS 2>/dev/null | grep cms+crabclient+ | cut -d\> -f7 | cut -d\< -f1 | sed 's#slc# slc#g' | sed 's#cms+crabclient+# #g' | sed 's#-1-1.# #g' | sed 's#.rpm##g' | awk '{print $1}')
+  #crab3s=$(wget -O- $crab3_RPMS 2>/dev/null | grep cms+crabclient+ | cut -d\> -f7 | cut -d\< -f1 | sed 's#slc# slc#g' | sed 's#cms+crabclient+# #g' | sed 's#-1-1.# #g' | sed 's#.rpm##g' | awk '{print $1}')
+  
+  cvmfs_server transaction 2>&1 | tee $HOME/logs/cvmfs_server+transaction.log
+  [ $? -eq 0 ] || { printf "ERROR: function install_slc6_amd64_gcc493_crab3 cvmfs_server transaction failed\n$(cat $HOME/logs/cvmfs_server+transaction.log)\n" | mail -s "ERROR: cvmfs_server transaction failed for the crab3-client installation" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+  
+  export MYTESTAREA=$VO_CMS_SW_DIR/crab3
+  CMSPKG="$MYTESTAREA/common/cmspkg -a $SCRAM_ARCH"
+  if [ -f $MYTESTAREA/common/cmspkg ] ; then
+     echo INFO We use cmspkg
+  else
+     (
+      cd /tmp
+      echo INFO downloading cmspkg.py
+      wget -O cmspkg.py https://raw.githubusercontent.com/cms-sw/cmspkg/production/client/cmspkg.py
+
+      [ $? -eq 0 ] || { echo ERROR wget cmspkg.py failed ; rm -f cmspkg.py ; cd - ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+
+      python cmspkg.py --architecture $SCRAM_ARCH --path $MYTESTAREA --repository $crab3_REPO setup
+      status=$?
+      [ -f $MYTESTAREA/common/cmspkg ] || { echo ERROR cmspkg is not installed ; rm -f cmspkg.py ; return 1 ; } ;
+      rm -f cmspkg.py
+      cd
+      return $status
+     )
+     [ $? -eq 0 ] || { printf "$(basename $0) $MYTESTAREA/common/cmspkg does not exist\nUse \nsource $HOME/cron_install_cmssw-functions\ndeploy_cmspkg /cvmfs/cms.cern.ch/phedexagents slc6_amd64_gcc494 comp\n" | mail -s "ERROR: $MYTESTAREA/common/cmspkg does not exist" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ;return 1 ; } ;
+  fi
+  echo INFO executing $CMSPKG -y upgrade
+  $CMSPKG -y upgrade
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG -y upgrade upgrade failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+  $CMSPKG update 2>&1
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG update failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+
+  crab3s=$($CMSPKG search cms+crabclient+ | awk '{print $1}' | sed 's#cms+crabclient+##g')
+  ( cd ; cvmfs_server abort -f ; ) ; # do not apply the change yet
 
   currdir=$(pwd)
   cd
@@ -3836,9 +3880,9 @@ function install_slc6_amd64_gcc493_phedexagents () {
   export phedexagents_SCRAM_ARCH=slc6_amd64_gcc493
   export SCRAM_ARCH=$phedexagents_SCRAM_ARCH
   
-  cvmfs_server transaction
-  [ $? -eq 0 ] || { printf "ERROR: function install_slc6_amd64_gcc493_phedexagents cvmfs_server transaction failed\n" | mail -s "ERROR: cvmfs_server transaction failed for the phedexagent installation" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
-  status=$?
+  cvmfs_server transaction 2>&1 | tee $HOME/logs/cvmfs_server+transaction.log
+  [ $? -eq 0 ] || { printf "ERROR: function install_slc6_amd64_gcc493_phedexagents cvmfs_server transaction failed\n$(cat $HOME/logs/cvmfs_server+transaction.log)\n" | mail -s "ERROR: cvmfs_server transaction failed for the phedexagent installation" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+  
   export MYTESTAREA=$VO_CMS_SW_DIR/phedex
   CMSPKG="$MYTESTAREA/common/cmspkg -a $SCRAM_ARCH"
   if [ -f $MYTESTAREA/common/cmspkg ] ; then
@@ -3876,13 +3920,6 @@ function install_slc6_amd64_gcc493_phedexagents () {
      return 1
   fi
 
-  if [ ] ; then
-  phedexagents_RPMS=http://cmsrep.cern.ch/cmssw/${phedexagents_REPO}/RPMS/${phedexagents_SCRAM_ARCH}/
-  echo INFO checking ${phedexagents_RPMS}
-
-  phedexagentss=$(wget -O- $phedexagents_RPMS 2>/dev/null | grep cms+PHEDEX+ | cut -d\> -f7 | cut -d\< -f1 | sed 's#slc# slc#g' | sed 's#cms+PHEDEX+# #g' | sed 's#-1-1.# #g' | sed 's#.rpm##g' | awk '{print $1}')
-
-  fi
   phedexagentss=$($CMSPKG search cms+PHEDEX+ | awk '{print $1}' | sed 's#cms+PHEDEX+##g')
   ( cd ; cvmfs_server abort -f ; ) ; # do not apply the change yet
 
@@ -3891,9 +3928,6 @@ function install_slc6_amd64_gcc493_phedexagents () {
   for release in $phedexagentss ; do
      echo $release | grep -q "4.1.4\|4.1.5\|4.1.7\|4.1.7-comp\|4.1.8\|4.2.0pre2"
      [ $? -eq 0 ] && continue
-     #echo "$release" | grep -q pre
-     #[ $? -eq 0 ] && { echo INFO skipping pre release per Marco\'s request ; continue ; } ;
-     ##grep -q "crabclient$release ${phedexagents_SCRAM_ARCH} " $updated_list
      grep -q "PhEDExAgents $release ${phedexagents_SCRAM_ARCH} " $updated_list
      if [ $? -eq 0 ] ; then
         echo Warning PhEDExAgents $release ${phedexagents_SCRAM_ARCH} installed according to $updated_list
@@ -3941,7 +3975,6 @@ function install_slc6_amd64_gcc493_phedexagents () {
            cd
            time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
            cd $currdir
-           #printf "install_phedexagents () published  \n$(cat $HOME/logs/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
            printf "install_slc6_amd64_gcc493_phedexagents() PhEDExAgents ${release}+${phedexagents_SCRAM_ARCH} installed/published from $(/bin/hostname -f)\n$(cat $HOME/logs/install_phedexagents.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] install_slc6_amd64_gcc493_phedexagents() PhEDExAgents INSTALLED" $notifytowhom
            #echo INFO no cvmfs server. will tell the main script not to publish
         fi
@@ -3949,9 +3982,8 @@ function install_slc6_amd64_gcc493_phedexagents () {
         printf "FAILED: install_slc6_amd64_gcc493_phedexagents() PhEDExAgents ${release}+${phedexagents_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/logs/install_phedexagents.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_phedexagents() PhEDExAgents installation" $notifytowhom
         ( cd ; cvmfs_server abort -f ; ) ;
      fi
-     #break
+     
   done
-  #done
 
   return 0
 }
@@ -3960,11 +3992,55 @@ function install_slc6_amd64_gcc493_phedexagents () {
 function install_slc6_amd64_gcc493_spacemonclient () {
   export spacemonclient_REPO=comp
   export spacemonclient_SCRAM_ARCH=slc6_amd64_gcc493  
+  export SCRAM_ARCH=slc6_amd64_gcc493  
   
-  spacemonclient_RPMS=http://cmsrep.cern.ch/cmssw/${spacemonclient_REPO}/RPMS/${spacemonclient_SCRAM_ARCH}/
-  echo INFO checking ${spacemonclient_RPMS}
+  #spacemonclient_RPMS=http://cmsrep.cern.ch/cmssw/${spacemonclient_REPO}/RPMS/${spacemonclient_SCRAM_ARCH}/
+  #echo INFO checking ${spacemonclient_RPMS}
 
-  spacemonclients=$(wget -O- $spacemonclient_RPMS 2>/dev/null | grep cms+spacemon-client+ | cut -d\> -f7 | cut -d\< -f1 | sed 's#slc# slc#g' | sed 's#cms+spacemon-client+# #g' | sed 's#-1-1.# #g' | sed 's#.rpm##g' | awk '{print $1}')
+  #spacemonclients=$(wget -O- $spacemonclient_RPMS 2>/dev/null | grep cms+spacemon-client+ | cut -d\> -f7 | cut -d\< -f1 | sed 's#slc# slc#g' | sed 's#cms+spacemon-client+# #g' | sed 's#-1-1.# #g' | sed 's#.rpm##g' | awk '{print $1}')
+  
+  cvmfs_server transaction 2>&1 | tee $HOME/logs/cvmfs_server+transaction.log
+  [ $? -eq 0 ] || { printf "ERROR: function install_slc6_amd64_gcc493_spacemonclient cvmfs_server transaction failed\n$(cat $HOME/logs/cvmfs_server+transaction.log)\n" | mail -s "ERROR: cvmfs_server transaction failed for the spacemonclient installation" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+  
+  export MYTESTAREA=$VO_CMS_SW_DIR/spacemon-client
+  CMSPKG="$MYTESTAREA/common/cmspkg -a $SCRAM_ARCH"
+  if [ -f $MYTESTAREA/common/cmspkg ] ; then
+     echo INFO We use cmspkg
+  else
+     (
+      cd /tmp
+      echo INFO downloading cmspkg.py
+      wget -O cmspkg.py https://raw.githubusercontent.com/cms-sw/cmspkg/production/client/cmspkg.py
+
+      [ $? -eq 0 ] || { echo ERROR wget cmspkg.py failed ; rm -f cmspkg.py ; cd - ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+
+      python cmspkg.py --architecture $SCRAM_ARCH --path $MYTESTAREA --repository $spacemonclient_REPO setup
+      status=$?
+      [ -f $MYTESTAREA/common/cmspkg ] || { echo ERROR cmspkg is not installed ; rm -f cmspkg.py ; return 1 ; } ;
+      rm -f cmspkg.py
+      cd
+      return $status
+     )
+     [ $? -eq 0 ] || { printf "$(basename $0) $MYTESTAREA/common/cmspkg does not exist\nUse \nsource $HOME/cron_install_cmssw-functions\ndeploy_cmspkg /cvmfs/cms.cern.ch/spacemon-client slc6_amd64_gcc494 comp\n" | mail -s "ERROR: $MYTESTAREA/common/cmspkg does not exist" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ;return 1 ; } ;
+  fi
+  echo INFO executing $CMSPKG -y upgrade
+  $CMSPKG -y upgrade
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG -y upgrade upgrade failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+  $CMSPKG update 2>&1
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG update failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+
+  spacemonclients=$($CMSPKG search cms+spacemon-client+ | awk '{print $1}' | sed 's#cms+spacemon-client+##g')
+  ( cd ; cvmfs_server abort -f ; ) ; # do not apply the change yet
 
   currdir=$(pwd)
   cd
