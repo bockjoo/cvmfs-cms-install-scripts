@@ -141,7 +141,7 @@ if [ ! -d $rpmdb_local_dir ] ; then
 fi
 
 slcs_excluded="_ia32_"
-archs_excluded="slc5_amd64_gcc451"
+archs_excluded="slc5_amd64_gcc434\|slc5_amd64_gcc451\|slc5_amd64_gcc4621|slc5_amd64_gcc462"
 cmssws_excluded="CMSSW_4_2_8_SLHCstd_patch1 CMSSW_4_1_3_patch1 CMSSW_4_2_0 CMSSW_4_2_0_pre6 CMSSW_4_2_2_SLHC_pre1 CMSSW_4_2_3_SLHC_pre1 CMSSW_4_2_8_SLHC1_patch1 MSSW_4_2_8_SLHCstd_patch1 CMSSW_4_3_0_pre7 CMSSW_4_4_2_p10JEmalloc CMSSW_5_0_0_g4emtest CMSSW_5_0_0_pre5_root532rc1 CMSSW_4_2_3_onlpatch2 CMSSW_4_2_3_onlpatch4 CMSSW_4_2_7_hinpatch1 CMSSW_4_2_7_onlpatch2 CMSSW_4_2_9_HLT2_onlpatch1 CMSSW_4_4_2_onlpatch1 CMSSW_5_1_0_pre1 CMSSW_5_1_0_pre2 CMSSW_5_2_0_pre2_TS113282 CMSSW_5_2_0_pre3HLT CMSSW_5_3_4_TS125616patch1 CMSSW_5_3_X CMSSW_6_2_X CMSSW_6_2_X_SLHC CMSSW_7_0_X CMSSW_7_1_X CMSSW_7_2_X CMSSW_7_3_X CMSSW_7_4_X CMSSW_7_1_50"
 
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
@@ -357,6 +357,9 @@ echo INFO "[$j]" ARCHS Available: $archs
 for arch in $archs ; do
   echo "$arch" | grep -q amd64_gcc
   [ $? -eq 0 ] || continue
+  echo "$arch" | grep -q slc5_amd64_gcc
+  [ $? -eq 0 ] && continue
+
   i=$(expr $i + 1)
   echo "     INFO [ $i / $narchs ]" arch=$arch
   # Do a bootstrap if necessary
@@ -413,7 +416,16 @@ for arch in $archs ; do
   fi
   k=0
   ncmssws=$(echo $cmssws | wc -w)
+  echo DEBUG WILL DO arch=$arch and
   for cmssw in $cmssws ; do
+      echo $cmssw
+  done
+  for cmssw in $cmssws ; do
+     echo $arch | grep -q slc6_amd64_gcc600
+     if [ $? -eq 0 ] ; then
+        echo $cmssw | grep -q CMSSW_8_1_0_pre[4-8]
+        [ $? -eq 0 ] && continue
+     fi
      grep -q "$cmssw $arch" $updated_list # if it is not in the updated_list, it should be reinstall, e.g., power outage, $db
      if [ $? -eq 0 ] ; then
         #echo "          INFO [ $k / $ncmssws ]" cmssw=$cmssw arch=$arch in the db $updated_list
