@@ -57,8 +57,9 @@
 # 1.7.9: phedexagents
 # 1.8.0: spacemon-client
 # 1.8.1: Changed the way the new package is discovered
-# version 1.8.1
-version=1.8.1
+# 1.8.2: Changed the way the new CMSSW package is discovered
+# version 1.8.2
+version=1.8.2
 
 # Basic Configs
 WORKDIR=/cvmfs/cms.cern.ch
@@ -72,6 +73,8 @@ db=$HOME/$(basename $0 | sed "s#\.sh##g").db.txt
 [ -d $HOME/logs ] || mkdir -p $HOME/logs
 lock=$workdir/$(basename $0 | sed "s#\.sh##g").lock
 
+
+CMSSW_REPO=cms
 # This is a hack to add dev archs and cmssws to be installed
 # Add archs whenever a new cmssw is installed by checking extra archs for the cmssw
 dev_arch_cmssws=$HOME/$(basename $0 | sed "s#\.sh##g").dev.arch.cmssws.txt
@@ -275,7 +278,8 @@ if [ $? -ne 0 ] ; then
    exit 1
 fi
 
-archs=$(list_announced_cmssw_archs | grep -v "$slcs_excluded")
+#archs=$(list_announced_cmssw_archs | grep -v "$slcs_excluded")
+archs=$(list_announced_cmssw_slc_amd_archs | grep -v "$slcs_excluded")
 narchs=$(echo $archs | wc -w)
 
 ## [] Download the archs list every 2 hours for collect_power_arch_rpms_page
@@ -401,7 +405,12 @@ for arch in $archs ; do
   fi
   j=$(expr $j + 1)
   echo INFO "[$j]" install cmssw if necessary for $arch
-  cmssws=$(list_announced_arch_cmssws $arch | grep CMSSW_)
+  #cmssws=$(list_announced_arch_cmssws $arch | grep CMSSW_)
+  cmssws=$(list_announced_arch_cmssws $arch)
+  if [ $? -ne 0 ] ; then
+     printf "ERROR: list_announced_arch_cmssws $arch failed\n" | mail -s "ERROR: list_announced_arch_cmssws $arch failed" $notifytowhom
+     continue
+  fi
   k=0
   ncmssws=$(echo $cmssws | wc -w)
   for cmssw in $cmssws ; do
@@ -732,9 +741,26 @@ function list_requested_arch_cmssws () { # This function needs a manual edition
     return 0
 }
 
+function list_announced_all_cmssw_archs () {
+    CMSSW_REPO=cms
+    curl http://cmsrep.cern.ch/cgi-bin/repos/$CMSSW_REPO 2>/dev/null | cut -d\> -f2 | cut -d\< -f1 | sort -u | grep -v $archs_excluded
+
+}
+
+function list_announced_cmssw_slc_amd_archs () {
+    #CMSSW_REPO=cms
+    #curl http://cmsrep.cern.ch/cgi-bin/repos/$CMSSW_REPO 2>/dev/null | grep slc[0-9]_amd64_| cut -d\> -f2 | cut -d\< -f1 | sort -u | grep -v $archs_excluded
+    list_announced_all_cmssw_archs | grep slc[0-9]_amd64_ | grep -v $archs_excluded    
+}
+
 function list_announced_cmssw_archs () {
     #a_archs=$(wget --no-check-certificate -q -O- "$release_tag_xml" | grep "<architecture" | cut -d\" -f2 | sort -u)
     #a_archs=$(wget --no-check-certificate -q -O- "${releases_map}" |  cut -d\; -f1 | cut -d= -f2 | sort -u | grep slc | grep -v slc3_ | grep -v slc4_ | grep -v slc5_ia32_)
+if [ ] ; then
+    releases_map_local=$HOME/releases.map
+    releases_map="https://cmssdt.cern.ch/SDT/releases.map"
+    wget --no-check-certificate -q -O $releases_map_local  "${releases_map}"
+fi # if [ ] ; then
     a_archs=$(cat "$releases_map_local" |  cut -d\; -f1 | cut -d= -f2 | sort -u | grep slc | grep -v slc3_ | grep -v slc4_ | grep -v slc5_ia32_)
 
     r_archs=$(list_requested_cmssw_archs)
@@ -750,6 +776,36 @@ function list_announced_cmssw_archs () {
 }
 
 function list_announced_arch_cmssws () {
+  export CMSSW_REPO=cms # $crab3repos 
+  export SCRAM_ARCH=$1
+  cvmfs_server transaction 2>&1 | tee $HOME/logs/cvmfs_server+transaction.log
+  [ $? -eq 0 ] || { printf "ERROR: function list_announced_arch_cmssws cvmfs_server transaction failed\n$(cat $HOME/logs/cvmfs_server+transaction.log)\n" | mail -s "ERROR: cvmfs_server transaction failed for list_announced_arch_cmssws" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+
+  CMSPKG="$VO_CMS_SW_DIR/common/cmspkg -a $SCRAM_ARCH"
+
+  #echo INFO executing $CMSPKG -y upgrade
+  $CMSPKG -y upgrade 2>/dev/null 1>/dev/null
+  status=$?
+  if [ $status -ne 0 ] ; then
+     #echo ERROR $CMSPKG -y upgrade upgrade failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+
+  $CMSPKG update 2>/dev/null 1>/dev/null
+  status=$?
+  if [ $status -ne 0 ] ; then
+     #echo ERROR $CMSPKG update failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+  $CMSPKG search cms+cmssw+ | awk '{print $1}' | sed 's#cms+cmssw+##g'
+  $CMSPKG search cms+cmssw-patch+ | awk '{print $1}' | sed 's#cms+cmssw-patch+##g'
+  ( cd ; cvmfs_server abort -f ; ) ;
+  return 0
+}
+
+function list_announced_arch_cmssws0 () {
     ARCH=$1
     #a_cmssws=$(wget --no-check-certificate -q -O- "${release_tag_xml}&architecture=$ARCH" | grep "<project" | grep "Announced" | cut -d\" -f2 | sort -u)
     #a_cmssws=$(wget --no-check-certificate -q -O- "${releases_map}" | grep "$ARCH" | grep label=CMSSW_ | cut -d\; -f2 | cut -d= -f2)
@@ -799,23 +855,9 @@ function install_cmssw_power_archs () {
     [ $? -eq 0 ] || { export PATH=$PATH:/cvmfs/cms.cern.ch/common ; } ;
 
     what=fc
-    # required
-    # rpms_list=http://cmsrep.cern.ch/cmssw/cms/RPMS/
-    # dev_arch_rpm_list=$HOME/$(basename $0 | sed "s#\.sh##g").dev.arch.rpm
-    #[ "x$rpms_list" == "x" ] && rpms_list=http://cmsrep.cern.ch/cmssw/cms/RPMS/
-    #[ "x$dev_arch_rpm_list" == "x" ] && dev_arch_rpm_list=$HOME/cron_install_cmssw.dev.arch.rpm
-    # to be executed only once at each execution of the script to create arch rpms page files
-    #a_archs=$(wget --no-check-certificate -q -O- "$rpms_list" | grep fc[0-9][0-9]_ | grep ppc64le | grep -v "$excludes" | sed "s#/</a>#|#g" | sed "s#fc#|fc#g" | cut -d\| -f3 | sort -u)
-    #a_archs=$(grep ${what}[0-9][0-9]_ $archs_list | grep ppc64le | grep -v "$excludes_power" | sed "s#/</a>#|#g" | sed "s#${what}#|${what}#g" | cut -d\| -f3 | sort -u)
     a_archs=$(grep ${what}[0-9][0-9]_ "$releases_map_local" |  cut -d\; -f1 | cut -d= -f2 | sort -u | grep ppc64le)
+    #DRY a_archs=$(list_announced_all_cmssw_archs | grep ^${what} | grep ppc64le)
     for a in $a_archs ; do
-        #echo "$a" | grep -q "$which_slc"
-        #[ $? -eq 0 ] && continue
-        #echo INFO downloading rpm list for $a to ${dev_arch_rpm_list}.${a}.txt
-        #wget --no-check-certificate -q $rpms_list/${a} -O ${dev_arch_rpm_list}.${a}.txt
-        #echo INFO downloaded rpm list for $a
-        #cat ${dev_arch_rpm_list}.${a}.txt
-        #cmssw_releases=$(grep "cms+cmssw+CMSSW\|cms+cmssw-patch+CMSSW" ${dev_arch_rpm_list}.${a}.txt | sed "s#href=#|#g"  | cut -d\| -f2 | sed "s#${what}#|#g" | cut -d\| -f1 | cut -d+ -f3 | sed "s#-[0-9]# #g" | awk '{print $1}' | sort -u)
         cmssw_releases=$(grep $a "$releases_map_local" | grep label=CMSSW_ | cut -d\; -f2 | cut -d= -f2)
         for cmssw_release in $cmssw_releases ; do
             grep -q "$cmssw_release $a " $updated_list
