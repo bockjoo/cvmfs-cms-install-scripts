@@ -526,9 +526,10 @@ echo INFO "executing install_cmssw_power_archs 2>&1 | tee  $HOME/logs/install_cm
 install_cmssw_power_archs 2>&1 | tee  $HOME/logs/install_cmssw_power_archs.log
 
 # [] install slc aarch
-echo INFO executing "install_cmssw_aarch64_archs 2>&1 | tee $HOME/logs/cvmfs_install_aarch64.log"
-install_cmssw_aarch64_archs 2>&1 | tee $HOME/logs/cvmfs_install_aarch64.log
-
+#echo INFO executing "install_cmssw_aarch64_archs 2>&1 | tee $HOME/logs/cvmfs_install_aarch64.log"
+#install_cmssw_aarch64_archs 2>&1 | tee $HOME/logs/cvmfs_install_aarch64.log
+echo INFO executing "install_cmssw_centos72_exotic_archs 2>&1 | tee $HOME/logs/install_cmssw_centos72_exotic_archs.log"
+install_cmssw_centos72_exotic_archs 2>&1 | tee $HOME/logs/cvmfs_install_cmssw_centos72_exotic_archs.log
 echo
 echo INFO Done CMSSW installation part of the script
 
@@ -909,6 +910,7 @@ function install_cmssw_power_archs_apt () {
     # to be executed only once at each execution of the script to create arch rpms page files
     #a_archs=$(wget --no-check-certificate -q -O- "$rpms_list" | grep fc[0-9][0-9]_ | grep ppc64le | grep -v "$excludes" | sed "s#/</a>#|#g" | sed "s#fc#|fc#g" | cut -d\| -f3 | sort -u)
     a_archs=$(grep ${what}[0-9][0-9]_ $archs_list | grep ppc64le | grep -v "$excludes_power" | sed "s#/</a>#|#g" | sed "s#${what}#|${what}#g" | cut -d\| -f3 | sort -u)
+    #a_archs=$(grep ${what}[0-9]_ "$releases_map_local" |  cut -d\; -f1 | cut -d= -f2 | sort -u | grep $chip)
     for a in $a_archs ; do
         #echo "$a" | grep -q "$which_slc"
         #[ $? -eq 0 ] && continue
@@ -917,6 +919,7 @@ function install_cmssw_power_archs_apt () {
         echo INFO downloaded rpm list for $a
         #cat ${dev_arch_rpm_list}.${a}.txt
         cmssw_releases=$(grep "cms+cmssw+CMSSW\|cms+cmssw-patch+CMSSW" ${dev_arch_rpm_list}.${a}.txt | sed "s#href=#|#g"  | cut -d\| -f2 | sed "s#${what}#|#g" | cut -d\| -f1 | cut -d+ -f3 | sed "s#-[0-9]# #g" | awk '{print $1}' | sort -u)
+        #cmssw_releases=$(grep $a "$releases_map_local" | grep label=CMSSW_ | cut -d\; -f2 | cut -d= -f2)
         for cmssw_release in $cmssw_releases ; do
             grep -q "$cmssw_release $a " $updated_list
             [ $? -eq 0 ] && { echo INFO $cmssw_release $a installed according to the $updated_list ; continue ; } ;
@@ -943,23 +946,8 @@ function install_cmssw_aarch64_archs () {
 
     what=slc
     chip=aarch64
-    # required
-    # rpms_list=http://cmsrep.cern.ch/cmssw/cms/RPMS/
-    # dev_arch_rpm_list=$HOME/$(basename $0 | sed "s#\.sh##g").dev.arch.rpm
-    #[ "x$rpms_list" == "x" ] && rpms_list=http://cmsrep.cern.ch/cmssw/cms/RPMS/
-    #[ "x$dev_arch_rpm_list" == "x" ] && dev_arch_rpm_list=$HOME/cron_install_cmssw.dev.arch.rpm
-    # to be executed only once at each execution of the script to create arch rpms page files
-    #a_archs=$(wget --no-check-certificate -q -O- "$rpms_list" | grep fc[0-9][0-9]_ | grep ppc64le | grep -v "$excludes" | sed "s#/</a>#|#g" | sed "s#fc#|fc#g" | cut -d\| -f3 | sort -u)
-    #a_archs=$(grep ${what}[0-9]_ $archs_list | grep $chip | grep -v "$excludes_aarch64" | sed "s#/</a>#|#g" | sed "s#${what}#|${what}#g" | cut -d\| -f3 | sort -u)
     a_archs=$(grep ${what}[0-9]_ "$releases_map_local" |  cut -d\; -f1 | cut -d= -f2 | sort -u | grep $chip)
     for a in $a_archs ; do
-        #echo "$a" | grep -q "$which_slc"
-        #[ $? -eq 0 ] && continue
-        #echo INFO downloading rpm list for $a to ${dev_arch_rpm_list}.${a}.txt
-        #wget --no-check-certificate -q $rpms_list/${a} -O ${dev_arch_rpm_list}.${a}.txt
-        #echo INFO downloaded rpm list for $a
-        #cat ${dev_arch_rpm_list}.${a}.txt
-        #cmssw_releases=$(grep "cms+cmssw+CMSSW\|cms+cmssw-patch+CMSSW" ${dev_arch_rpm_list}.${a}.txt | sed "s#href=#|#g"  | cut -d\| -f2 | sed "s#${what}#|#g" | cut -d\| -f1 | cut -d+ -f3 | sed "s#-[0-9]# #g" | awk '{print $1}' | sort -u)
         cmssw_releases=$(grep $a "$releases_map_local" | grep label=CMSSW_ | cut -d\; -f2 | cut -d= -f2)
 
         for cmssw_release in $cmssw_releases ; do
@@ -1012,6 +1000,48 @@ function install_cmssw_aarch64_archs_apt () {
         done
     done
     return 0
+}
+
+function install_cmssw_centos72_exotic_archs () {
+    #DRY
+    #TEST workdir=$HOME
+    #TEST releases_map_local=$workdir/releases.map
+    #TEST updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
+    if [ $(expr $(date +%H) % 2) -eq 1 ] ; then
+    #TEST if [ $(expr $(date +%H) % 2) -eq -1 ] ; then
+       echo INFO install_cmssw_centos72_exotic_archs executed every 2 hours.
+       return 0
+    fi
+   
+    # use cmspkg instead of apt-get
+    which cmspkg 2>/dev/null 1>/dev/null
+    [ $? -eq 0 ] || { export PATH=$PATH:/cvmfs/cms.cern.ch/common ; } ;
+
+    status=0
+
+    what=slc
+    chips="aarch64 ppc64le"
+    #chips="ppc64le"
+    echo DEBUG doing $what and $chips
+    for chip in $chips ; do
+       a_archs=$(grep ${what}[0-9]_ "$releases_map_local" |  cut -d\; -f1 | cut -d= -f2 | sort -u | grep $chip)
+       #echo DEBUG found a_archs=$a_archs
+       for a in $a_archs ; do
+        echo DEBUG a=$a
+        cmssw_releases=$(grep $a "$releases_map_local" | grep label=CMSSW_ | cut -d\; -f2 | cut -d= -f2)
+
+        for cmssw_release in $cmssw_releases ; do
+            grep -q "$cmssw_release $a " $updated_list
+            [ $? -eq 0 ] && { echo INFO $cmssw_release $a installed according to the $updated_list ; continue ; } ;
+            echo INFO $cmssw_release $a needs to be installed
+            echo INFO executing $HOME/install_cmssw_centos72_exotic_archs.sh "$a" "$cmssw_release"
+            $HOME/install_cmssw_centos72_exotic_archs.sh "$a" "$cmssw_release" > $HOME/logs/install_cmssw_centos72_exotic_archs.${a}.${cmssw_release}.log 2>&1
+            status=$(expr $status + $?)
+            cat $HOME/logs/install_cmssw_centos72_exotic_archs.${a}.${cmssw_release}.log
+        done
+       done
+    done # chips loop
+    return $status
 }
 
 function collect_osx_rpms_page () {

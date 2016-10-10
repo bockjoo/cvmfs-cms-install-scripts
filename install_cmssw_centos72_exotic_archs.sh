@@ -4,12 +4,17 @@ updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
 export bootstrap_script=http://cmsrep.cern.ch/cmssw/cms/bootstrap.sh
 export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
 export SCRAM_ARCH=fc22_ppc64le_gcc530
-export CMSSW_RELEASE=CMSSW_8_0_0
+export CMSSW_RELEASE=CMSSW_8_0_0_pre6
+export SCRAM_ARCH=slc7_aarch64_gcc530
+export CMSSW_RELEASE=CMSSW_8_0_1
 export CMSSW_RELEASE=CMSSW_8_0_2
 [ $# -gt 0 ] && export SCRAM_ARCH=$1
 [ $# -gt 1 ] && export CMSSW_RELEASE=$2
-fedora_bzip_file=fedora-$(echo $SCRAM_ARCH | cut -c3-4)-ppc64le-rootfs.tar.bz2
-
+exotic_arch=$(echo $SCRAM_ARCH | cut -d_ -f2)
+centos72_exotic_arch_bzip_file=centos-7.2.1511-$(echo $SCRAM_ARCH | cut -d_ -f2)-rootfs.tar.bz2
+THECHIP=cortex-a57
+[ ${exotic_arch} == "aarch64" ] && THECHIP=cortex-a57
+[ ${exotic_arch} == "ppc64le" ] && THECHIP=POWER8
 
 function add_nested_entry_to_cvmfsdirtab () {
    if [ $# -lt 1 ] ; then
@@ -50,11 +55,12 @@ if [ $? -eq 0 ] ; then
    echo INFO "$CMSSW_RELEASE $SCRAM_ARCH" found in $updated_list
    exit 0
 fi
+#exotic_arch=$(echo $SCRAM_ARCH | cut -d_ -f2)
+#centos72_exotic_arch_bzip_file=centos-7.2.1511-$(echo $SCRAM_ARCH | cut -d_ -f2)-rootfs.tar.bz2
 
 files="proot qemu-ppc64le" 
-[ -d $(echo ${fedora_bzip_file} | sed 's#\.tar\.bz2##g') ] || files="$files ${fedora_bzip_file}"
-echo DEBUG $files
-
+[ -d $(echo ${centos72_exotic_arch_bzip_file} | sed 's#\.tar\.bz2##g') ] || files="$files ${centos72_exotic_arch_bzip_file}"
+#files="proot qemu-aarch64 centos-7.2.1511-aarch64-rootfs.tar.bz2 qemu-ppc64le"
 for f in $files ; do
   [ -f $f ] && continue
   wget -q -O $f http://davidlt.web.cern.ch/davidlt/vault/proot/$f
@@ -64,39 +70,34 @@ for f in $files ; do
      printf "$(basename $0): FAILED wget -q -O $f http://davidlt.web.cern.ch/davidlt/vault/proot/$f " | mail -s "ERROR FAILED downloading one of PROOT files" $notifytowhom
      exit 1
   fi
-
-  if [ "x$f" == "xproot" ] ; then
-     chmod a+x proot
-  elif [ "x$f" == "xqemu-ppc64le" ] ; then
-     chmod a+x qemu-ppc64le
-  elif [ "x$f" == "x${fedora_bzip_file}" ] ; then
-     bzip2 -d ${fedora_bzip_file} 
-     tar xvf $(echo ${fedora_bzip_file} | sed 's#\.bz2##g')
+  [ "x$f" == "xproot" ] && chmod a+x proot
+  [ "x$f" == "xqemu-${exotic_arch}" ] && chmod a+x qemu-${exotic_arch}
+  #[ "x$f" == "xqemu-aarch64" ] && chmod a+x qemu-aarch64
+  
+  if [ "x$f" == "x${centos72_exotic_arch_bzip_file}" ] ; then
+     bzip2 -d ${centos72_exotic_arch_bzip_file} 
+     tar xvf $(echo ${centos72_exotic_arch_bzip_file} | sed 's#\.bz2##g')
   fi
 done
 echo INFO $(basename $0) going to cvmfs write mode cvmfs_server transaction
 cvmfs_server transaction
 if [ $? -ne 0 ] ; then
    echo ERROR cvmfs_server transaction failed. Exiting $(basename $0)...
-   printf "$(basename $0): cvfms_server transaction failed to install $CMSSW_RELEASE ${SCRAM_ARCH}\n$(cat $HOME/cvmfs_install_POWER8.log | sed 's#%#%%#g')\n" | mail -s "ERROR installation of $CMSSW_RELEASE ${SCRAM_ARCH} failed " $notifytowhom
+   printf "$(basename $0): cvfms_server transaction failed to install $CMSSW_RELEASE ${SCRAM_ARCH}\n$(cat $HOME/logs/install_cmssw_centos72_exotic_archs.${SCRAM_ARCH}.$CMSSW_RELEASE.log | sed 's#%#%%#g')\n" | mail -s "ERROR installation of $CMSSW_RELEASE ${SCRAM_ARCH} failed " $notifytowhom
    exit 1
 fi
 
-#Because of cmspkg
-#if [ $(ls -al $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/apt/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null ; echo $? ; ) -eq 0 ] ; then
 if [ $(ls -al $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null ; echo $? ; ) -eq 0 ] ; then
      echo INFO arch ${SCRAM_ARCH} seems to be already bootstrapped
 else
      echo INFO downloading bootstrap.sh for ${SCRAM_ARCH}
      wget -q -O $VO_CMS_SW_DIR/$(basename $bootstrap_script) $bootstrap_script
-     #sh -x $VO_CMS_SW_DIR/bootstrap.sh -repository cms setup -path $VO_CMS_SW_DIR -a ${SCRAM_ARCH} > $HOME/bootstrap_${SCRAM_ARCH}.log 2>&1
-     #cat $HOME/bootstrap_${SCRAM_ARCH}.log
 fi
 
 echo INFO installing $CMSSW_RELEASE ${SCRAM_ARCH} in the proot env
-PROOT_ROOT=$(echo ${fedora_bzip_file} | sed 's#\.tar\.bz2##g')
+PROOT_ROOT=$(echo ${centos72_exotic_arch_bzip_fil} | sed 's#\.tar\.bz2##g')
 
-./proot -R $PWD/$PROOT_ROOT -b /cvmfs:/cvmfs -q "$PWD/qemu-ppc64le -cpu POWER8" /bin/sh -c "\
+./proot -R $PWD/$PROOT_ROOT -b /cvmfs:/cvmfs -q "$PWD/qemu-${exotic_arch} -cpu ${THECHIP}" /bin/sh -c "\
 star='*' ; \
 init_sh=\`ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh -t | head -1\` ; \
 if [ -f \"\$init_sh\" ] ; then \
@@ -134,17 +135,18 @@ echo INFO executing cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+
 cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+$CMSSW_RELEASE > $HOME/logs/cmspkg_install.log 2>&1 ; \
 [ \$? -eq 0 ] || { echo cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+$CMSSW_RELEASE failed ; cat $HOME/logs/cmspkg_install.log ; echo proot_status=1 ; exit 1 ; } ; \
 cat $HOME/logs/cmspkg_install.log ; \
-echo proot_status=0" > $HOME/logs/proot.log 2>&1 &
+echo proot_status=0" > $HOME/logs/proot.${exotic_arch}.log 2>&1 &
 job_pid=$!
 
 second_plus=
 echo $CMSSW_RELEASE | grep -q patch && second_plus=-patch
+
 if [ ] ; then
 n=10800 # 180 minues
 i=0
 nkill=0
 while [ $i -lt $n ] ;do
-   status=$(grep proot_status= $HOME/logs/proot.log | cut -d= -f2)
+   status=$(grep proot_status= $HOME/logs/proot.${exotic_arch}.log | cut -d= -f2)
    if [ "x$status" != "x" ] ; then
       [ $status -eq 0 ] || break
    fi 
@@ -153,8 +155,8 @@ while [ $i -lt $n ] ;do
    i=$(expr $i + 1)
    ps auxwww | grep -v grep | grep perl | grep -q projectAreaRename.pl
    if [ $? -eq 0 ] ; then
-      [ $(expr $i % 30) -eq 0 ] && { echo DEBUG grep cms+cmssw${second_plus}+${CMSSW_RELEASE} $HOME/apt_get_install.log ; grep ^cms+cmssw${second_plus}+${CMSSW_RELEASE} $HOME/apt_get_install.log ; } ;
-      grep -q ^cms+cmssw${second_plus}+${CMSSW_RELEASE} $HOME/apt_get_install.log
+      [ $(expr $i % 30) -eq 0 ] && { echo DEBUG grep cms+cmssw${second_plus}+${CMSSW_RELEASE} $HOME/POWER8/apt_get_install.${CMSSW_RELEASE}.${SCRAM_ARCH}.log ; grep ^cms+cmssw${second_plus}+${CMSSW_RELEASE} $HOME/POWER8/apt_get_install.${CMSSW_RELEASE}.${SCRAM_ARCH}.log ; } ;
+      grep -q ^cms+cmssw${second_plus}+${CMSSW_RELEASE} $HOME/POWER8/apt_get_install.${CMSSW_RELEASE}.${SCRAM_ARCH}.log
       if [ $? -eq 0 ] ; then
          echo KILLING the process
          ps auxwww | grep -v grep | grep perl | grep projectAreaRename.pl
@@ -176,26 +178,21 @@ wait $job_pid
 status_job_pid=$?
 if [ $nkill -eq 2 ] ; then
    #echo INFO after killing  projectAreaRename.pl executing it from x86_64
-   build_hash=$(grep BUILDROOT $HOME/logs/proot.log | head -1 | awk '{print $(NF-2)}' | sed 's#/# #g' | awk '{print $(NF-2)}')
+   build_hash=$(grep BUILDROOT $HOME/logs/proot.${exotic_arch}.log | head -1 | awk '{print $(NF-2)}' | sed 's#/# #g' | awk '{print $(NF-2)}')
    echo INFO after killing  projectAreaRename.pl executing it from x86_64 $HOME/cvmfs_postinstall_POWER8.sh $CMSSW_RELEASE $SCRAM_ARCH $build_hash
-   $HOME/cvmfs_postinstall_POWER8.sh $CMSSW_RELEASE $SCRAM_ARCH $build_hash
+   $HOME/cvmfs_postinstall_POWER8.sh $CMSSW_RELEASE $SCRAM_ARCH $build_hash > $HOME/cvmfs_postinstall_POWER8.${CMSSW_RELEASE}.${SCRAM_ARCH}.${build_hash}.log 2>&1
 fi
 fi # if [ ] ; then
 echo INFO doing wait
 wait $job_pid
 status_job_pid=$?
 
-status=$(grep proot_status= $HOME/logs/proot.log | cut -d= -f2) 
+
+status=$(grep proot_status= $HOME/logs/proot.${exotic_arch}.log | cut -d= -f2) 
 echo status=$status status_job_pid=$status_job_pid
-#grep Killed $HOME/apt_get_install.log | grep -q projectAreaRename
-#if [ $? -eq 0 ] ; then
-#   #status=1
-#   $HOME/cvmfs_postinstall_POWER8.sh $CMSSW_RELEASE $SCRAM_ARCH
-#   status=$?
-#fi
+
 echo INFO proot install status=$status
-#second_plus=
-#echo $CMSSW_RELEASE | grep -q patch && second_plus=-patch
+
 if [ $status -eq 0 ] ; then
    if [ -d $VO_CMS_SW_DIR/${SCRAM_ARCH}/cms/cmssw${second_plus}/$CMSSW_RELEASE ] ; then
       echo INFO updating the cvmfs management stuff
@@ -207,17 +204,21 @@ if [ $status -eq 0 ] ; then
          echo INFO creating $VO_CMS_SW_DIR/${SCRAM_ARCH}/.cvmfscatalog
          touch $VO_CMS_SW_DIR/${SCRAM_ARCH}/.cvmfscatalog
       fi
+
       grep -q "$CMSSW_RELEASE ${SCRAM_ARCH} " $updated_list
       if [ $? -eq 0 ] ; then
          echo INFO "$CMSSW_RELEASE ${SCRAM_ARCH} " found in $updated_list
       else
+         echo INFO adding "$CMSSW_RELEASE ${SCRAM_ARCH} " to $updated_list
          echo $CMSSW_RELEASE ${SCRAM_ARCH} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
          printf "$(basename $0): $CMSSW_RELEASE ${SCRAM_ARCH} installed " | mail -s "Installed $CMSSW_RELEASE ${SCRAM_ARCH} " $notifytowhom
-      fi      
+      fi
    else
+      echo ERROR $CMSSW_RELEASE ${SCRAM_ARCH} install failed. Not found.
       printf "$(basename $0): $CMSSW_RELEASE ${SCRAM_ARCH} install failed\nNot found:  $VO_CMS_SW_DIR/${SCRAM_ARCH}/cms/cmssw${second_plus}/$CMSSW_RELEASE\n$(cat $HOME/cvmfs_install_POWER8.log | sed 's###g')\n" | mail -s "ERROR installation of $CMSSW_RELEASE ${SCRAM_ARCH} failed " $notifytowhom
    fi
 else
+   echo ERROR $CMSSW_RELEASE ${SCRAM_ARCH} install failed
    printf "$(basename $0): $CMSSW_RELEASE ${SCRAM_ARCH} install failed\n$(cat $HOME/cvmfs_install_POWER8.log | sed 's###g')\n" | mail -s "ERROR installation of $CMSSW_RELEASE ${SCRAM_ARCH} failed " $notifytowhom
 fi
 echo INFO executing cvmfs_server publish
