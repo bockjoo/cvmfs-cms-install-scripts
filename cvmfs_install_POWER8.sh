@@ -8,7 +8,7 @@ export CMSSW_RELEASE=CMSSW_8_0_0
 export CMSSW_RELEASE=CMSSW_8_0_2
 [ $# -gt 0 ] && export SCRAM_ARCH=$1
 [ $# -gt 1 ] && export CMSSW_RELEASE=$2
-
+fedora_bzip_file=fedora-$(echo $SCRAM_ARCH | cut -c3-4)-ppc64le-rootfs.tar.bz2
 
 
 function add_nested_entry_to_cvmfsdirtab () {
@@ -51,19 +51,21 @@ if [ $? -eq 0 ] ; then
    exit 0
 fi
 
-files="proot qemu-ppc64le fedora-22-ppc64le-rootfs.tar.bz2"
+files="proot qemu-ppc64le" 
+[ -d $(echo ${fedora_bzip_file} | sed 's#\.tar\.bz2##g') ] || files="$files ${fedora_bzip_file}"
+echo DEBUG $files
+
 for f in $files ; do
   [ -f $f ] && continue
-  if [ "x$f" == "xfedora-22-ppc64le-rootfs.tar.bz2" ] ; then
-     [ -d fedora-22-ppc64le-rootfs ] && continue
-  fi
   wget -q -O $f http://davidlt.web.cern.ch/davidlt/vault/proot/$f
   echo Download status=$? for $f
-  [ "x$f" == "xproot" ] && chmod a+x proot
-  [ "x$f" == "xqemu-ppc64le" ] && chmod a+x qemu-ppc64le
-  if [ "x$f" == "xfedora-22-ppc64le-rootfs.tar.bz2" ] ; then
-     bzip2 -d fedora-22-ppc64le-rootfs.tar.bz2 
-     tar xvf fedora-22-ppc64le-rootfs.tar
+  if [ "x$f" == "xproot" ] ; then
+     chmod a+x proot
+  elif [ "x$f" == "xqemu-ppc64le" ] ; then
+     chmod a+x qemu-ppc64le
+  elif [ "x$f" == "x${fedora_bzip_file}" ] ; then
+     bzip2 -d ${fedora_bzip_file} 
+     tar xvf $(echo ${fedora_bzip_file} | sed 's#\.bz2##g')
   fi
 done
 echo INFO $(basename $0) going to cvmfs write mode cvmfs_server transaction
@@ -86,7 +88,9 @@ else
 fi
 
 echo INFO installing $CMSSW_RELEASE ${SCRAM_ARCH} in the proot env
-./proot -R $PWD/fedora-22-ppc64le-rootfs -b /cvmfs:/cvmfs -q "$PWD/qemu-ppc64le -cpu POWER8" /bin/sh -c "\
+PROOT_ROOT=$(echo ${fedora_bzip_file} | sed 's#\.tar\.bz2##g')
+
+./proot -R $PWD/$PROOT_ROOT -b /cvmfs:/cvmfs -q "$PWD/qemu-ppc64le -cpu POWER8" /bin/sh -c "\
 star='*' ; \
 init_sh=\`ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh -t | head -1\` ; \
 if [ -f \"\$init_sh\" ] ; then \
