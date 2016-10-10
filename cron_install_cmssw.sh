@@ -278,8 +278,12 @@ if [ $? -ne 0 ] ; then
    exit 1
 fi
 
-#archs=$(list_announced_cmssw_archs | grep -v "$slcs_excluded")
-archs=$(list_announced_cmssw_slc_amd_archs | grep -v "$slcs_excluded")
+# release.map
+archs=$(list_announced_cmssw_archs | grep -v "$slcs_excluded")
+
+# cmspkg-way 
+#archs=$(list_announced_cmssw_slc_amd_archs | grep -v "$slcs_excluded")
+
 narchs=$(echo $archs | wc -w)
 
 ## [] Download the archs list every 2 hours for collect_power_arch_rpms_page
@@ -408,8 +412,9 @@ for arch in $archs ; do
   fi
   j=$(expr $j + 1)
   echo INFO "[$j]" install cmssw if necessary for $arch
-  #cmssws=$(list_announced_arch_cmssws $arch | grep CMSSW_)
-  cmssws=$(list_announced_arch_cmssws $arch)
+  # release.map
+  cmssws=$(list_announced_arch_cmssws $arch | grep CMSSW_)
+  #cmssws=$(list_announced_arch_cmssws_cmspkg_way $arch)
   if [ $? -ne 0 ] ; then
      printf "ERROR: list_announced_arch_cmssws $arch failed\n" | mail -s "ERROR: list_announced_arch_cmssws $arch failed" $notifytowhom
      continue
@@ -694,15 +699,16 @@ function dockerrun()
   case "$SCRAM_ARCH" in
     slc7_amd64_* )
       ARGS="cd $THISDIR; $@"
-      echo INFO checking docker images
+      echo INFO checking docker images ARGS="|"$ARGS"|"
       docker images 2>/dev/null | grep $(echo $DOCKER_TAG | cut -d: -f1) | grep -q $(echo $DOCKER_TAG | cut -d: -f2)
       [ $? -eq 0 ] || { echo ERROR docker image $DOCKER_TAG not found ; return 1 ; } ;
-      #docker run --rm -it -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} -u $(id -u $(whoami)):$(id -g $(whoami)) cmssw/slc7-installer:latest sh -c "$ARGS"
       echo INFO running docker run --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} $DOCKER_TAG sh -c "$ARGS"
       #docker run --rm -it -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} -u $(whoami) $DOCKER_TAG sh -c "$ARGS"
       #docker run --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} -u $(whoami) $DOCKER_TAG sh -c "$ARGS"
       docker run --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} $DOCKER_TAG sh -c "$ARGS"
-      return $?
+      status=$?
+      echo INFO done running docker run ...
+      return $status
       ;;
     * )
       eval $@
@@ -787,7 +793,7 @@ fi # if [ ] ; then
     return 0
 }
 
-function list_announced_arch_cmssws () {
+function list_announced_arch_cmssws_cmspkg_way () {
   export CMSSW_REPO=cms # $crab3repos 
   export SCRAM_ARCH=$1
   cvmfs_server transaction 2>&1 | tee $HOME/logs/cvmfs_server+transaction.log
@@ -817,7 +823,7 @@ function list_announced_arch_cmssws () {
   return 0
 }
 
-function list_announced_arch_cmssws0 () {
+function list_announced_arch_cmssws () {
     ARCH=$1
     #a_cmssws=$(wget --no-check-certificate -q -O- "${release_tag_xml}&architecture=$ARCH" | grep "<project" | grep "Announced" | cut -d\" -f2 | sort -u)
     #a_cmssws=$(wget --no-check-certificate -q -O- "${releases_map}" | grep "$ARCH" | grep label=CMSSW_ | cut -d\; -f2 | cut -d= -f2)
@@ -1232,11 +1238,7 @@ function bootstrap_arch_slc7 () {
    #which docker 2>/dev/null 1>/dev/null
    docker images 2>/dev/null | grep $(echo $DOCKER_TAG | cut -d: -f1) | grep -q $(echo $DOCKER_TAG | cut -d: -f2)
    if [ $? -eq 0 ] ; then
-   #if [ ] ; then
-     #sh -x $VO_CMS_SW_DIR/bootstrap.sh -repository cms setup -path $VO_CMS_SW_DIR -a ${SCRAM_ARCH} > $VO_CMS_SW_DIR/bootstrap_${SCRAM_ARCH}.log 2>&1 # | tee $VO_CMS_SW_DIR/bootstrap_${SCRAM_ARCH}.log
-     #echo INFO executing dockerrun
-     #return 0
-     dockerrun "sh -ex $workdir/bootstrap.sh -repository cms setup -path $VO_CMS_SW_DIR -a $SCRAM_ARCH -y " || (cat $workdir/logs/bootstrap_${SCRAM_ARCH}.log && exit 1)
+     dockerrun "sh -ex $workdir/bootstrap.sh -repository cms setup -path $VO_CMS_SW_DIR -a $SCRAM_ARCH -y > $workdir/logs/bootstrap_$SCRAM_ARCH.log 2>&1" || (cat $workdir/logs/bootstrap_${SCRAM_ARCH}.log && exit 1)
      status=$?
    else
      /usr/bin/wget -q -O $workdir/${SCRAM_ARCH}.tar.gz --connect-timeout=360 --read-timeout=360 http://oo.ihepa.ufl.edu:8080/cmssoft/${SCRAM_ARCH}.tar.gz 2>/dev/null
