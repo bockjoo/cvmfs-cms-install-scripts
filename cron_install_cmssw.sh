@@ -58,8 +58,9 @@
 # 1.8.0: spacemon-client
 # 1.8.1: Changed the way the new package is discovered
 # 1.8.2: Changed the way the new CMSSW package is discovered
-# version 1.8.2
-version=1.8.2
+# 1.8.4: xrootd client to COMP with cmspkg
+# version 1.8.4
+version=1.8.4
 
 # Basic Configs
 WORKDIR=/cvmfs/cms.cern.ch
@@ -569,6 +570,14 @@ install_slc6_amd64_gcc493_spacemonclient
 echo
 echo INFO Done spacemon-client EL6 gcc493 check and update part of the script
 echo
+# [] spacemon-client
+echo INFO Next xrootd_client EL6 gcc493 update will be checked and updated as needed
+echo
+echo INFO installing slc6 gcc493 xrootd_client
+install_slc6_amd64_gcc493_xrootd_client
+echo
+echo INFO Done xrootd_client EL6 gcc493 check and update part of the script
+echo
 
 echo INFO Next LHAPDF update will be checked and updated as needed
 echo
@@ -1025,7 +1034,7 @@ function install_cmssw_centos72_exotic_archs () {
     echo DEBUG doing $what and $chips
     for chip in $chips ; do
        a_archs=$(grep ${what}[0-9]_ "$releases_map_local" |  cut -d\; -f1 | cut -d= -f2 | sort -u | grep $chip)
-       #echo DEBUG found a_archs=$a_archs
+       echo DEBUG found a_archs=$a_archs
        for a in $a_archs ; do
         echo DEBUG a=$a
         cmssw_releases=$(grep $a "$releases_map_local" | grep label=CMSSW_ | cut -d\; -f2 | cut -d= -f2)
@@ -3957,6 +3966,121 @@ function install_slc6_amd64_gcc493_crab3 () {
      #break
   done
   #done
+
+  return 0
+}
+
+function install_slc6_amd64_gcc493_xrootd_client () {
+  updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
+  export xrootd_client_REPO=comp
+  export xrootd_client_SCRAM_ARCH=slc6_amd64_gcc493
+  export SCRAM_ARCH=$xrootd_client_SCRAM_ARCH
+  
+  cvmfs_server transaction 2>&1 | tee $HOME/logs/cvmfs_server+transaction.log
+  [ $? -eq 0 ] || { printf "ERROR: function install_slc6_amd64_gcc493_xrootd_client cvmfs_server transaction failed\n$(cat $HOME/logs/cvmfs_server+transaction.log)\n" | mail -s "ERROR: cvmfs_server transaction failed for the xrootd_client installation" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+  
+  export MYTESTAREA=$VO_CMS_SW_DIR/COMP
+  CMSPKG="$MYTESTAREA/common/cmspkg -a $SCRAM_ARCH"
+  if [ -f $MYTESTAREA/common/cmspkg ] ; then
+     echo INFO We use cmspkg
+  else
+     (
+      cd /tmp
+      echo INFO downloading cmspkg.py
+      wget -q -O cmspkg.py https://raw.githubusercontent.com/cms-sw/cmspkg/production/client/cmspkg.py
+
+      [ $? -eq 0 ] || { echo ERROR wget cmspkg.py failed ; rm -f cmspkg.py ; cd - ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+
+      python cmspkg.py --architecture $SCRAM_ARCH --path $MYTESTAREA --repository $xrootd_client_REPO setup
+      status=$?
+      [ -f $MYTESTAREA/common/cmspkg ] || { echo ERROR cmspkg is not installed ; rm -f cmspkg.py ; return 1 ; } ;
+      rm -f cmspkg.py
+      cd
+      return $status
+     )
+     [ $? -eq 0 ] || { printf "$(basename $0) $MYTESTAREA/common/cmspkg does not exist\nUse \nsource $HOME/cron_install_cmssw-functions\ndeploy_cmspkg /cvmfs/cms.cern.ch/COMP slc6_amd64_gcc494 comp\n" | mail -s "ERROR: $MYTESTAREA/common/cmspkg does not exist" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ;return 1 ; } ;
+  fi
+  echo INFO executing $CMSPKG -y upgrade
+  $CMSPKG -y upgrade
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG -y upgrade upgrade failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+  $CMSPKG update 2>&1
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG update failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+
+  xrootd_clients=$($CMSPKG search external+xrootd+ | awk '{print $1}' | sed 's#external+xrootd+##g')
+  ( cd ; cvmfs_server abort -f ; ) ; # do not apply the change yet
+
+  currdir=$(pwd)
+  cd
+  for release in $xrootd_clients ; do
+     #echo $release | grep -q "4.0.4-comp\|4.0.4"
+     #echo $release | grep -q "4.1.4\|4.1.5\|4.1.7\|4.1.7-comp\|4.1.8\|4.2.0pre2"
+     #[ $? -eq 0 ] && continue
+     grep -q "xrootd_client $release ${xrootd_client_SCRAM_ARCH} " $updated_list
+     if [ $? -eq 0 ] ; then
+        echo Warning xrootd_client $release ${xrootd_client_SCRAM_ARCH} installed according to $updated_list
+        continue
+     fi
+     printf "install_slc6_amd64_gcc493_xrootd_client () Starting cvmfs_server transaction\n" | mail -s "cvmfs_server transaction started" $notifytowhom
+     cvmfs_server transaction
+     status=$?
+     what="install_slc6_amd64_gcc493_xrootd_client ()"
+     cvmfs_server_transaction_check $status $what
+     if [ $? -eq 0 ] ; then
+        echo INFO transaction OK for $what
+     else
+        printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+        cd $currdir
+        return 1
+     fi
+     printf "install_slc6_amd64_gcc493_xrootd_client() installing xrootd_client ${release}+${xrootd_client_SCRAM_ARCH} from $(/bin/hostname -f)\n" | mail -s "[0] install_slc6_amd64_gcc493_xrootd_client() installing xrootd_client ${release}" $notifytowhom
+     echo INFO installing $release under $VO_CMS_SW_DIR : install_xrootd_client.sh $VO_CMS_SW_DIR $release ${xrootd_client_REPO} ${xrootd_client_SCRAM_ARCH}
+     $HOME/install_xrootd_client.sh $VO_CMS_SW_DIR $release ${xrootd_client_REPO} ${xrootd_client_SCRAM_ARCH} > $HOME/logs/install_xrootd_client.${release}.log 2>&1
+     status=$?
+     [ $status -eq 0 ] && printf "New xrootd_client Installed with status=$?\n$(cat $HOME/logs/install_xrootd_client.${release}.log | sed 's#%#%%#g')\n" | mail -s "INFO: New xrootd_client Installed" $notifytowhom
+     
+     echo DEBUG status=$status at install_slc6_amd64_gcc493_xrootd_client
+     if [ $status -eq 0 ] ; then
+        grep -q "PhEDExAgents $release ${xrootd_client_SCRAM_ARCH} " $updated_list
+        if [ $? -eq 0 ] ; then
+           echo Warning xrootd_client $release for ${xrootd_client_SCRAM_ARCH} installed
+        else
+           printf "install_slc6_amd64_gcc493_xrootd_client () Starting cvmfs_server transaction\n" | mail -s "cvmfs_server transaction started" $notifytowhom
+           cvmfs_server transaction
+           status=$?
+           what="install_slc6_amd64_gcc493_xrootd_client ()"
+           cvmfs_server_transaction_check $status $what
+           if [ $? -eq 0 ] ; then
+              echo INFO transaction OK for $what
+           else
+              printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+              cd $currdir
+              return 1
+           fi
+           echo INFO adding xrootd_client $release for ${xrootd_client_SCRAM_ARCH} to local $updated_list
+           echo xrootd_client ${release} ${xrootd_client_SCRAM_ARCH} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
+           currdir=$(pwd)
+           cd
+           time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
+           cd $currdir
+           printf "install_slc6_amd64_gcc493_xrootd_client() xrootd_client ${release}+${xrootd_client_SCRAM_ARCH} installed/published from $(/bin/hostname -f)\n$(cat $HOME/logs/install_xrootd_client.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] install_slc6_amd64_gcc493_xrootd_client() xrootd_client INSTALLED" $notifytowhom
+           #echo INFO no cvmfs server. will tell the main script not to publish
+        fi
+     else
+        printf "FAILED: install_slc6_amd64_gcc493_xrootd_client() xrootd_client ${release}+${xrootd_client_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/logs/install_xrootd_client.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_xrootd_client() xrootd_client installation" $notifytowhom
+        ( cd ; cvmfs_server abort -f ; ) ;
+     fi
+     
+  done
 
   return 0
 }
