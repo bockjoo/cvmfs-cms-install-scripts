@@ -1,0 +1,51 @@
+#!/bin/bash
+# Figure out the size of cvmfs catalogs in a repository based on the
+# .cvmfsdirtab file and a 'find * ! -type d' in the top level directory.
+# Rewritten by Dave Dykstra October 4, 2016
+# BUG: does not support '!' non-match wildcards
+
+usage()
+{
+    echo "cvmfscatalogsize cmvfsdirtabpath cvmfsfindpathfile" >&2
+    echo "Either path may be '-' to read from stdin" >&2
+    echo "Example: $ cd /cvmfs/<repo>" >&2
+    echo "         $ find * ! -type d|cvmfscatalogsize .cvmfsdirtab -" >&2    
+    exit 2
+}
+
+if [ $# != 2 ]; then
+    usage
+fi
+
+
+# convert shell wildcards into regular expressions for awk's convenience
+awk -v EXPRS="`sort $1|sed '/^!/d;s,^/,,;s,\.,\\.,g;s,\*,[^/]*,g;s,?,.,g'|tr '\n' ','`" '
+BEGIN { 
+    NUMAEXPRS=split(EXPRS,AEXPRS,",")
+    NUMAEXPRS-- # ignores element after trailing newline
+    TOT=0
+}
+{
+    TOT++
+    # count down to match the longest one first
+    for (n=NUMAEXPRS; n > 0; n--) {
+        EXPR=AEXPRS[n]
+        MATCH=gensub("^(" EXPR ")/.*","\\1",1,$0)
+	if (MATCH!=$0) {
+	    if(COUNT[MATCH]=="")
+		COUNT[MATCH]=1
+	    else
+		COUNT[MATCH]++
+	    break
+	}
+    }
+}
+END {
+    for (MATCH in COUNT) {
+	print COUNT[MATCH],"\t/" MATCH
+	TOT-=COUNT[MATCH]
+    }
+    print TOT,"\t/"
+}
+' $2 | sort -k 2
+
