@@ -95,7 +95,7 @@ else
 fi
 
 echo INFO installing $CMSSW_RELEASE ${SCRAM_ARCH} in the proot env
-PROOT_ROOT=$(echo ${centos72_exotic_arch_bzip_fil} | sed 's#\.tar\.bz2##g')
+PROOT_ROOT=$(echo ${centos72_exotic_arch_bzip_file} | sed 's#\.tar\.bz2##g')
 
 ./proot -R $PWD/$PROOT_ROOT -b /cvmfs:/cvmfs -q "$PWD/qemu-${exotic_arch} -cpu ${THECHIP}" /bin/sh -c "\
 star='*' ; \

@@ -51,7 +51,7 @@ if [ $? -eq 0 ] ; then
    exit 0
 fi
 
-files="proot qemu-aarch64 centos-7.2.1511-aarch64-rootfs.tar.bz2 qemu-ppc64le fedora-22-ppc64le-rootfs.tar.bz2"
+files="proot qemu-aarch64 centos-7.2.1511-aarch64-rootfs.tar.bz2 qemu-ppc64le"
 for f in $files ; do
   [ -f $f ] && continue
   if [ "x$f" == "xfedora-22-ppc64le-rootfs.tar.bz2" ] ; then
@@ -65,10 +65,10 @@ for f in $files ; do
   [ "x$f" == "xproot" ] && chmod a+x proot
   [ "x$f" == "xqemu-ppc64le" ] && chmod a+x qemu-ppc64le
   [ "x$f" == "xqemu-aarch64" ] && chmod a+x qemu-aarch64
-  if [ "x$f" == "xfedora-22-ppc64le-rootfs.tar.bz2" ] ; then
-     bzip2 -d fedora-22-ppc64le-rootfs.tar.bz2 
-     tar xvf fedora-22-ppc64le-rootfs.tar
-  fi
+  #if [ "x$f" == "xfedora-22-ppc64le-rootfs.tar.bz2" ] ; then
+  #   bzip2 -d fedora-22-ppc64le-rootfs.tar.bz2 
+  #   tar xvf fedora-22-ppc64le-rootfs.tar
+  #fi
   if [ "x$f" == "xcentos-7.2.1511-aarch64-rootfs.tar.bz2" ] ; then
      bzip2 -d centos-7.2.1511-aarch64-rootfs.tar.bz2 
      tar xvf centos-7.2.1511-aarch64-rootfs.tar

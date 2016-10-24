@@ -973,10 +973,10 @@ function install_cmssw_aarch64_archs () {
 }
 
 function install_cmssw_aarch64_archs_apt () {
-    if [ $(expr $(date +%H) % 2) -eq 1 ] ; then
-       echo INFO install_cmssw_aarch64_archs executed every 2 hours.
-       return 0 # wget --no-check-certificate -q -O $archs_list "$rpms_list"
-    fi
+    #if [ $(expr $(date +%H) % 2) -eq 1 ] ; then
+    #   echo INFO install_cmssw_aarch64_archs executed every 2 hours.
+    #   return 0 # wget --no-check-certificate -q -O $archs_list "$rpms_list"
+    #fi
    
     # use cmspkg instead of apt-get
     which cmspkg 2>/dev/null 1>/dev/null
@@ -1016,11 +1016,11 @@ function install_cmssw_centos72_exotic_archs () {
     #TEST workdir=$HOME
     #TEST releases_map_local=$workdir/releases.map
     #TEST updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
-    if [ $(expr $(date +%H) % 2) -eq 1 ] ; then
-    #TEST if [ $(expr $(date +%H) % 2) -eq -1 ] ; then
-       echo INFO install_cmssw_centos72_exotic_archs executed every 2 hours.
-       return 0
-    fi
+    #if [ $(expr $(date +%H) % 2) -eq 1 ] ; then
+    ##TEST if [ $(expr $(date +%H) % 2) -eq -1 ] ; then
+    #   echo INFO install_cmssw_centos72_exotic_archs executed every 2 hours.
+    #   return 0
+    #fi
    
     # use cmspkg instead of apt-get
     which cmspkg 2>/dev/null 1>/dev/null
