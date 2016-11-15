@@ -233,9 +233,11 @@ echo DEBUG check point will execute
 #rm -f $HOME/rsync+generator+package+from+eos.log
 #rsync -arzuvp $rsync_source $(dirname $rsync_name) 2>&1 | tee $HOME/rsync+generator+package+from+eos.log
 echo rsync -arzuvp --delete $rsync_source $(dirname $rsync_name)
+#echo rsync -arzuvp $rsync_source $(dirname $rsync_name)
 thelog=$HOME/logs/rsync+generator+package+from+eos.log
 rm -f $thelog
 rsync -arzuvp --delete $rsync_source $(dirname $rsync_name) > $thelog 2>&1
+#rsync -arzuvp $rsync_source $(dirname $rsync_name) > $thelog 2>&1
 status=$?
 cat $thelog
 if [ $status -eq 0 ] ; then
