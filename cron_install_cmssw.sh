@@ -660,8 +660,10 @@ printf "%32s %32s\n"  "UTC_TIME"  "CERN_TIME"  > $cvmfs_self_mon
 printf "%32s %32s\n" "$UTC_TIME" "$CERN_TIME" >> $cvmfs_self_mon
 currdir=$(pwd)
 cd
-time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
+time cvmfs_server publish 2>&1 | tee $HOME/logs/cvmfs_server+publish.log
 cd $currdir
+
+backup_installation 2>&1 | tee $HOME/logs/backup_installation.log
 
 echo script $(basename $0) Done
 echo
@@ -674,6 +676,41 @@ exit 0
 
 ####### BEGIN Functions 12345
 # Functions
+function backup_installation () {
+   export X509_USER_PROXY=$HOME/.florida.t2.proxy
+   db_backup=$HOME/cvmfs_cms_cern_ch_backup.db.txt
+   [ -f $db_backup ] || touch $db_backup
+   BACKUP_SECONDS=$(expr 60 \* 59)
+   BACKUP_SOURCE=$HOME/cvmfs_backup
+   BACKUP_UP=srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/data/store/local/cvmfs/cms.cern.ch
+   BACKUP_COMMAND="lcg-cp -b --vo cms -D srmv2 -T srmv2 -v"
+   [ -d $BACKUP_SOURCE ] || mkdir -p $BACKUP_SOURCE
+   starttime=$(date +%s)
+   BACKUP_ALL=$(cd /cvmfs/cms.cern.ch ; for d in * ; do echo $d ; done) 
+   BACKUP_DATE=$(date +%Y%m%d)
+   BACKUP_EVEN_ODD=1
+   [ $(expr $BACKUP_DATE % 2) -eq 0 ] && BACKUP_EVEN_ODD=0
+   while [ $(expr $(date +%s) - $starttime) -lt $BACKUP_SECONDS ] ; do # stall only the thing in one hour
+      echo $(date)
+      cd /cvmfs/cms.cern.ch
+      for b in $BACKUP_ALL ; do
+         [ $(expr $(date +%s) - $starttime) -gt $BACKUP_SECONDS ] && break
+         grep -q "$BACKUP_DATE ${b}.tar.gz" $db_backup
+         [ $? -eq 0 ] && continue
+         tar czf ${BACKUP_SOURCE}/${b}.tar.gz ${b}
+         [ $? -eq 0 ] || break
+         lcg-cp -b --vo cms -D srmv2 -T srmv2 -v file://${BACKUP_SOURCE}/${b}.tar.gz ${BACKUP_UP}/${BACKUP_EVEN_ODD}/${b}.tar.gz
+         if [ $? -eq 0 ] ; then
+            grep -q "$BACKUP_DATE ${b}.tar.gz" $db_backup
+            [ $? -eq 0 ] || echo $BACKUP_DATE ${b}.tar.gz >> $db_backup
+         fi
+      done
+      cd -
+      sleep 1
+   done
+   return 0
+}
+
 function deploy_cmspkg () {
   [ $# -lt 3 ] && { echo ERROR deploy_cmspkg path arch repo ; return 1 ; } ;
   swpath=$1 # /cvmfs/cms.cern.ch/crab3
