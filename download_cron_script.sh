@@ -44,7 +44,7 @@ for f in $files ; do
   ls -al $workdir/$f
 done
 
-files="lhapdf_list.txt list_requested_arch_cmssws_cvmfs.txt cron_install_cmssw.config"
+files="functions-cms-cvmfs-mgmt lhapdf_list.txt list_requested_arch_cmssws_cvmfs.txt cron_install_cmssw.config"
 i=0
 for f in $files ; do
    i=$(expr $i + 1)
