@@ -697,13 +697,16 @@ function backup_installation () {
          [ $(expr $(date +%s) - $starttime) -gt $BACKUP_SECONDS ] && break
          grep -q "$BACKUP_DATE ${b}.tar.gz" $db_backup
          [ $? -eq 0 ] && continue
+         echo INFO $(date) STARTED executing tar czf ${BACKUP_SOURCE}/${b}.tar.gz ${b}
          tar czf ${BACKUP_SOURCE}/${b}.tar.gz ${b}
-         [ $? -eq 0 ] || break
+         [ $? -eq 0 ] || { echo INFO $(date) ENDED executing tar czf ${BACKUP_SOURCE}/${b}.tar.gz ${b} ; break ; } ;
+         echo INFO $(date) ENDED executing tar czf ${BACKUP_SOURCE}/${b}.tar.gz ${b}
          lcg-cp -b --vo cms -D srmv2 -T srmv2 -v file://${BACKUP_SOURCE}/${b}.tar.gz ${BACKUP_UP}/${BACKUP_EVEN_ODD}/${b}.tar.gz
          if [ $? -eq 0 ] ; then
             grep -q "$BACKUP_DATE ${b}.tar.gz" $db_backup
             [ $? -eq 0 ] || echo $BACKUP_DATE ${b}.tar.gz >> $db_backup
          fi
+         rm -f ${BACKUP_SOURCE}/${b}.tar.gz
       done
       cd -
       sleep 1
