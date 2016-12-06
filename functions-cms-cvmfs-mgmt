@@ -1,5 +1,175 @@
+#!/bin/bash
 ####### BEGIN Functions 12345
+notifytowhom=bockjoo@phys.ufl.edu
 # Functions
+function day_and_even_odd_combination () {
+   BACKUP_DATE=$(date +%Y%m%d)
+   BACKUP_EVEN_ODD=1
+   [ $(expr $BACKUP_DATE % 2) -eq 0 ] && BACKUP_EVEN_ODD=0
+   if [ $(expr $(date  --date="1 day ago" +%Y%m%d) % 2) -eq 0 ] ; then
+      BACKUP_EVEN_ODD_YTD=0
+   else
+      BACKUP_EVEN_ODD_YTD=1
+   fi
+   [ $BACKUP_EVEN_ODD_YTD -eq $BACKUP_EVEN_ODD ] && BACKUP_EVEN_ODD=2
+   echo $BACKUP_EVEN_ODD
+}
+
+function T2_host_sleep_time () {
+   # generate a random sleep time between 48 second 3600
+   sleep_time=$(echo $(( RANDOM % (3600 - 48 + 1 ) + 48 )))
+   [ $(/bin/hostname -f) == archer.ihepa.ufl.edu ] && { sleep_time=1 ; echo $sleep_time ; return 0 ; } ;
+   [ $(/bin/hostname -f) == alachua.ihepa.ufl.edu ] && { sleep_time=5 ; echo $sleep_time ; return 0 ; } ;
+   [ $(/bin/hostname -f) == newberry.ihepa.ufl.edu ] && { sleep_time=7 ; echo $sleep_time ; return 0 ; } ;
+   [ $(/bin/hostname -f) == melrose.ihepa.ufl.edu ] && { sleep_time=9 ; echo $sleep_time ;return 0 ; } ;
+   [ $(/bin/hostname -f) == oo.ihepa.ufl.edu ] && { sleep_time=10 ; echo $sleep_time ; return 0 ; } ;
+   [ $(/bin/hostname -f) == xrootd2.ihepa.ufl.edu ] && { sleep_time=15 ; echo $sleep_time ; return 0 ; } ;
+   [ $(/bin/hostname -f) == phedexb.ihepa.ufl.edu ] && { sleep_time=20 ; echo $sleep_time ; return 0 ; } ;
+
+   echo $sleep_time
+   return 0
+}
+
+function rsync_cvmfs_cms_cern_ch_to_cms_cvmfs () {
+   NCYCLE=$(grep /usr/local/bin/cvmfs-rsync.sh /etc/cron.d/cvmfs-rsync 2>/dev/null | awk '{print $2}' | cut -d/ -f2)
+   [ "x$(echo $NCYCLE)" == "x" ] && NCYCLE=6
+   sleep_time=$(T2_host_sleep_time)
+   echo INFO starting rsync_cvmfs_cms_cern_ch_to_cms_cvmfs ICYCLE=$(expr $(date +%H) / $NCYCLE) NCYCLE=$NCYCLE Sleeping for $sleep_time
+   # Run it every NCYCLE (default=6) hours with a machine-dependent sleep time
+   
+   #sleep_time=$(T2_host_sleep_time)
+   sleep $sleep_time
+   db_backup=/cms/data/store/local/cvmfs/cms.cern.ch/cvmfs_cms_cern_ch_backup.db.txt
+   [ -f $db_backup ] || touch $db_backup
+   BACKUP_SECONDS=$(expr 60 \* 59)
+   BACKUP_COMMAND="lcg-cp -b --vo cms -D srmv2 -T srmv2 -v"
+   
+   starttime=$(date +%s)
+   BACKUP_LIST=$(cd /cvmfs/cms.cern.ch ; for d in * ; do echo $d ; done) 
+   
+   BACKUP_DATE=$(date +%Y%m%d)
+   BACKUP_CYCLE=$(expr $(date +%H ) / $NCYCLE)
+   #BACKUP_UP=/cms/data/store/local/cvmfs/cms.cern.ch #/$(day_and_even_odd_combination)
+   BACKUP_UP=/cms/cvmfs/cms.cern.ch
+   thelock=${BACKUP_UP}/.rsync.$(/bin/hostname -f).lock
+   if [ -f $thelock ] ; then
+      echo INFO $thelock exists cat $thelock
+      printf "$(/bin/hostname -f): rsync_cvmfs_cms_cern_ch_to_cms_cvmfs: rsync is still running\n$(cat $thelock)\n" | mail -s "rsync_cvmfs_cms_cern_ch_to_cms_cvmfs: rsync locked" $notifytowhom
+      return 0
+   else
+      echo INFO creating $thelock
+      echo $(/bin/hostname -f) $(date) $(date +%s) > $thelock
+   fi
+   echo $(date)
+   cd /cvmfs/cms.cern.ch
+   #ndone=$(for b in $BACKUP_LIST ; do ls ${BACKUP_UP}/${b}.lock ; done | wc -l)
+   #if [ $ndone -eq $(echo $BACKUP_LIST | wc -w) ] ; then
+   #   printf "$(/bin/hostname -f): rsync_cvmfs_cms_cern_ch_to_cms_cvmfs: rsync done for this cycle\n" | mail -s "rsync_cvmfs_cms_cern_ch_to_cms_cvmfs: rsync done" $notifytowhom
+   #   for b in $BACKUP_LIST ; do rm -f ${BACKUP_UP}/${b}.lock ; done
+   #fi
+   for b in $BACKUP_LIST ; do
+      echo INFO Checking and doing "$b"
+      #[ $(expr $(date +%s) - $starttime) -gt $BACKUP_SECONDS ] && break
+
+      # if it is already in the db, skip it
+      grep -q "$BACKUP_DATE $BACKUP_CYCLE ${b}.rsync" $db_backup
+      [ $? -eq 0 ] && continue
+
+      # if something else is doing the job, skip it 
+      [ -f ${BACKUP_UP}/.${b}.lock ] && continue
+      
+      # claim the task first
+      STARTTIME=$(date +%s)
+      echo INFO "$b" Starting at $(/bin/hostname -f) $(date) $STARTTIME > ${BACKUP_UP}/.${b}.lock
+      echo INFO "$b" $(date) STARTED executing rsync -arupq --delete /cvmfs/cms.cern.ch/${b} ${BACKUP_UP}
+      rsync -arupq --delete /cvmfs/cms.cern.ch/${b} ${BACKUP_UP}
+      status=$?
+      ENDTIME=$(date +%s)
+      if [ $(expr $ENDTIME - $STARTTIME) -gt 1800 ] ; then
+         printf "$(/bin/hostname -f): INFO rsync_cvmfs_cms_cern_ch_to_cms_cvmfs: rsync -arupq --delete /cvmfs/cms.cern.ch/${b} ${BACKUP_UP} just finished\n" | mail -s "INFO rsync_cvmfs_cms_cern_ch_to_cms_cvmfs" $notifytowhom
+      fi
+
+      if [ $status -ne 0 ] ; then
+         echo INFO $(date) ERROR for ${b}
+         printf "$(/bin/hostname -f): ERROR rsync_cvmfs_cms_cern_ch_to_cms_cvmfs: rsync error for ${b}\n" | mail -s "ERROR rsync_cvmfs_cms_cern_ch_to_cms_cvmfs" $notifytowhom
+      fi
+      echo INFO $(date) ENDED executing rsync -arupq --delete /cvmfs/cms.cern.ch/${b} ${BACKUP_UP}
+
+      #if [ $status -eq 0 ] ; then
+      grep -q "$BACKUP_DATE $BACKUP_CYCLE ${b}.rsync" $db_backup
+      if [ $? -ne 0 ] ; then
+         echo $BACKUP_DATE $BACKUP_CYCLE ${b}.rsync >> $db_backup
+      fi
+      #fi
+      echo INFO $(date) Done $b with status=$status
+      rm -f ${BACKUP_UP}/.${b}.lock
+   done
+   cd -
+   BACKUP_DATE_ADAY_AGO=$(date  --date="1 day ago")
+   #sed -i "/$(echo $BACKUP_DATE_ADAY_AGO | sed 's^/^\\\/^g')/ d" $db_backup
+   rm -f $thelock
+   return 0
+}
+
+function backup_installation_to_T2_US_Florida () {
+   # Run it every 6 hours
+   #HNOW=$(date +%H)
+   #[ $HNOW -gt 9 -a $HNOW -le 11 ] && return 0 
+   #[ $HNOW -gt 21 -a $HNOW -le 23 ] && return 0
+   #export X509_USER_PROXY=$HOME/.florida.t2.proxy
+   #export X509_USER_PROXY=/raid/raid5/cms/bockjoo/cms_analysis/phedex_proxy
+   # Run 
+   db_backup=/cms/data/store/local/cvmfs/cms.cern.ch/cvmfs_cms_cern_ch_backup.db.txt
+   [ -f $db_backup ] || touch $db_backup
+   BACKUP_SECONDS=$(expr 60 \* 59)
+   #BACKUP_SOURCE=$HOME/cvmfs_backup
+   #BACKUP_UP=srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/data/store/local/cvmfs/cms.cern.ch
+   BACKUP_COMMAND="lcg-cp -b --vo cms -D srmv2 -T srmv2 -v"
+   #[ -d $BACKUP_SOURCE ] || mkdir -p $BACKUP_SOURCE
+   starttime=$(date +%s)
+   BACKUP_ALL=$(cd /cvmfs/cms.cern.ch ; for d in * ; do echo $d ; done) 
+   BACKUP_EVEN_ODD=$(day_and_even_odd_combination)
+   BACKUP_DATE=$(date +%Y%m%d)
+   BACKUP_CYCLE=$(expr $(date +%H ) / 6)
+   BACKUP_UP=/cms/data/store/local/cvmfs/cms.cern.ch/${BACKUP_EVEN_ODD}
+   #BACKUP_UP=/cms/cvmfs/cms.cern.ch
+   #while [ $(expr $(date +%s) - $starttime) -lt $BACKUP_SECONDS ] ; do # stall only the thing in one hour
+      echo $(date)
+      cd /cvmfs/cms.cern.ch
+      ndone=$(for b in $BACKUP_ALL ; do ls ${BACKUP_UP}/${b}.lock ; done | wc -l)
+      if [ $ndone -eq $(echo $BACKUP_ALL | wc -w) ] ; then
+         printf "$(/bin/hostname -f): backup_installation_to_T2_US_Florida: rsync done for this cycle\n" | mail -s "backup_installation_to_T2_US_Florida: rsync done" $notifytowhom
+         for b in $BACKUP_ALL ; do rm -f ${BACKUP_UP}/${b}.lock ; done
+      fi
+      for b in $BACKUP_ALL ; do
+         #[ $(expr $(date +%s) - $starttime) -gt $BACKUP_SECONDS ] && break
+         [ -f ${BACKUP_UP}/.${b} ] && continue # if something else is doing the job, skip it 
+         grep -q "$BACKUP_DATE $BACKUP_CYCLE ${b}.rsync" $db_backup # if it is already in the db, skip it
+         [ $? -eq 0 ] && continue
+         touch ${BACKUP_UP}/${b}.lock
+         #echo INFO $(date) STARTED executing tar czf ${BACKUP_UP}/${b}.tar.gz ${b}
+         #tar czf ${BACKUP_SOURCE}/${b}.tar.gz ${b}
+         #1 tar czf ${BACKUP_UP}/${b}.tar.gz ${b}
+         echo INFO $(date) STARTED executing rsync -arupq --delete /cvmfs/cms.cern.ch/${b} ${BACKUP_UP}
+         rsync -arupq --delete /cvmfs/cms.cern.ch/${b} ${BACKUP_UP}
+         status=$?
+         #[ $? -eq 0 ] || { echo INFO $(date) ENDED failed execution of tar czf ${BACKUP_UP}/${b}.tar.gz ${b} ; break ; } ;
+         [ $status -eq 0 ] || { echo INFO $(date) ERROR for ${b} ; } ;
+         echo INFO $(date) ENDED executing rsync -arupq --delete /cvmfs/cms.cern.ch/${b} ${BACKUP_UP}
+         #echo INFO $(date) ENDED executing tar czf ${BACKUP_UP}/${b}.tar.gz ${b}
+         #lcg-cp -b --vo cms -D srmv2 -T srmv2 -v file://${BACKUP_SOURCE}/${b}.tar.gz ${BACKUP_UP}/${BACKUP_EVEN_ODD}/${b}.tar.gz
+         if [ $status -eq 0 ] ; then
+            grep -q "$BACKUP_DATE $BACKUP_CYCLE ${b}.rsync" $db_backup
+            [ $? -eq 0 ] || echo $BACKUP_DATE ${b}.rsync >> $db_backup
+         fi
+         #rm -f ${BACKUP_SOURCE}/${b}.tar.gz
+      done
+      cd -
+      sleep 1
+   #done
+   return 0
+}
+
 function backup_installation () {
    export X509_USER_PROXY=$HOME/.florida.t2.proxy
    db_backup=$HOME/cvmfs_cms_cern_ch_backup.db.txt
@@ -7,6 +177,7 @@ function backup_installation () {
    BACKUP_SECONDS=$(expr 60 \* 59)
    BACKUP_SOURCE=$HOME/cvmfs_backup
    BACKUP_UP=srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/data/store/local/cvmfs/cms.cern.ch
+   BACKUP_UP=gsiftp://gridftp3.ihepa.ufl.edu///raid/raid8/cvmfs/cms.cern.ch
    BACKUP_COMMAND="lcg-cp -b --vo cms -D srmv2 -T srmv2 -v"
    [ -d $BACKUP_SOURCE ] || mkdir -p $BACKUP_SOURCE
    starttime=$(date +%s)
@@ -14,6 +185,7 @@ function backup_installation () {
    BACKUP_DATE=$(date +%Y%m%d)
    BACKUP_EVEN_ODD=1
    [ $(expr $BACKUP_DATE % 2) -eq 0 ] && BACKUP_EVEN_ODD=0
+   BACKUP_EVEN_ODD=
    while [ $(expr $(date +%s) - $starttime) -lt $BACKUP_SECONDS ] ; do # stall only the thing in one hour
       echo $(date)
       cd /cvmfs/cms.cern.ch
@@ -557,10 +729,10 @@ function bootstrap_arch () {
       return 1
    fi
    echo INFO executing bootstrap.sh
-   sh -x $VO_CMS_SW_DIR/bootstrap.sh -repository cms setup -path $VO_CMS_SW_DIR -a ${SCRAM_ARCH} > $VO_CMS_SW_DIR/bootstrap_${SCRAM_ARCH}.log 2>&1 # | tee $VO_CMS_SW_DIR/bootstrap_${SCRAM_ARCH}.log
+   sh -x $VO_CMS_SW_DIR/bootstrap.sh -repository cms setup -path $VO_CMS_SW_DIR -a ${SCRAM_ARCH} > $HOME/logs/bootstrap_arch_${SCRAM_ARCH}.log 2>&1 # | tee $VO_CMS_SW_DIR/bootstrap_${SCRAM_ARCH}.log
    status=$?
    if [ $status -eq 0 ] ; then
-      tail -1 $VO_CMS_SW_DIR/bootstrap_${SCRAM_ARCH}.log | grep -q "+ exit 0"
+      tail -1  $HOME/logs/bootstrap_arch_${SCRAM_ARCH}.log | grep -q "+ exit 0"
       if [ $? -eq 0 ] ; then
          printf "bootstrap_arch() publishing bootstrap for ${SCRAM_ARCH}\n" | mail -s "bootstrap_arch() publishing bootstrap" $notifytowhom
          publish_cmssw_cvmfs bootstrap_for_${SCRAM_ARCH}

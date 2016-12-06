@@ -664,7 +664,7 @@ cd
 time cvmfs_server publish 2>&1 | tee $HOME/logs/cvmfs_server+publish.log
 cd $currdir
 
-backup_installation 2>&1 | tee $HOME/logs/backup_installation.log
+#backup_installation 2>&1 | tee $HOME/logs/backup_installation.log
 
 echo script $(basename $0) Done
 echo
