@@ -1,6 +1,6 @@
 #!/bin/bash
-# versiono 0.1.5
-version=0.1.5
+# versiono 0.1.6
+version=0.1.6
 source $HOME/cron_install_cmssw.config # notifytowhom
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
 
@@ -29,14 +29,16 @@ EOS_CLIENT_VERSION=${EOS_CLIENT_VERSION:-0.3.15}
 #alias eosforceumount='killall eosfsd 2>/dev/null; killall -9 eosfsd 2>/dev/null; fusermount -u '
 #alias eosmount='/afs/cern.ch/project/eos/installation/0.3.15/bin/eos.select -b fuse mount'
 #alias eosumount='/afs/cern.ch/project/eos/installation/0.3.15/bin/eos.select -b fuse umount'
+export EOSSYS=/home/cvcms/eos_installation/${EOS_CLIENT_VERSION}
+export EOSSYS=/afs/cern.ch/project/eos/installation/${EOS_CLIENT_VERSION}
 
 eos () {
-  /afs/cern.ch/project/eos/installation/${EOS_CLIENT_VERSION}/bin/eos.select
+  $EOSSYS/bin/eos.select
   return $?
 }
 
 eoscms () {
-  /afs/cern.ch/project/eos/installation/${EOS_CLIENT_VERSION}/bin/eos.select
+  $EOSSYS/bin/eos.select
   return $?
 }
 
@@ -48,12 +50,12 @@ eosforceumount () {
 }
 
 eosmount () {
-  /afs/cern.ch/project/eos/installation/${EOS_CLIENT_VERSION}/bin/eos.select -b fuse mount $1
+  $EOSSYS/bin/eos.select -b fuse mount $1
   return $?  
 }
 
 eosumount () {
-  /afs/cern.ch/project/eos/installation/${EOS_CLIENT_VERSION}/bin/eos.select -b fuse umount $1
+  $EOSSYS/bin/eos.select -b fuse umount $1
   return $?
 }
 
