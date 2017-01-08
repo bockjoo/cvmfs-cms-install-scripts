@@ -1,6 +1,6 @@
 #!/bin/bash
-# versiono 0.1.6
-version=0.1.6
+# versiono 0.1.7
+version=0.1.7
 source $HOME/cron_install_cmssw.config # notifytowhom
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
 
@@ -30,7 +30,7 @@ EOS_CLIENT_VERSION=${EOS_CLIENT_VERSION:-0.3.15}
 #alias eosmount='/afs/cern.ch/project/eos/installation/0.3.15/bin/eos.select -b fuse mount'
 #alias eosumount='/afs/cern.ch/project/eos/installation/0.3.15/bin/eos.select -b fuse umount'
 export EOSSYS=/home/cvcms/eos_installation/${EOS_CLIENT_VERSION}
-export EOSSYS=/afs/cern.ch/project/eos/installation/${EOS_CLIENT_VERSION}
+#export EOSSYS=/afs/cern.ch/project/eos/installation/${EOS_CLIENT_VERSION}
 
 eos () {
   $EOSSYS/bin/eos.select
