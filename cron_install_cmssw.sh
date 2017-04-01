@@ -156,6 +156,8 @@ cvmfs_self_mon=/cvmfs/cms.cern.ch/oo77
 releases_map="https://cmssdt.cern.ch/SDT/releases.map"
 releases_map_local=$workdir/releases.map
 bootstrap_script=http://cmsrep.cern.ch/cmssw/cms/bootstrap.sh
+bootstrap_script=http://cmsrep.cern.ch/cmssw/repos/bootstrap-dev.sh # 01FEB2017
+bootstrap_script=http://cmsrep.cern.ch/cmssw/repos/bootstrap.sh     # 01FEB2017
 #rpms_list=http://cmsrep.cern.ch/cmssw/cms/RPMS/
 
 #archs_list=$HOME/archs_list.txt
@@ -192,6 +194,7 @@ export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
 export LANG="C"
 #DOCKER_TAG=bockjoo/slc7:test
 DOCKER_TAG=cmssw/slc7:current
+DOCKER_TAG=cmssw/slc7-installer:cvcms # the one that Shahzad built and pulled from hub
 
 functions=$HOME/functions-cms-cvmfs-mgmt # $workdir/$(basename $0 | sed "s#\.sh##g")-functions # .$(date -u +%s)
 
@@ -252,7 +255,8 @@ if [ -f $lock ] ; then
    printf "$(basename $0) Warning lock exists\n$(ls -al $lock)\nContent of lock\n$(cat $lock)\nDate now is \n$(date)\n$(date -u)\n\n\nIs the lock created process running? Ans: $is_this_running\n\n\n$(ps auxwww | grep -v grep | grep $theuser | grep $0)\nRunning processes\n$(ps auxwww | grep -v grep | grep $theuser)\n" | mail -s "$(basename $0) Warning lock exists" $notifytowhom      
    exit 0
 else
-   printf "$(basename $0) INFO starting $(basename $0)\n" | mail -s "$(basename $0) [ $date_ymdhs ] starting $(basename $0)" $notifytowhom      
+   date_ymdh=$(date +"["%H"] ["%Y-%m-%d"]")
+   printf "$(basename $0) INFO starting $(basename $0)\n" | mail -s "$date_ymdh $(basename $0) starting $(basename $0)" $notifytowhom      
 fi
 
 echo INFO creating $lock
@@ -371,9 +375,10 @@ for arch in $archs ; do
   # Do a bootstrap if necessary
   j=$(expr $j + 1)
   echo INFO "[$j]" do a bootstrap if necessary
-  if [ $(ls -al $VO_CMS_SW_DIR/${arch}/external/apt/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null ; echo $? ; ) -eq 0 ] ; then
+  if [ $(ls -al $VO_CMS_SW_DIR/${arch}/external/rpm/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null ; echo $? ; ) -eq 0 ] ; then
      echo INFO "[$j]" arch $arch seems to be already bootstrapped
   else
+     echo INFO "[$j]" bootstrapping bootstrap_arch $arch
      bootstrap_arch $arch
      if [ $? -eq 0 ] ; then
         printf "$(basename $0) $(hostname -f) Success: bootstrap_arch $arch \n$(cat $VO_CMS_SW_DIR/bootstrap_${arch}.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) $(hostname -f) Success: bootstrap_arch $arch " $notifytowhom      
@@ -386,7 +391,7 @@ for arch in $archs ; do
            if [ $? -eq 0 ] ; then
               printf "$(basename $0) $(hostname -f) Success: bootstrap_arch_tarball $arch \n$(cat $VO_CMS_SW_DIR/bootstrap_${arch}.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) $(hostname -f) Success: bootstrap_arch_tarball $arch " $notifytowhom
            else
-              printf "$(basename $0) $(hostname -f) failed: bootstrap_arch $arch \n" | mail -s "ERROR $(basename $0) $(hostname -f) bootstrap_arch $arch failed " $notifytowhom
+              printf "$(basename $0) $(hostname -f) failed: bootstrap_arch $arch \n$(cat $workdir/logs/bootstrap_arch_slc7_${arch}.log | sed 's#%#%%#g')\n" | mail -s "ERROR $(basename $0) $(hostname -f) bootstrap_arch $arch failed " $notifytowhom
               continue
            fi
         else
@@ -665,11 +670,11 @@ time cvmfs_server publish 2>&1 | tee $HOME/logs/cvmfs_server+publish.log
 cd $currdir
 
 #backup_installation 2>&1 | tee $HOME/logs/backup_installation.log
-
+#it takes longer than 8 hours: backup_installation_one slc6_amd64_gcc472 2>&1 | tee $HOME/logs/backup_installation_one_slc6_amd64_gcc472.log
 echo script $(basename $0) Done
 echo
-
-printf "$(basename $0) Removing $lock from $(/bin/hostname -f)\n" | mail -s "$(basename $0) [ $date_ymdhs ] Removing lock" $notifytowhom
+date_ymdh=$(date +"["%H"] ["%Y-%m-%d"]")
+printf "$(basename $0) Removing $lock from $(/bin/hostname -f)\n" | mail -s "$date_ymdh $(basename $0) Removing lock" $notifytowhom
 
 rm -f $lock
 exit 0
