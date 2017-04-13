@@ -272,6 +272,8 @@ fi
 /bin/rm ${ERR_FILE} 1>/dev/null 2>&1
 #
 # make list of CMS site names:
+echo DEBUG content of sitedb 
+cat ${TMP_AREA}/sitedb.json 
 /bin/rm -f ${TMP_AREA}/sitedb.list
 /usr/bin/awk -f ${TMP_AREA}/sitedb.awk ${TMP_AREA}/sitedb.json 1>${TMP_AREA}/sitedb.list
 /bin/rm ${TMP_AREA}/sitedb.json
@@ -330,6 +332,8 @@ FAIL=0
 for PAGE in 1 2 3 4 5 6 7 8 9; do
    /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=90 -O ${TMP_AREA}/gitlab_${PAGE}.json 'https://gitlab.cern.ch/api/v3/groups/SITECONF/projects?per_page=100&page='${PAGE} 1>>${ERR_FILE} 2>&1
    RC=$?
+   echo DEBUG gitlab page:
+   cat ${TMP_AREA}/gitlab_${PAGE}.json
    if [ ${RC} -eq 0 ]; then
       SUCC=1
       /bin/grep name ${TMP_AREA}/gitlab_${PAGE}.json 1>/dev/null 2>&1
@@ -600,7 +604,29 @@ if [ ${FAIL} -ne 0 ]; then
    fi
    exit 1
 fi
+
+#
+# if there are sites that are removed from gitlab or sitedb and UPDATE_SITES is empty,
+# we need to make sure those sites are deleted from /cvmfs/cms.cern.ch/SITECONF and those
+# sites should be added to the UPDATED_SITES list
+#
+#if [ "x$UPDATED_SITES" == "x" ] ; then
+#echo DEBUG updated_sites are empty
+sites_cvmfs=$(ls /cvmfs/cms.cern.ch/SITECONF | sort -u | grep T[0-9])
+sites_sync_dir=$(ls $SYNC_DIR/SITECONF | sort -u | grep T[0-9])
+   
+for s in $sites_cvmfs ; do
+    for s_sync in $sites_sync_dir ; do echo $s_sync ; done | grep -q $s
+    if [ $? -ne 0 ] ; then
+       echo DEBUG $s REMOVED from gitlab or sitedb
+       for s_u in $list_sites_updated ; do echo $s_u ; done | grep -q $s
+       [ $? -eq 0 ] || list_sites_updated="$list_sites_updated $s"
+    fi
+done
+#fi
 echo UPDATED_SITES=\"$(echo $list_sites_updated)\"
+
+#echo UPDATED_SITES=
 cp -pR /cvmfs/cms.cern.ch/SITECONF/local ${SYNC_DIR}/SITECONF/
 /bin/rm ${ERR_FILE} 1>/dev/null 2>&1
 # #############################################################################

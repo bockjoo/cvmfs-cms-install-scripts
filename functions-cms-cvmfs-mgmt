@@ -210,6 +210,54 @@ function backup_installation () {
    return 0
 }
 
+
+function backup_installation_one () {
+   b=$1
+   export X509_USER_PROXY=$HOME/.florida.t2.proxy
+   db_backup=$HOME/cvmfs_cms_cern_ch_backup.db.txt
+   [ -f $db_backup ] || touch $db_backup
+   BACKUP_SECONDS=$(expr 60 \* 59)
+   BACKUP_SOURCE=$HOME/cvmfs_backup
+   BACKUP_UP=srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/data/store/local/cvmfs/cms.cern.ch
+   #BACKUP_UP=gsiftp://gridftp3.ihepa.ufl.edu///raid/raid8/cvmfs/cms.cern.ch
+   BACKUP_COMMAND="lcg-cp -b --vo cms -D srmv2 -T srmv2 -v"
+   [ -d $BACKUP_SOURCE ] || mkdir -p $BACKUP_SOURCE
+   starttime=$(date +%s)
+   #BACKUP_ALL=$(cd /cvmfs/cms.cern.ch ; for d in * ; do echo $d ; done) 
+   BACKUP_ALL=$(for d in $(ls /cvmfs/cms.cern.ch | grep slc6_ | grep -v slc6_mic) ; do echo $d ; done)
+   BACKUP_DATE=$(date +%Y%m%d)
+   #BACKUP_EVEN_ODD=1
+   #[ $(expr $BACKUP_DATE % 2) -eq 0 ] && BACKUP_EVEN_ODD=0
+   #BACKUP_EVEN_ODD=
+   #while [ $(expr $(date +%s) - $starttime) -lt $BACKUP_SECONDS ] ; do # stall only the thing in one hour
+   #   echo $(date)
+   cd /cvmfs/cms.cern.ch
+   for b in $BACKUP_ALL ; do
+       #      [ $(expr $(date +%s) - $starttime) -gt $BACKUP_SECONDS ] && break
+       grep -q "${b}.tar.gz" $db_backup | grep -q "$(date +%Y%m)"
+       [ $? -eq 0 ] && continue
+       echo INFO $(date) STARTED executing tar czf ${BACKUP_SOURCE}/${b}.tar.gz ${b}
+       tar czf ${BACKUP_SOURCE}/${b}.tar.gz ${b}
+       [ $? -eq 0 ] || { echo INFO $(date) FAILED executing tar czf ${BACKUP_SOURCE}/${b}.tar.gz ${b} ; printf "backup_installation_one(): tar czf ${BACKUP_SOURCE}/${b}.tar.gz ${b} failed\n" | mail -s "tar czf failed" $notifytowhom ; } ;
+       echo INFO $(date) ENDED executing tar czf ${BACKUP_SOURCE}/${b}.tar.gz ${b}
+       lcg-cp -b --vo cms -D srmv2 -T srmv2 -v file://${BACKUP_SOURCE}/${b}.tar.gz ${BACKUP_UP}/${BACKUP_EVEN_ODD}/${b}.tar.gz
+       if [ $? -eq 0 ] ; then
+          printf "backup_installation_one(): lcg-cp OK\nCheck $(echo $BACKUP_UP | cut -d= -f2-)/${b}.tar.gz\n" | mail -s "lcg-cp OK for $b" $notifytowhom
+       else
+          printf "backup_installation_one(): lcg-cp failed for $b\n" | mail -s "lcg-cp failed" $notifytowhom
+       fi
+       grep -q "$BACKUP_DATE ${b}.tar.gz" $db_backup
+       [ $? -eq 0 ] || echo $BACKUP_DATE ${b}.tar.gz >> $db_backup
+       #fi
+       rm -f ${BACKUP_SOURCE}/${b}.tar.gz
+       break # do other work too
+   done
+   cd -
+   #sleep 1
+   #done
+   return 0
+}
+
 function deploy_cmspkg () {
   [ $# -lt 3 ] && { echo ERROR deploy_cmspkg path arch repo ; return 1 ; } ;
   swpath=$1 # /cvmfs/cms.cern.ch/crab3
@@ -1084,6 +1132,12 @@ fi # if [ ] ; then
          rpmdb --define "_rpmlock_path /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/lock" --rebuilddb --dbpath /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm 2>&1 | tee $HOME/logs/rpmdb_rebuild.${SCRAM_ARCH}.log
       fi
    fi    
+
+   echo DEBUG adding blindly mutex_set_max 10000000 to /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+
+   if [ ! -f /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG ] ; then
+         echo mutex_set_max 10000000 >> /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+   fi
    #echo INFO executing apt-get --assume-yes -c=$apt_config update for $cmssw_release ${SCRAM_ARCH}
    #apt-get --assume-yes -c=$apt_config update > $HOME/apt_get_update.log 2>&1
    echo INFO executing cmspkg -a ${SCRAM_ARCH} update for $cmssw_release ${SCRAM_ARCH}
@@ -4217,7 +4271,7 @@ function check_and_update_siteconf () {
       return 1
    fi
    UPDATED_SITES=
-   eval $(grep UPDATED_SITES= $thelog 2>/dev/null)
+   eval $(grep ^UPDATED_SITES= $thelog 2>/dev/null)
    if [ "x$UPDATED_SITES" == "x" ] ; then
       echo INFO nothing to do thelog=$thelog
       #printf "$what Nothing to update after executing $HOME/cvmfs_check_and_update_siteconf.sh\n$(cat $HOME/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "DEBUG : $what cvmfs_check_and_update_siteconf.sh execution shows no updated site" $notifytowhom
@@ -4235,11 +4289,12 @@ function check_and_update_siteconf () {
       return 1
    fi
    
-   echo rsync -arzuvp ${rsync_source}/SITECONF/ $rsync_name
+   echo rsync -arzuvp --exclude=.cvmfscatalog --delete ${rsync_source}/SITECONF/ $rsync_name
    #printf "$what rsync -arzuvp ${rsync_source}/SITECONF/ $rsync_name\n" | mail -s "DEBUG : $what rsync" $notifytowhom
    # rsync -arzuvp --delete ${rsync_source}/SITECONF/ $rsync_name > $HOME/cvmfs_check_and_update_siteconf_rsync.log 2>&1
    thelog=$HOME/logs/cvmfs_check_and_update_siteconf_rsync.log 
-   rsync -arzuvp ${rsync_source}/SITECONF/ $rsync_name > $thelog 2>&1
+   #rsync -arzuvp ${rsync_source}/SITECONF/ $rsync_name > $thelog 2>&1
+   rsync -arzuvp --exclude=.cvmfscatalog --delete ${rsync_source}/SITECONF/ $rsync_name > $thelog 2>&1 # option --delete                delete extraneous files from dest dirs
    if [ $? -eq 0 ] ; then
       publish_needed=0
       i=0
@@ -4251,7 +4306,8 @@ function check_and_update_siteconf () {
          publish_needed=1
          echo "[ $i ] " $rsync_name/$f is a file $publish_needed
       done
-
+      grep -q "deleting T[0-9]_" $thelog
+      [ $? -eq 0 ] && publish_needed=1 #echo DEBUG publish_needed=1 for deleted files
       echo INFO check point publish_needed $publish_needed
 
       if [ $publish_needed -eq 0 ] ; then
@@ -4260,7 +4316,7 @@ function check_and_update_siteconf () {
          printf "$what publish was not needed, though there are $UPDATED_SITES\nCheck $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/logs/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "ERROR $what publish was not needed but with updated sites" $notifytowhom
       else
          echo INFO publish necessary
-         #printf "$what publish is needed UPDATED_SITES=$UPDATED_SITES\nCheck $HOME/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "DEBUG $what publish is necessary" $notifytowhom
+         printf "$what publish is needed UPDATED_SITES=$UPDATED_SITES\nCheck $HOME/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "DEBUG $what publish is necessary" $notifytowhom
          YMDM=$(date -u +%Y%m%d%H)
          grep "$YMDM " $updated_list | grep -q "$UPDATED_SITES"
          if [ $? -ne 0 ] ; then
