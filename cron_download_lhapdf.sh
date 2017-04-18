@@ -24,8 +24,8 @@ updated_list=$VO_CMS_SW_DIR/cvmfs-cms.cern.ch-updates
 #reference_list=http://oo.ihepa.ufl.edu:8080/cmssoft/lhapdf_list.txt
 reference_list=$HOME/lhapdf_list.txt
 
-lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c 6.1.d 6.1.e 6.1.f 6.1.g"
-needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b 6.1.d|6.1.5d 6.1.e|6.1.5e 6.1.f|6.1.5f 6.1.g|6.1.6"
+lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c 6.1.d 6.1.e 6.1.f 6.1.g 6.1.h"
+needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b 6.1.d|6.1.5d 6.1.e|6.1.5e 6.1.f|6.1.5f 6.1.g|6.1.6 6.1.h|6.1.6a" # 6.1.6 -> 6.1.g
 
 #lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c"
 #needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b"
@@ -158,17 +158,6 @@ for v in $releases $lhapdfweb_updates ; do
      #printf "$(basename $0) Starting cvmfs_server transaction for cron_download_lhapdf.sh $v\n" | mail -s "cvmfs_server transaction started" $notifytowhom
      cvmfs_server transaction 2>&1
      [ $? -eq 0 ] || { printf "$(basename $0) ERROR cvmfs_server transaction failed while doing lhapdf v=$v\n$(cat $THELOG | sed 's#%#%%#g')\nChecking ps\n$(ps auxwww | sed 's#%#%%#g' | grep $(/usr/bin/whoami) | grep -v grep)\n" | mail -s "$(basename $0) cvmfs_server transaction lock failed" $notifytowhom ; exit 1 ; } ;
-if [ ] ; then
-     status=$?
-     what="$(basename $0) for $v"
-     cvmfs_server_transaction_check $status $what
-     if [ $? -eq 0 ] ; then
-        echo INFO transaction OK for $what
-     else
-        printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
-        exit 1
-     fi
-fi # if [ ]
      begin_transaction=1
    fi
    #wget -q -O /dev/null $reference_list
