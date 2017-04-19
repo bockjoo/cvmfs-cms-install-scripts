@@ -4,8 +4,8 @@
 # It downloads any new lhapdf and updates the lhapdf db.
 #
 # 0.2.2: downloads pdfsets.index as well
-# versiono 0.3.1
-version=0.3.1
+# versiono 0.3.2
+version=0.3.2
 export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
 workdir=/tmp/lhapdf
 thehome=$HOME # /home/shared # /scratch/shared/cms
@@ -26,6 +26,7 @@ reference_list=$HOME/lhapdf_list.txt
 
 lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c 6.1.d 6.1.e 6.1.f 6.1.g 6.1.h"
 needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b 6.1.d|6.1.5d 6.1.e|6.1.5e 6.1.f|6.1.5f 6.1.g|6.1.6 6.1.h|6.1.6a" # 6.1.6 -> 6.1.g
+previous_release=$(echo $lhapdfweb_updates | awk '{print $(NF-1)}')
 
 #lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c"
 #needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b"
@@ -273,11 +274,22 @@ for v in $releases $lhapdfweb_updates ; do
         j=0
         while [ $j -lt $ntry ] ; do
            echo INFO "[ $i ] Trial=$j Downloading $f"
+           # example: wget --no-check-certificate -O /cvmfs/cms.cern.ch/lhapdf/pdfsets/6.1.h/HERAPDF20_NNLO_ALPHAS_118.tar.gz http://www.hepforge.org/archive/lhapdf/pdfsets/6.1/HERAPDF20_NNLO_ALPHAS_118.tar.gz
            wget -q --no-check-certificate -O $lhapdf_top/${dest_nested_catalog}/$f  ${lhapdfweb}/$dest/$f
            status=$?
            [ $status -eq 0 ] && break
            j=$(expr $j + 1)
         done
+        # v 0.3.2 take the one from previous release if permission error
+        if [ $status -ne 0 ] ; then
+           echo DEBUG checking $lhapdf_top/pdfsets/${previous_release}/$(echo $f | sed 's#\.tar\.gz##')
+           if [ -d $lhapdf_top/pdfsets/${previous_release}/$(echo $f | sed 's#\.tar\.gz##') ] ; then
+              echo Warning it exists in $previous_release
+              echo Warning creating the artificial one
+              ( cd $lhapdf_top/pdfsets/${previous_release} ; tar czvf $lhapdf_top/${dest_nested_catalog}/$f $(echo $f | sed 's#\.tar\.gz##') ; exit $? )
+              status=$?
+           fi
+        fi # v 0.3.2 take the one from previous release if permission error
         #cd $lhapdf_top/${dest_nested_catalog} # new 22JUL2015 0.2.4
         echo INFO "[ $i ] Status $status"
         /usr/bin/file $lhapdf_top/${dest_nested_catalog}/$f | grep -q "gzip compressed data"

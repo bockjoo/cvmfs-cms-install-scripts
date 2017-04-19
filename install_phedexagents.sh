@@ -246,7 +246,7 @@ if [ "x$cvmfs_server_yes" == "xyes" ] ; then
       echo ERROR failed cvmfs_server publish
       printf "$(basename $0) cvmfs_server publish failed\n$(cat $HOME/logs/cvmfs_server+publish+phedexagents+install.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish failed" $notifytowhom
       ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-      return 1
+      exit 1
    fi
 
    #echo INFO publishing 

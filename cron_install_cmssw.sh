@@ -616,7 +616,10 @@ echo INFO Done Pilot config check and update part of the script
 
 # [] python
 echo INFO Next COMP+python update will be checked and updated as needed
-install_comp_python
+#install_comp_python
+install_slc6_amd64_gcc493_comp_python 2>&1 | tee $HOME/logs/install_slc6_amd64_gcc493_comp_python.log
+#printf "install_slc6_amd64_gcc493_comp_python\n$(cat $HOME/logs/install_slc6_amd64_gcc493_comp_python.log | sed 's#%#%%#g')\n" | mail -s "INFO: Done install_slc6_amd64_gcc493_comp_python" $notifytowhom      
+
 echo INFO Done COMP+python EL6 check and update part of the script
 
 # [] git mirroring

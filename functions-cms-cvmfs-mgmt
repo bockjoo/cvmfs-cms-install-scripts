@@ -3909,6 +3909,134 @@ function install_slc6_amd64_gcc493_spacemonclient () {
   return 0
 }
 
+function install_slc6_amd64_gcc493_comp_python () {
+  export comp_python_REPO=comp
+  export comp_python_SCRAM_ARCH=slc6_amd64_gcc493  
+  export SCRAM_ARCH=slc6_amd64_gcc493  
+  skip_comp_python_releases="2.7.6-comp 2.7.11 2.7.11-comp"
+
+  
+  cvmfs_server transaction 2>&1 | tee $HOME/logs/cvmfs_server+transaction.log
+  [ $? -eq 0 ] || { printf "ERROR: function install_slc6_amd64_gcc493_comp_python cvmfs_server transaction failed\n$(cat $HOME/logs/cvmfs_server+transaction.log)\n" | mail -s "ERROR: cvmfs_server transaction failed for the comp_python installation" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+  
+  export MYTESTAREA=$VO_CMS_SW_DIR/COMP
+  CMSPKG="$MYTESTAREA/common/cmspkg -a $SCRAM_ARCH"
+  if [ -f $MYTESTAREA/common/cmspkg ] ; then
+     echo INFO We use cmspkg
+  else
+     (
+      cd /tmp
+      echo INFO downloading cmspkg.py
+      wget -O cmspkg.py https://raw.githubusercontent.com/cms-sw/cmspkg/production/client/cmspkg.py
+
+      [ $? -eq 0 ] || { echo ERROR wget cmspkg.py failed ; rm -f cmspkg.py ; cd - ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+
+      python cmspkg.py --architecture $SCRAM_ARCH --path $MYTESTAREA --repository $comp_python_REPO setup
+      status=$?
+      [ -f $MYTESTAREA/common/cmspkg ] || { echo ERROR cmspkg is not installed ; rm -f cmspkg.py ; return 1 ; } ;
+      rm -f cmspkg.py
+      cd
+      return $status
+     )
+     [ $? -eq 0 ] || { printf "$(basename $0) $MYTESTAREA/common/cmspkg does not exist\nUse \nsource $HOME/cron_install_cmssw-functions\ndeploy_cmspkg /cvmfs/cms.cern.ch/COMP slc6_amd64_gcc494 comp\n" | mail -s "ERROR: $MYTESTAREA/common/cmspkg does not exist" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ;return 1 ; } ;
+  fi
+  echo INFO executing $CMSPKG -y upgrade
+  $CMSPKG -y upgrade
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG -y upgrade upgrade failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+  $CMSPKG update 2>&1
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG update failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+
+  comp_pythons=$($CMSPKG search external+python+ | awk '{print $1}' | sed 's#external+python+##g')
+  ( cd ; cvmfs_server abort -f ; ) ; # do not apply the change yet
+  #echo TESTING...
+  #echo Checking $MYTESTAREA/$SCRAM_ARCH
+  #ls -al $MYTESTAREA/$SCRAM_ARCH
+  #for release in $comp_pythons ; do
+  #    for r in $skip_comp_python_releases ; do echo "+"$r"+" ; done | grep -q "+"$release"+" 
+  #    [ $? -eq 0 ] && { echo Skipping $release ; continue ; } ;
+  #    echo install_slc6_amd64_gcc493_comp_python release=$release
+  #done
+  #return 0
+  #echo TESTING...
+  currdir=$(pwd)
+  cd
+  for release in $comp_pythons ; do
+     for r in $skip_comp_python_releases ; do echo "+"$r"+" ; done | grep -q "+"$release"+" 
+     [ $? -eq 0 ] && { echo Skipping $release ; continue ; } ;
+     #echo $release | grep -q "4.1.4\|4.1.5\|4.1.7\|4.1.7-comp\|4.1.8\|4.2.0pre2"
+     #[ $? -eq 0 ] && continue
+     grep -q "COMP+python+$release ${comp_python_SCRAM_ARCH} " $updated_list
+     if [ $? -eq 0 ] ; then
+        echo Warning COMP+python+$release ${comp_python_SCRAM_ARCH} installed according to $updated_list
+        continue
+     fi
+     printf "install_slc6_amd64_gcc493_comp_python () Starting cvmfs_server transaction\n" | mail -s "cvmfs_server transaction started" $notifytowhom
+     cvmfs_server transaction
+     status=$?
+     what="install_slc6_amd64_gcc493_comp_python ()"
+     cvmfs_server_transaction_check $status $what
+     if [ $? -eq 0 ] ; then
+        echo INFO transaction OK for $what
+     else
+        printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+        cd $currdir
+        return 1
+     fi
+     printf "install_slc6_amd64_gcc493_comp_python() installing Comp_Python ${release}+${comp_python_SCRAM_ARCH} from $(/bin/hostname -f)\n" | mail -s "[0] install_slc6_amd64_gcc493_comp_python() installing Comp_Python ${release}" $notifytowhom
+     echo INFO installing $release under $VO_CMS_SW_DIR : install_comp_python_cmspkg.sh $VO_CMS_SW_DIR $release ${comp_python_REPO} ${comp_python_SCRAM_ARCH}
+     $HOME/install_comp_python_cmspkg.sh $VO_CMS_SW_DIR $release ${comp_python_REPO} ${comp_python_SCRAM_ARCH} > $HOME/logs/install_comp_python_cmspkg.${release}.log 2>&1
+     status=$?
+     [ $status -eq 0 ] && printf "New COMP_PYTHON Client Installed with status=$?\n$(cat $HOME/logs/install_comp_python_cmspkg.${release}.log | sed 's#%#%%#g')\n" | mail -s "INFO: New COMP_PYTHON Client Installed" $notifytowhom
+     
+     echo DEBUG status=$status at install_slc6_amd64_gcc493_comp_python
+     if [ $status -eq 0 ] ; then
+        grep -q "Comp+python+$release ${comp_python_SCRAM_ARCH} " $updated_list
+        if [ $? -eq 0 ] ; then
+           echo Warning Comp+python+$release for ${comp_python_SCRAM_ARCH} installed
+        else
+           printf "install_slc6_amd64_gcc493_comp_python () Starting cvmfs_server transaction\n" | mail -s "cvmfs_server transaction started" $notifytowhom
+           cvmfs_server transaction
+           status=$?
+           what="install_slc6_amd64_gcc493_comp_python ()"
+           cvmfs_server_transaction_check $status $what
+           if [ $? -eq 0 ] ; then
+              echo INFO transaction OK for $what
+           else
+              printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+              cd $currdir
+              return 1
+           fi
+           echo INFO adding COMP $release for ${comp_python_SCRAM_ARCH} to local $updated_list
+           echo COMP+python+${release} ${comp_python_SCRAM_ARCH} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
+           currdir=$(pwd)
+           cd
+           time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
+           cd $currdir
+           #printf "install_comp_python () published  \n$(cat $HOME/logs/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
+           printf "install_slc6_amd64_gcc493_comp_python() Comp+python+${release}+${comp_python_SCRAM_ARCH} installed/published from $(/bin/hostname -f)\n$(cat $HOME/logs/install_comp_python_cmspkg.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] install_slc6_amd64_gcc493_comp_python() Comp_Python INSTALLED" $notifytowhom
+           #echo INFO no cvmfs server. will tell the main script not to publish
+        fi
+     else
+        printf "FAILED: install_slc6_amd64_gcc493_comp_python() Comp+python+${release}+${comp_python_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/logs/install_comp_python.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_comp_python() Comp_Python installation" $notifytowhom
+        ( cd ; cvmfs_server abort -f ; ) ;
+     fi
+     #break
+  done
+  #done
+
+  return 0
+}
+
 function install_comp_python () {
   release_arch_repos="2.6.8-comp9+slc6_amd64_gcc481+comp.pre 2.7.6+slc6_amd64_gcc493+comp"
 

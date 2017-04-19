@@ -1,16 +1,16 @@
 #!/bin/sh
-# 0.1.0 : Request from alan.malta@cern.ch
 # version=0.1.0
-install_xrootd_client_version=0.1.0
+install_comp_python_cmspkg_version=0.1.0
 ###################################################################
 
 export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
 
-export RELEASE=4.0.4-comp
+export RELEASE=1.0.1
 export REPO=comp
 export SCRAM_ARCH=slc6_amd64_gcc493
 cvmfs_server_name=$(grep cvmfs_server_name= $HOME/cron_install_cmssw.config | grep -v \# | cut -d= -f2)
 cvmfs_server_name=$(eval echo $cvmfs_server_name)
+
 notifytowhom=$(grep notifytowhom= $HOME/cron_install_cmssw.config | grep -v \# | cut -d= -f2)
 RPMS=http://cmsrep.cern.ch/cmssw/${REPO}/RPMS/${SCRAM_ARCH}/
 
@@ -46,13 +46,13 @@ if [ $? -eq 0 ] ; then
 fi
 
 #
-export MYTESTAREA=$VO_CMS_SW_DIR/COMP
+export MYTESTAREA=$VO_CMS_SW_DIR/COMP # ~/tmp/spacemon-test # or wherever#
 #
 #                                                                 #
 ###################################################################
-grep -q "xrootd_client $RELEASE ${SCRAM_ARCH}" $updated_list
+grep -q "COMP+python+$RELEASE ${SCRAM_ARCH}" $updated_list
 if [ $? -eq 0 ] ; then
-   echo Warning xrootd_client $RELEASE ${SCRAM_ARCH} installed according to $updated_list
+   echo Warning COMP+python+$RELEASE ${SCRAM_ARCH} installed according to $updated_list
    exit 0
 fi
 
@@ -77,7 +77,7 @@ i=$(expr $i + 1)
 # Check if bootstrap is needed for $arch
 ls -al $MYTESTAREA/$SCRAM_ARCH/external/rpm/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
 if [ $? -eq 0 ] ; then
-   echo INFO "[$i]" bootstratp unnecessary for ${SCRAM_ARCH} in xrootd_client
+   echo INFO "[$i]" bootstratp unnecessary for ${SCRAM_ARCH} in comp+python
 else
    printf "$(basename $0) downloading bootstrap for $SCRAM_ARCH \n" | mail -s "$(basename $0) downloading bootstrap" $notifytowhom
    echo INFO "[$i]" downloading bootstrap.sh
@@ -114,7 +114,7 @@ else
     cd
     exit $status
    )
-   [ $? -eq 0 ] || { printf "$(basename $0) $MYTESTAREA/common/cmspkg does not exist\nUse \nsource $HOME/cron_install_cmssw-functions\ndeploy_cmspkg /cvmfs/cms.cern.ch/COMP slc6_amd64_gcc494 comp\n" | mail -s "ERROR: $MYTESTAREA/common/cmspkg does not exist" $notifytowhom ; exit 1 ; } ;
+   [ $? -eq 0 ] || { printf "$(basename $0) $MYTESTAREA/common/cmspkg does not exist\nUse \nsource $HOME/cron_install_cmssw-functions\ndeploy_cmspkg /cvmfs/cms.cern.ch/COMP slc6_amd64_gcc493 comp\n" | mail -s "ERROR: $MYTESTAREA/common/cmspkg does not exist" $notifytowhom ; exit 1 ; } ;
 fi
 
 #
@@ -139,15 +139,15 @@ else
    echo Warning $rpm_init_env does not exist
 fi
 echo INFO first which rpm"?: " $(which rpm) 
-rpm -qa --queryformat '%{NAME} %{RELEASE}' > $HOME/logs/rpm_qa_NAME_RELEASE.${SCRAM_ARCH}.log 2>&1
-grep "unable to allocate memory for mutex" $HOME/logs/rpm_qa_NAME_RELEASE.${SCRAM_ARCH}.log | grep -q "resize mutex region"
+rpm -qa --queryformat '%{NAME} %{RELEASE}' > $HOME/logs/rpm_qa_NAME_RELEASE.comp+python.${SCRAM_ARCH}.log 2>&1
+grep "unable to allocate memory for mutex" $HOME/logs/rpm_qa_NAME_RELEASE.comp+python.${SCRAM_ARCH}.log | grep -q "resize mutex region"
 if [ $? -eq 0 ] ; then
       grep -q "mutex_set_max 10000000" $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
       if [ $? -ne 0 ] ; then
          echo INFO adding mutex_set_max 1000000 to $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
          echo mutex_set_max 10000000 >> $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
          echo INFO rebuilding the DB
-         rpmdb --define "_rpmlock_path $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/lock" --rebuilddb --dbpath $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm 2>&1 | tee $HOME/logs/rpmdb_rebuild.${SCRAM_ARCH}.log
+         rpmdb --define "_rpmlock_path $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/lock" --rebuilddb --dbpath $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm 2>&1 | tee $HOME/logs/rpmdb_rebuild.comp+python.${SCRAM_ARCH}.log
       fi
 fi    
 
@@ -161,45 +161,45 @@ if [ $status -ne 0 ] ; then
 fi
 
 i=$(expr $i + 1)
-echo INFO "[$i]" executing $CMSPKG -y install external+xrootd+$RELEASE
-$CMSPKG -y install external+xrootd+$RELEASE > $HOME/logs/cmspkg_install_cms_external+xrootd_${SCRAM_ARCH}_$RELEASE.log 2>&1
+echo INFO "[$i]" executing $CMSPKG -y install external+python+$RELEASE
+$CMSPKG -y install external+python+$RELEASE > $HOME/logs/cmspkg_install_comp_python_${SCRAM_ARCH}_$RELEASE.log 2>&1
 status=$?
-grep "unable to allocate memory for mutex" $HOME/logs/cmspkg_install_cms_external+xrootd_${SCRAM_ARCH}_$RELEASE.log | grep -q "resize mutex region"
+grep "unable to allocate memory for mutex" $HOME/logs/cmspkg_install_comp_python_${SCRAM_ARCH}_$RELEASE.log | grep -q "resize mutex region"
 if [ $? -eq 0 ] ; then
       grep -q "mutex_set_max 10000000" $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
       if [ $? -ne 0 ] ; then
          echo INFO adding mutex_set_max 1000000 to $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
          echo mutex_set_max 10000000 >> $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
          echo INFO rebuilding the DB
-         rpmdb --define "_rpmlock_path $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/lock" --rebuilddb --dbpath $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm 2>&1 | tee $HOME/logs/rpmdb_rebuild.${SCRAM_ARCH}.log
+         rpmdb --define "_rpmlock_path $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/lock" --rebuilddb --dbpath $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm 2>&1 | tee $HOME/logs/rpmdb_rebuild.external+python.${SCRAM_ARCH}.log
       fi
       if [ $status -ne 0 ] ; then
-         echo INFO "[$i]" executing $CMSPKG -y install external+xrootd+$RELEASE again after rebuilding the rpmdb after the mutex error
-         $CMSPKG -y install external+xrootd+$RELEASE > $HOME/logs/cmspkg_install_cms_external+xrootd_${SCRAM_ARCH}_$RELEASE.log 2>&1
+         echo INFO "[$i]" executing $CMSPKG -y install external+python+$RELEASE again after rebuilding the rpmdb after the mutex error
+         $CMSPKG -y install external+python+$RELEASE > $HOME/logs/cmspkg_install_comp_python_${SCRAM_ARCH}_$RELEASE.log 2>&1
          status=$?
       fi
 fi    
 
-cat $HOME/logs/cmspkg_install_cms_external+xrootd_${SCRAM_ARCH}_$RELEASE.log
+cat $HOME/logs/cmspkg_install_comp_python_${SCRAM_ARCH}_$RELEASE.log
 
 if [ $status -ne 0 ] ; then
-   echo ERROR $CMSPKG -y install external+xrootd+$RELEASE failed
+   echo ERROR $CMSPKG -y install external+python++$RELEASE failed
    echo Exiting from $(basename $0)
    exit 1
 fi
 
 i=$(expr $i + 1)
-echo INFO "[$i]" succefully executed $CMSPKG -y install external+xrootd+$RELEASE
+echo INFO "[$i]" succefully executed $CMSPKG -y install external+python+$RELEASE
 
 echo INFO checking $SCRAM_ARCH
 
 if [ "x$cvmfs_server_yes" == "xyes" ] ; then
-   grep -q "xrootd_client $RELEASE ${SCRAM_ARCH}" $updated_list
+   grep -q "COMP+python+$RELEASE ${SCRAM_ARCH}" $updated_list
    if [ $? -eq 0 ] ; then
-     echo Warning xrootd_client $RELEASE ${SCRAM_ARCH} is already in the $updated_list
+     echo Warning COMP+python+$RELEASE ${SCRAM_ARCH} is already in the $updated_list
    else
-     echo INFO adding xrootd_client $RELEASE ${SCRAM_ARCH} to $updated_list
-     echo xrootd_client $RELEASE ${SCRAM_ARCH} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
+     echo INFO adding COMP+python+$RELEASE ${SCRAM_ARCH} to $updated_list
+     echo COMP+python+$RELEASE ${SCRAM_ARCH} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
    fi
    i=$(expr $i + 1)
    echo INFO "[$i]" Check $updated_list for $RELEASE
@@ -220,32 +220,31 @@ if [ "x$cvmfs_server_yes" == "xyes" ] ; then
       fi
       i=$(expr $i + 1)
       echo INFO "[$i]" Check $thedir/.cvmfscatalog
-      echo INFO now further doing $xrootd_client_rel_dir/.cvmfscatalog
-
-      #for phedexagents_rel_dir in $thedir/cms/PHEDEX/* ; do
-      #    [ "x$phedexagents_rel_dir" == "x$thedir/cms/PHEDEX/*" ] && break
-      #    [ -d $phedexagents_rel_dir ] || continue
-      #    ls -al $phedexagents_rel_dir/.cvmfscatalog 2>/dev/null 1>/dev/null ;
-      #    if [ $? -eq 0 ] ; then
-      #       echo INFO $phedexagents_rel_dir/.cvmfscatalog exists
-      #    else
-      #       echo INFO creating $phedexagents_rel_dir/.cvmfscatalog
-      #      touch $phedexagents_rel_dir/.cvmfscatalog
-      #    fi
-      #done
+      echo INFO now further doing $python_rel_dir/.cvmfscatalog
+      for python_rel_dir in $thedir/external/python/* ; do
+          [ "x$python_rel_dir" == "x$thedir/external/python/*" ] && break
+          [ -d $python_rel_dir ] || continue
+          ls -al $python_rel_dir/.cvmfscatalog 2>/dev/null 1>/dev/null ;
+          if [ $? -eq 0 ] ; then
+             echo INFO $python_rel_dir/.cvmfscatalog exists
+          else
+             echo INFO creating $python_rel_dir/.cvmfscatalog
+             touch $python_rel_dir/.cvmfscatalog
+          fi
+      done
    done
    echo INFO publishing cvmfs
    echo INFO publishing the installation in the cvmfs
    currdir=$(pwd)
    cd
-   time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish+external+xrootd+install.log
+   time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish+comp+python+install.log
    cd $currdir
    status=$?
    if [ $status -eq 0 ] ; then
-      printf "$(basename $0) cvmfs_server_publish OK \n$(cat $HOME/logs/cvmfs_server+publish+external+xrootd+install.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish for external+xrootd install OK" $notifytowhom
+      printf "$(basename $0) cvmfs_server_publish OK \n$(cat $HOME/logs/cvmfs_server+publish++comp+python+install.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish for +comp+python install OK" $notifytowhom
    else
       echo ERROR failed cvmfs_server publish
-      printf "$(basename $0) cvmfs_server publish failed\n$(cat $HOME/logs/cvmfs_server+publish+external+xrootd+install.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish failed" $notifytowhom
+      printf "$(basename $0) cvmfs_server publish failed\n$(cat $HOME/logs/cvmfs_server+publish+comp+python+install.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish failed" $notifytowhom
       ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
       exit 1
    fi
