@@ -433,11 +433,17 @@ for arch in $archs ; do
       echo $cmssw
   done
   for cmssw in $cmssws ; do
+
+     # skip some troublesome releases
      echo $arch | grep -q slc6_amd64_gcc600
      if [ $? -eq 0 ] ; then
         echo $cmssw | grep -q CMSSW_8_1_0_pre[4-8]
         [ $? -eq 0 ] && continue
      fi
+
+     #echo $arch | grep -q "slc7_amd64_gcc630\|slc7_amd64_gcc530"
+     #[ $? -eq 0 ] && { echo $cmssw | grep -q CMSSW_9_1_0_pre3 ; [ $? -eq 0 ] && printf "Warning $0 Skipping CMSSW_9_1_0_pre3 and $arch\n" | mail -s "Warning:Skipping CMSSW_9_1_0_pre3 and $arch" $notifytowhom ; continue ; } ;
+
      grep -q "$cmssw $arch" $updated_list # if it is not in the updated_list, it should be reinstall, e.g., power outage, $db
      if [ $? -eq 0 ] ; then
         #echo "          INFO [ $k / $ncmssws ]" cmssw=$cmssw arch=$arch in the db $updated_list

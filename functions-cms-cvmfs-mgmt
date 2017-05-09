@@ -296,10 +296,10 @@ function dockerrun()
       echo INFO checking docker images ARGS="|"$ARGS"|"
       docker images 2>/dev/null | grep $(echo $DOCKER_TAG | cut -d: -f1) | grep -q $(echo $DOCKER_TAG | cut -d: -f2)
       [ $? -eq 0 ] || { echo ERROR docker image $DOCKER_TAG not found ; return 1 ; } ;
-      echo INFO running docker run --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} $DOCKER_TAG sh -c "$ARGS"
+      echo INFO running docker run --net=host --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} $DOCKER_TAG sh -c "$ARGS"
       #docker run --rm -it -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} -u $(whoami) $DOCKER_TAG sh -c "$ARGS"
       #docker run --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} -u $(whoami) $DOCKER_TAG sh -c "$ARGS"
-      docker run --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} $DOCKER_TAG sh -c "$ARGS"
+      docker run --net=host --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} $DOCKER_TAG sh -c "$ARGS"
       status=$?
       echo INFO done running docker run ...
       return $status
@@ -1292,8 +1292,9 @@ function docker_install_nn_cmssw () {
    $CMSPKG -y upgrade
    echo INFO executing cmspkg -a ${SCRAM_ARCH} update and install cms-common for $cmssw_release ${SCRAM_ARCH}
    #dockerrun "${CMSPKG} update > $workdir/logs/cmspkg_update_${SCRAM_ARCH}.log 2>&1 ; status=\$? ; ${CMSPKG} -f install cms+cms-common+1.0 > $workdir/logs/cmspkg_install_cms-common_${SCRAM_ARCH}+$cmssw_release.log 2>&1 ; exit \`expr $? + \$status\`" > $HOME/logs/dockerrun.log 2>&1
-   dockerrun "${CMSPKG} update ; status=\$? ; ${CMSPKG} -f install cms+cms-common+1.0 ; exit \`expr $? + \$status\`" > $HOME/logs/dockerrun_install_cms_commong.log 2>&1
+   dockerrun "${CMSPKG} update > $HOME/logs/dockerrun_cmspkg_update.log 2>&1 ; status=\$? ; ${CMSPKG} -f install cms+cms-common+1.0 > $HOME/logs/dockerrun_cmspkg_install_cms-common.log 2>&1 ; exit \`expr $? + \$status\`" > $HOME/logs/dockerrun_install_cms_commong.log 2>&1
    status=$?
+   
    echo INFO content of $HOME/logs/dockerrun_install_cms_commong.log
    cat $HOME/logs/dockerrun_install_cms_commong.log
    cp $HOME/logs/dockerrun_install_cms_commong.log $workdir/logs/cmspkg_update_${SCRAM_ARCH}.log
