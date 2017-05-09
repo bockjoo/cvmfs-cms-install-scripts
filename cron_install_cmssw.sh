@@ -641,6 +641,9 @@ echo INFO Done git mirror check
 # Check Point 5
 #rm -f $lock
 #exit 0
+echo INFO Next CA/CRL update
+$HOME/update_ca_crl.sh> $HOME/logs/update_ca_crl.log 2>&1
+echo INFO Done CA/CRL update
 
 echo INFO Next update the self-monitoring
 
