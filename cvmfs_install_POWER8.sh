@@ -1,7 +1,8 @@
 #!/bin/sh
 notifytowhom=bockjoo@phys.ufl.edu
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
-export bootstrap_script=http://cmsrep.cern.ch/cmssw/cms/bootstrap.sh
+#export bootstrap_script=http://cmsrep.cern.ch/cmssw/cms/bootstrap.sh # 20MAY2017
+export bootstrap_script=http://cmsrep.cern.ch/cmssw/repos/bootstrap.sh
 export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
 export SCRAM_ARCH=fc22_ppc64le_gcc530
 export CMSSW_RELEASE=CMSSW_8_0_0
