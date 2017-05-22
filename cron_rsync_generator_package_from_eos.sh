@@ -322,5 +322,9 @@ ls $HOME/eos2
 
 echo script $0 Done
 log=$(basename $0 | sed 's#\.sh#\.log#g')
-#printf "$(basename $0) Done\nEOS Client Version=$EOS_CLIENT_VERSION\n$(cat $log 2>&1 | sed 's#%#%%#g')\n" | mail -s "$(basename $0) Done" $notifytowhom
+eos_fuse_logs=
+for f in /tmp/eos-fuse.*.log ; do
+   [ -f "$f" ] && { eos_fuse_logs="$eos_fuse_logs $f" ; rm -f $f ; } ;
+done
+printf "$(basename $0) Done\nEOS Client Version=$EOS_CLIENT_VERSION\nRemoved $eos_fuse_logs\n$(ls -al /tmp)\n$(cat $log 2>&1 | sed 's#%#%%#g')\n" | mail -s "$(basename $0) Done" $notifytowhom
 exit 0
