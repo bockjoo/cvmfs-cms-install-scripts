@@ -106,18 +106,19 @@ voms-proxy-info -timeleft 2>&1
 #else
 #   printf "$(basename $0) ERROR failed to download $X509_USER_PROXY\n$(/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://${X509_USER_PROXY}.copy 2>&1 | sed 's#%#%%#g')n" | mail -s "$(basename $0) ERROR proxy download failed" $notifytowhom
 #fi
-   /usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+#/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
 if [ $? -eq 0 ] ; then
    cp $X509_USER_PROXY.copy $X509_USER_PROXY
       voms-proxy-info -all
 else
-      printf "$(basename $0) ERROR failed to download $X509_USER_PROXY\n$(/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://${X509_USER_PROXY}.copy 2>&1 | sed 's#%#%%#g')n" | mail -s "$(basename $0) ERROR proxy download failed" $notifytowhom
+      printf "$(basename $0) ERROR failed to download $X509_USER_PROXY\n$(/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://${X509_USER_PROXY}.copy 2>&1 | sed 's#%#%%#g')n" | mail -s "$(basename $0) ERROR proxy download failed" $notifytowhom
 fi
 
 timeleft=$(voms-proxy-info -timeleft 2>/dev/null)
 if [ $timeleft -lt 1900 ] ; then # 1800 + 100
    #/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY
-   /usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+   /usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
    [ $? -eq 0 ] && cp $X509_USER_PROXY.copy $X509_USER_PROXY
 if [ ] ; then
    echo INFO creating the grid proxy
@@ -326,5 +327,6 @@ eos_fuse_logs=
 for f in /tmp/eos-fuse.*.log ; do
    [ -f "$f" ] && { eos_fuse_logs="$eos_fuse_logs $f" ; rm -f $f ; } ;
 done
-printf "$(basename $0) Done\nEOS Client Version=$EOS_CLIENT_VERSION\nRemoved $eos_fuse_logs\n$(ls -al /tmp)\n$(cat $log 2>&1 | sed 's#%#%%#g')\n" | mail -s "$(basename $0) Done" $notifytowhom
+printf "$(basename $0) Done\nEOS Client Version=$EOS_CLIENT_VERSION\nRemoved $eos_fuse_logs\n$(ls -al /tmp)\n$(cat $log 2>&1 | sed 's#%#%%#g')\n"
+#printf "$(basename $0) Done\nEOS Client Version=$EOS_CLIENT_VERSION\nRemoved $eos_fuse_logs\n$(ls -al /tmp)\n$(cat $log 2>&1 | sed 's#%#%%#g')\n" | mail -s "$(basename $0) Done" $notifytowhom
 exit 0

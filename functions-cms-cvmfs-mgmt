@@ -4379,7 +4379,8 @@ function check_and_update_siteconf () {
       [ -f /afs/cern.ch/cms/LCG/LCG-2/UI/cms_ui_env.sh ] && source /afs/cern.ch/cms/LCG/LCG-2/UI/cms_ui_env.sh
    fi
    export X509_USER_PROXY=$HOME/.florida.t2.proxy
-   /usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+   #/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+   /usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
    if [ $? -eq 0 ] ; then
       cp $X509_USER_PROXY.copy $X509_USER_PROXY
       voms-proxy-info -all
