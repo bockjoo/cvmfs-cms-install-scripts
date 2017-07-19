@@ -32,32 +32,32 @@ EOS_CLIENT_VERSION=${EOS_CLIENT_VERSION:-0.3.15}
 export EOSSYS=/home/cvcms/eos_installation/${EOS_CLIENT_VERSION}
 #export EOSSYS=/afs/cern.ch/project/eos/installation/${EOS_CLIENT_VERSION}
 
-eos () {
+function eos () {
   $EOSSYS/bin/eos.select
   return $?
 }
 
-eoscms () {
+function eoscms () {
   $EOSSYS/bin/eos.select
   return $?
 }
 
-eosforceumount () {
+function eosforceumount () {
   killall eosfsd 2>/dev/null
   killall -9 eosfsd 2>/dev/null
   fusermount -u $1
   return $?
 }
 
-eosmount () {
-  $EOSSYS/bin/eos.select -b fuse mount $1
-  return $?  
-}
+#function eosmount () {
+#  $EOSSYS/bin/eos.select -b fuse mount $1
+#  return $?  
+#}
 
-eosumount () {
-  $EOSSYS/bin/eos.select -b fuse umount $1
-  return $?
-}
+#function eosumount () {
+#  $EOSSYS/bin/eos.select -b fuse umount $1
+#  return $?
+#}
 
 
 
@@ -159,13 +159,13 @@ df -h | grep -q $(echo $EOS_MGM_URL | cut -d/ -f3 | cut -d: -f1)
 if [ $? -eq 0 ] ; then
    echo INFO $HOME/eos2 is already mounted
 else
-   eosmount $HOME/eos2
+   $EOSSYS/bin/eos.select -b fuse mount $HOME/eos2
 fi
 
 if [ ! -d $rsync_source ] ; then
    echo ERROR rsync_source not found eosmount error
-   printf "$(basename $0) $rsync_source not found \n Issue with: eosmount $HOME/eos2 did not work\nls $HOME/eos2/cms follows\n$(ls $HOME/eos2/cms)\ntail -10 eos log\n$(tail -10 /tmp/eos*)" | mail -s "$(basename $0) ERROR eosmount $HOME/eos2 failed " $notifytowhom
-   eosumount $HOME/eos2
+   printf "$(basename $0) $rsync_source not found \n Issue with: $EOSSYS/bin/eos.select -b fuse mount $HOME/eos2 did not work\nls $HOME/eos2/cms follows\n$(ls $HOME/eos2/cms)\ntail -10 eos log\n$(tail -10 /tmp/eos*)" | mail -s "$(basename $0) ERROR $EOSSYS/bin/eos.select -b fuse mount $HOME/eos2 failed " $notifytowhom
+   $EOSSYS/bin/eos.select -b fuse mount $HOME/eos2
    ps auxwww | grep -v grep | grep -q eosfsd
    if [ $? -eq 0 ] ; then
       echo Warning eosforceumount $HOME/eos2
@@ -183,16 +183,6 @@ TOTAL_RSYNC_SIZE=$(echo "scale=2 ; $TOTAL_RSYNC_SIZE / 1024 / 1024" | bc | cut -
 if [ $TOTAL_RSYNC_SIZE -gt $TOTAL_RSYNC_SIZE_LIMIT ] ; then
    echo Warning TOTAL RSYNC SIZE is too large
    #printf "$(basename $0) Warning TOTAL_RSYNC_SIZE > TOTAL_RSYNC_SIZE_LIMIT : $TOTAL_RSYNC_SIZE > $TOTAL_RSYNC_SIZE_LIMIT \n Will not rsync $rsync_source" | mail -s "$(basename $0) Warning ERROR TOTAL_RSYNC_SIZE > TOTAL_RSYNC_SIZE_LIMIT" $notifytowhom
-   if [ ] ; then
-      eosumount $HOME/eos2
-      ps auxwww | grep -v grep | grep -q eosfsd
-      if [ $? -eq 0 ] ; then
-         echo Warning eosforceumount $HOME/eos2
-         eosforceumount $HOME/eos2
-      fi
-      ls $HOME/eos2
-      exit 1
-   fi
 fi
 
 echo INFO looks good TOTAL_RSYNC_SIZE "<" TOTAL_RSYNC_SIZE_LIMIT
@@ -221,7 +211,7 @@ if [ $? -eq 0 ] ; then
 else
    echo ERROR transaction check FAILED
    printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
-   eosumount $HOME/eos2
+   $EOSSYS/bin/eos.select -b fuse mount $HOME/eos2
    ps auxwww | grep -v grep | grep -q eosfsd
    if [ $? -eq 0 ] ; then
       echo Warning eosforceumount $HOME/eos2
@@ -312,7 +302,7 @@ else
 fi
 
 echo INFO eosumount $HOME/eos2
-eosumount $HOME/eos2
+$EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
 ps auxwww | grep -v grep | grep -q eosfsd
 if [ $? -eq 0 ] ; then
    echo Warning eosforceumount $HOME/eos2

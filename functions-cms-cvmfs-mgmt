@@ -4385,7 +4385,7 @@ function check_and_update_siteconf () {
       cp $X509_USER_PROXY.copy $X509_USER_PROXY
       voms-proxy-info -all
    else
-      printf "check_and_update_siteconf() ERROR failed to download $X509_USER_PROXY\n$(/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://${X509_USER_PROXY}.copy 2>&1 | sed 's#%#%%#g')n" | mail -s "$what ERROR proxy download failed" $notifytowhom
+      printf "check_and_update_siteconf() ERROR failed to download $X509_USER_PROXY\n$(/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://${X509_USER_PROXY}.copy 2>&1 | sed 's#%#%%#g')n" | mail -s "$what ERROR proxy download failed" $notifytowhom
       return 1
    fi
    if [ ! -f $HOME/.AUTH_TKN ] ; then
