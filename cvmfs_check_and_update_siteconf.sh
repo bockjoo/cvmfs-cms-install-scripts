@@ -627,7 +627,8 @@ done
 echo UPDATED_SITES=\"$(echo $list_sites_updated)\"
 
 #echo UPDATED_SITES=
-cp -pR /cvmfs/cms.cern.ch/SITECONF/local ${SYNC_DIR}/SITECONF/
+#cp -pR /cvmfs/cms.cern.ch/SITECONF/local ${SYNC_DIR}/SITECONF/
+[ -L ${SYNC_DIR}/SITECONF/local ] || ln  -s '$(CMS_LOCAL_SITE)' ${SYNC_DIR}/SITECONF/local
 /bin/rm ${ERR_FILE} 1>/dev/null 2>&1
 # #############################################################################
 

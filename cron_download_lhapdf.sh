@@ -24,7 +24,10 @@ updated_list=$VO_CMS_SW_DIR/cvmfs-cms.cern.ch-updates
 #reference_list=http://oo.ihepa.ufl.edu:8080/cmssoft/lhapdf_list.txt
 reference_list=$HOME/lhapdf_list.txt
 
+# Format: dest
 lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c 6.1.d 6.1.e 6.1.f 6.1.g 6.1.h 6.2"
+
+# Format: dest|symlink
 needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b 6.1.d|6.1.5d 6.1.e|6.1.5e 6.1.f|6.1.5f 6.1.g|6.1.6 6.1.h|6.1.6a 6.2|6.2.0a" # 6.1.6 -> 6.1.g
 previous_release=$(echo $lhapdfweb_updates | awk '{print $(NF-1)}')
 

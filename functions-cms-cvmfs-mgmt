@@ -4445,6 +4445,16 @@ function check_and_update_siteconf () {
          ( cd ; cvmfs_server abort -f ; ) ;
          printf "$what publish was not needed, though there are $UPDATED_SITES\nCheck $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/logs/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "ERROR $what publish was not needed but with updated sites" $notifytowhom
       else
+         if [ -L /cvmfs/cms.cern.ch/SITECONF/local ] ; then
+            printf "functions-cms-cvmfs-mgmt /cvmfs/cms.cern.ch/SITECONF/local exists\n$(ls -al /cvmfs/cms.cern.ch/SITECONF/local | sed 's#%#%%#g')\n" | mail -s "INFO /cvmfs/cms.cern.ch/SITECONF/local" $notifytowhom
+         else
+            ln -s '$(CMS_LOCAL_SITE)' /cvmfs/cms.cern.ch/SITECONF/local
+            if [ $? -eq 0 ] ; then
+               printf "functions-cms-cvmfs-mgmt local symlink went OK\nln -s '$\(CMS_LOCAL_SITE\)' /cvmfs/cms.cern.ch/SITECONF/local\n" | mail -s "INFO functions-cms-cvmfs-mgmt local symlink" $notifytowhom
+            else
+               printf "functions-cms-cvmfs-mgmt local symlink went failed\nln -s '$\(CMS_LOCAL_SITE\)' /cvmfs/cms.cern.ch/SITECONF/local\n" | mail -s "ERROR functions-cms-cvmfs-mgmt local symlink" $notifytowhom
+            fi
+         fi
          echo INFO publish necessary
          printf "$what publish is needed UPDATED_SITES=$UPDATED_SITES\nCheck $HOME/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "DEBUG $what publish is necessary" $notifytowhom
          YMDM=$(date -u +%Y%m%d%H)

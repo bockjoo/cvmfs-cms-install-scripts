@@ -85,7 +85,8 @@ fi
    
 i=$(expr $i + 1)
 # Check if bootstrap is needed for $arch
-ls -al $MYINSTALLAREA/$SCRAM_ARCH/external/apt/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
+#ls -al $MYINSTALLAREA/$SCRAM_ARCH/external/apt/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
+ls -al $MYINSTALLAREA/$SCRAM_ARCH/external/rpm/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
 if [ $? -eq 0 ] ; then
    echo INFO "[$i]" bootstratp unnecessary for ${SCRAM_ARCH} in COMP+python
    #exit 0
