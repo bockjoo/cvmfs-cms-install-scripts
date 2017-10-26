@@ -440,7 +440,8 @@ for arch in $archs ; do
         echo $cmssw | grep -q CMSSW_8_1_0_pre[4-8]
         [ $? -eq 0 ] && continue
      fi
-
+     echo $cmssw | grep -q CMSSW_10_0_X
+     [ $? -eq 0 ] && continue
      #echo $arch | grep -q "slc7_amd64_gcc630\|slc7_amd64_gcc530"
      #[ $? -eq 0 ] && { echo $cmssw | grep -q CMSSW_9_1_0_pre3 ; [ $? -eq 0 ] && printf "Warning $0 Skipping CMSSW_9_1_0_pre3 and $arch\n" | mail -s "Warning:Skipping CMSSW_9_1_0_pre3 and $arch" $notifytowhom ; continue ; } ;
 
