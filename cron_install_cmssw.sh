@@ -177,7 +177,8 @@ bootstrap_script=http://cmsrep.cern.ch/cmssw/repos/bootstrap.sh     # 01FEB2017
 #cms_common_version_archs="1119+slc6_amd64_gcc481"
 #cms_common_version_archs="1122+slc6_amd64_gcc493"
 #cms_common_version_archs="1123+slc6_amd64_gcc530"
-cms_common_version_archs="1129+slc6_amd64_gcc530"
+#cms_common_version_archs="1129+slc6_amd64_gcc530"
+cms_common_version_archs="1201+slc6_amd64_gcc630"
 
 which_slc=slc6
 uname -a  | grep ^Linux | grep GNU/Linux | grep -q .el5

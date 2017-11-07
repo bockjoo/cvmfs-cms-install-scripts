@@ -2743,6 +2743,7 @@ function install_cms_common () {
          echo INFO cms_common_1.0 $cms_common_v $cms_common_a in the $updated_list
          continue
       else
+         echo INFO trying $cms_common_v and $cms_common_a
          if [ "x$cvmfs_server_yes" == "xno" ] ; then
            ls -al $HOME/slc*.lock 2>/dev/null 1>/dev/null
            if [ $? -eq 0 ] ; then
@@ -2928,28 +2929,8 @@ function cmspkg_install_cms_common () {
   fi
   scram_arch=$1
   version=$2
-  CMSPKG="$VO_CMS_SW_DIR/common/cmspkg -a $SCRAM_ARCH"
-
-  # because of cmspkg, we should not need to set up apt
-if [ ] ; then
-  echo INFO sourcing cmsset_default.sh
-  source $VO_CMS_SW_DIR/cmsset_default.sh 2>&1
-
-  echo INFO setting up apt
-  #source $VO_CMS_SW_DIR/${scram_arch}/external/apt/*/etc/profile.d/init.sh 2>&1
-  source $(ls -t $VO_CMS_SW_DIR/${scram_arch}/external/apt/*/etc/profile.d/init.sh | head -1) 2>&1
-  source $(ls -t $VO_CMS_SW_DIR/${scram_arch}/external/curl/*/etc/profile.d/init.sh | head -1)
-
-  echo INFO checking ldd $(which curl)
-  ldd $(which curl)
-  ldd $(which curl) 2>&1 | grep OPENSSL | grep -q "not found"
-  if [ $? -eq 0 ] ; then
-     source $(ls -t $VO_CMS_SW_DIR/${scram_arch}/external/openssl/*/etc/profile.d/init.sh | head -1)
-  fi
-
-  echo INFO which apt-get
-  which apt-get 2>&1
-fi # if [ ] ; then
+  # bug 07NOV2017 CMSPKG="$VO_CMS_SW_DIR/common/cmspkg -a $SCRAM_ARCH"
+  CMSPKG="$VO_CMS_SW_DIR/common/cmspkg -a $scram_arch"
 
   echo INFO checking cms-common before installing it
   rpm -qa | grep cms-common | grep -q ${version}
@@ -2999,12 +2980,14 @@ fi # if [ ] ; then
      return 1
   fi
 
-  $CMSPKG -y upgrade
+  echo INFO upgrading it via $CMSPKG -y upgrade
+  $CMSPKG -y upgrade 2>&1
 
-  echo INFO updating the repo
+  echo INFO updating the repo via $CMSPKG update
   $CMSPKG update 2>&1 # apt-get update 2>&1
 
   echo INFO installing cms-common+1.0 version $version
+  echo INFO via $CMSPKG -f install cms+cms-common+1.0
   $CMSPKG -f install cms+cms-common+1.0 #apt-get install '--assume-yes' cms+cms-common+1.0
 
   echo INFO checking cms-common after installing
@@ -3022,9 +3005,10 @@ fi # if [ ] ; then
         return $status
      else
         echo INFO $version not found
-        echo INFO reinstalling it # executing apt-get reinstall cms+cms-common+1.0
+        echo INFO reinstalling it via ${CMSPKG} reinstall cms+cms-common+1.0 # executing apt-get reinstall cms+cms-common+1.0
         #apt-get '--assume-yes' reinstall cms+cms-common+1.0
-        ${CMSPKG} --reinstall -y cms+cms-common+1.0
+        #${CMSPKG} --reinstall -y cms+cms-common+1.0
+        ${CMSPKG} reinstall cms+cms-common+1.0 2>&1
         status=$?
         if [ $status -eq 0 ] ; then
            grep -q "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
@@ -3053,11 +3037,37 @@ fi # if [ ] ; then
      #time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
      #return $?
   else
-     echo ERROR cms-common version=$version installation failed
-     rpm -qa | grep cms-common
-     cvmfs_server abort -f
-     cd $currdir
-     return 1
+     echo Warning cms-common version=$version installation did not go
+     #rpm -qa | grep cms-common
+     #cvmfs_server abort -f
+     #cd $currdir
+     #return 1
+     echo INFO reinstalling it via ${CMSPKG} reinstall cms+cms-common+1.0 # executing apt-get reinstall cms+cms-common+1.0                                                                                                
+     #apt-get '--assume-yes' reinstall cms+cms-common+1.0                                                                                                                      
+     #${CMSPKG} --reinstall -y cms+cms-common+1.0
+     ${CMSPKG} reinstall cms+cms-common+1.0 2>&1
+     status=$?
+     if [ $status -eq 0 ] ; then
+           grep -q "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
+           status=$?
+           if [ $status -eq 0 ] ; then
+              time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
+              status=$?
+              cd $currdir
+              return $status
+           else
+              echo ERROR $version still not found after reinstalling it # apt-get '--assume-yes' reinstall cms+cms-common+1.0                                                     
+              printf "cmspkg_install_cms_common: cms-common reinstall  failed\n" | mail -s "ERROR: cms-common resintall failed" $notifytowhom
+              cvmfs_server abort -f
+              cd $currdir
+              return 1
+           fi
+     else
+           echo ERROR FAILED: reinstall failed # apt-get '--assume-yes' reinstall cms+cms-common+1.0                                                                              
+           cvmfs_server abort -f
+           cd $currdir
+           return 1
+     fi
   fi
 
 }

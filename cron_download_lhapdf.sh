@@ -25,10 +25,10 @@ updated_list=$VO_CMS_SW_DIR/cvmfs-cms.cern.ch-updates
 reference_list=$HOME/lhapdf_list.txt
 
 # Format: dest
-lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c 6.1.d 6.1.e 6.1.f 6.1.g 6.1.h 6.2"
+lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c 6.1.d 6.1.e 6.1.f 6.1.g 6.1.h 6.2 6.2.1"
 
 # Format: dest|symlink
-needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b 6.1.d|6.1.5d 6.1.e|6.1.5e 6.1.f|6.1.5f 6.1.g|6.1.6 6.1.h|6.1.6a 6.2|6.2.0a" # 6.1.6 -> 6.1.g
+needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b 6.1.d|6.1.5d 6.1.e|6.1.5e 6.1.f|6.1.5f 6.1.g|6.1.6 6.1.h|6.1.6a 6.2|6.2.0a 6.2.1|6.2.1a" # 6.1.6 -> 6.1.g
 previous_release=$(echo $lhapdfweb_updates | awk '{print $(NF-1)}')
 
 #lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c"
@@ -433,6 +433,7 @@ for v in $releases $lhapdfweb_updates ; do
    # At this point, dest is 6.1.4 and dest_nested_catalog=6.1.4a 
    #                dest=6.1 dest_nested_catalog=6.1.5a
    echo DEBUG Check point dest=$dest dest_nested_catalog=${dest_nested_catalog}
+   #    DEBUG Check point dest=pdfsets/6.2 dest_nested_catalog=pdfsets/6.2
 
    ( echo INFO creating the checksum file
      cd ${lhapdf_top}/$dest_nested_catalog
@@ -441,9 +442,42 @@ for v in $releases $lhapdfweb_updates ; do
      touch ${lhapdf_top}/checksum_pdfsets_${realv}.txt
      for f in $(find ${lhapdf_top}/$dest_nested_catalog -type f -name "*" -print) ; do
           echo DEBUG $f
+          echo INFO ensuring permission
+          if [ $(/usr/bin/stat --format=%a $f) -eq 644 ] ; then
+             : # good
+          else
+             perm_original=$(/usr/bin/stat --format=%a $f)
+             perm_file=644
+             if [ "x$(/usr/bin/stat --format=%F $f)" == "xregular file" ] ; then
+                echo Warning chaning the permssion for $f from $perm_original to $perm_file
+                chmod $perm_file $f
+                printf "$(basename $0) Warning chaning the permssion for $f from $perm_original to $perm_file\n" | mail -s "$(basename $0) Permission corrected $(basename $f)" $notifytowhom
+             else
+                echo Error not chaning the permssion for $f from $perm_original to $perm_file
+                #chmod $perm_file $f
+                printf "$(basename $0) Error not chaning the permssion for $f from $perm_original to $perm_file\n$f is not a regular file" | mail -s "$(basename $0) Permission needs to be corrected $(basename $f)" $notifytowhom
+             fi
+          fi
+          thedir=$(dirname $f)
+          if [ $(/usr/bin/stat --format=%a $thedir) -eq 755 ] ; then
+             : # good
+          else
+             perm_original=$(/usr/bin/stat --format=%a $thedir)
+             perm_file=755
+             if [ "x$(/usr/bin/stat --format=%F $thedir)" == "xdirectory" ] ; then                
+                echo Warning chaning the permssion for $thedir from $perm_original to $perm_file
+                chmod $perm_file $thedir
+                printf "$(basename $0) Warning chaning the permssion for $thedir from $perm_original to $perm_file\n" | mail -s "$(basename $0) Permission corrected $(basename $thedir)" $notifytowhom
+             else
+                echo Error not chaning the permssion for $thedir from $perm_original to $perm_file
+                printf "$(basename $0) Error not chaning the permssion for $thedir from $perm_original to $perm_file\n$thedir is not a directory" | mail -s "$(basename $0) Permission needs to be corrected $(basename $thedir)" $notifytowhom
+             fi
+          fi
+          
           grep -q $f ${lhapdf_top}/checksum_pdfsets_${realv}.txt
 	  if [ $? -ne 0 ] ; then
              echo DEBUG calculating checksum for $f
+             #    DEBUG calculating checksum for /cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2/HERAPDF20_NLO_VAR/HERAPDF20_NLO_VAR_0001.dat
              /usr/bin/cksum $f >> ${lhapdf_top}/checksum_pdfsets_${realv}.txt
           fi
      done
