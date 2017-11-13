@@ -235,6 +235,7 @@ status=$?
 cat $thelog
 if [ $status -eq 0 ] ; then
    publish_needed=0
+   files_with_strange_permission=""
    i=0
    for f in $(grep ^$(basename $rsync_source) $thelog 2>/dev/null) ; do
       i=$(expr $i + 1)
@@ -250,8 +251,23 @@ if [ $status -eq 0 ] ; then
          publish_needed=0
          break
       fi
+      themode=$(/usr/bin/stat -c %a $(dirname $rsync_name)/$f)
+      if [ $themode -lt 400 ] ; then
+         theuser=$(/usr/bin/stat -c %U $(dirname $rsync_name)/$f)
+         files_with_strange_permission="$files_with_strange_permission ${themode}+${theuser}+$(dirname $rsync_name)/$f"
+      fi
+      if [ $(echo $themode | cut -c2-) -lt 40 ] ; then
+         theuser=$(/usr/bin/stat -c %U $(dirname $rsync_name)/$f)
+         files_with_strange_permission="$files_with_strange_permission ${themode}+${theuser}+$(dirname $rsync_name)/$f"
+      fi
+      if [ $(echo $themode | cut -c3-) -lt 4 ] ; then
+         theuser=$(/usr/bin/stat -c %U $(dirname $rsync_name)/$f)
+         files_with_strange_permission="$files_with_strange_permission ${themode}+${theuser}+$(dirname $rsync_name)/$f"
+      fi
    done
-
+   if [ "x$files_with_strange_permission" != "x" ] ; then
+         printf "$(basename $0) Found files with strange permsion\n$(for f in $files_with_strange_permission ; do echo $f ; done)\n" | mail -s "$(basename $0) Warning Found files with strange permsion" $notifytowhom
+   fi
    echo INFO check point publish_needed $publish_needed
 
    if [ $publish_needed -eq 0 ] ; then
