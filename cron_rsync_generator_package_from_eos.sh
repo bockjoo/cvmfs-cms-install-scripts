@@ -252,17 +252,21 @@ if [ $status -eq 0 ] ; then
          break
       fi
       themode=$(/usr/bin/stat -c %a $(dirname $rsync_name)/$f)
+      original_file=$(echo $(dirname $rsync_name)/$f | sed "s#$rsync_name#$rsync_source#")
+      original_mode=$(/usr/bin/stat -c %a $original_file)
+      original_user=$(/usr/bin/stat -c %U $original_file)
       if [ $themode -lt 400 ] ; then
          theuser=$(/usr/bin/stat -c %U $(dirname $rsync_name)/$f)
-         files_with_strange_permission="$files_with_strange_permission ${themode}+${theuser}+$(dirname $rsync_name)/$f"
+         files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/${f}"
       fi
       if [ $(echo $themode | cut -c2-) -lt 40 ] ; then
          theuser=$(/usr/bin/stat -c %U $(dirname $rsync_name)/$f)
-         files_with_strange_permission="$files_with_strange_permission ${themode}+${theuser}+$(dirname $rsync_name)/$f"
+         echo "$files_with_strange_permission" | grep -q "+$(dirname $rsync_name)/$f" || files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/$f"
       fi
       if [ $(echo $themode | cut -c3-) -lt 4 ] ; then
          theuser=$(/usr/bin/stat -c %U $(dirname $rsync_name)/$f)
-         files_with_strange_permission="$files_with_strange_permission ${themode}+${theuser}+$(dirname $rsync_name)/$f"
+         #files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/$f"
+         echo "$files_with_strange_permission" | grep -q "+$(dirname $rsync_name)/$f" || files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/$f"
       fi
    done
    if [ "x$files_with_strange_permission" != "x" ] ; then
