@@ -270,7 +270,12 @@ if [ $status -eq 0 ] ; then
       fi
    done
    if [ "x$files_with_strange_permission" != "x" ] ; then
-         printf "$(basename $0) Found files with strange permsion\n$(for f in $files_with_strange_permission ; do echo $f ; done)\n" | mail -s "$(basename $0) Warning Found files with strange permsion" $notifytowhom
+         printout=$(printf "$(basename $0) Found files with strange permsion\n$(for f in $files_with_strange_permission ; do echo $f ; done)\n")
+         for f in $files_with_strange_permission ; do
+           thefile=$(echo $f | sed 's#+# #g' | awk '{print $NF}')
+           chmod 644 $thefile
+         done
+         printf "$printout\nStrange files after changing the perm\n$(for f in $files_with_strange_permission ; do ls -al $f ; done)\n" | mail -s "$(basename $0) Warning Found files with strange permsion" $notifytowhom
    fi
    echo INFO check point publish_needed $publish_needed
 
