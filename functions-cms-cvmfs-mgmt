@@ -5,6 +5,8 @@ notifytowhom=bockjoo@phys.ufl.edu
 function cms_cvmfs_mgmt_fix_gridpack_perms () {
     cvmfs_server transaction
     [ $? -eq 0 ] || return 1
+    echo cms_cvmfs_mgmt_fix_gridpack_perms > $HOME/cron_install_cmssw.lock
+    echo INFO $HOME/cron_install_cmssw.lock created
     n=0
     for f in $(find /cvmfs/cms.cern.ch/phys_generator/gridpacks/ -type f -name "*" -print) ; do
        themode=$(/usr/bin/stat -c %a $f)
@@ -24,11 +26,32 @@ function cms_cvmfs_mgmt_fix_gridpack_perms () {
           chmod 644 $f
        fi
     done
+    for d in $(find /cvmfs/cms.cern.ch/phys_generator/gridpacks/ -type d -name "*" -print) ; do
+       themode=$(/usr/bin/stat -c %a $d)
+       if [ $themode -lt 500 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 755 $d
+          chmod 755 $d
+       fi
+       if [ $(echo $themode | cut -c2-) -lt 50 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 755 $d
+          chmod 755 $d
+       fi
+       if [ $(echo $themode | cut -c3-) -lt 5 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 755 $d
+          chmod 755 $d
+       fi
+    done
     if [ $n -gt 0 ] ; then
        cvmfs_server publish
     else
        cvmfs_server abort -f
     fi
+    echo INFO removing $HOME/cron_install_cmssw.lock
+    rm -f $HOME/cron_install_cmssw.lock
+
 }
 
 function day_and_even_odd_combination () {
