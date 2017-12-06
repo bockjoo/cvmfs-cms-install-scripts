@@ -2,6 +2,35 @@
 ####### BEGIN Functions 12345
 notifytowhom=bockjoo@phys.ufl.edu
 # Functions
+function cms_cvmfs_mgmt_fix_gridpack_perms () {
+    cvmfs_server transaction
+    [ $? -eq 0 ] || return 1
+    n=0
+    for f in $(find /cvmfs/cms.cern.ch/phys_generator/gridpacks/ -type f -name "*" -print) ; do
+       themode=$(/usr/bin/stat -c %a $f)
+       if [ $themode -lt 400 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 644 $f
+          chmod 644 $f
+       fi
+       if [ $(echo $themode | cut -c2-) -lt 40 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 644 $f
+          chmod 644 $f
+       fi
+       if [ $(echo $themode | cut -c3-) -lt 4 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 644 $f
+          chmod 644 $f
+       fi
+    done
+    if [ $n -gt 0 ] ; then
+       cvmfs_server publish
+    else
+       cvmfs_server abort -f
+    fi
+}
+
 function day_and_even_odd_combination () {
    BACKUP_DATE=$(date +%Y%m%d)
    BACKUP_EVEN_ODD=1
