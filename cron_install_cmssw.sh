@@ -612,7 +612,11 @@ echo INFO Done LHAPDF check and update part of the script
 echo INFO Execute only the first half of the even hours
 echo INFO Next cron_rsync_generator_package_from_eos as needed
 echo
-$HOME/cron_rsync_generator_package_from_eos.sh > $HOME/logs/cron_rsync_generator_package_from_eos.log 2>&1
+#$HOME/cron_rsync_generator_package_from_eos.sh > $HOME/logs/cron_rsync_generator_package_from_eos.log 2>&1
+$HOME/cron_rsync_generator_package_from_eos_individual.sh > $HOME/logs/cron_rsync_generator_package_from_eos_individual.log 2>&1
+#cms_cvmfs_mgmt_fix_gridpack_perms_cron > $HOME/logs/cms_cvmfs_mgmt_fix_gridpack_perms_cron.log 2>&1
+#printf "$(/bin/hostname -f): $(basename $0) \n$(cat $HOME/logs/cms_cvmfs_mgmt_fix_gridpack_perms_cron.log | sed 's#%#%%#g')\n" | mail -s "INFO gridpack_perms fix" $notifytowhom
+
 echo
 echo INFO Done cron_rsync_generator_package_from_eos part of the script
 echo

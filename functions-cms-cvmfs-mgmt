@@ -2,6 +2,72 @@
 ####### BEGIN Functions 12345
 notifytowhom=bockjoo@phys.ufl.edu
 # Functions
+function cms_cvmfs_mount_eos () {
+   EOS_CLIENT_VERSION=${EOS_CLIENT_VERSION:-0.3.15}
+   export EOSSYS=/home/cvcms/eos_installation/${EOS_CLIENT_VERSION}
+   $EOSSYS/bin/eos.select -b fuse mount $HOME/eos2
+   return $?
+}
+
+function cms_cvmfs_umount_eos () {
+   EOS_CLIENT_VERSION=${EOS_CLIENT_VERSION:-0.3.15}
+   export EOSSYS=/home/cvcms/eos_installation/${EOS_CLIENT_VERSION}
+   $EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
+   return $?
+}
+
+function cms_cvmfs_mgmt_fix_gridpack_perms_cron () {
+    cvmfs_server transaction
+    [ $? -eq 0 ] || { echo ERROR cvmfs_server transaction failed in cms_cvmfs_mgmt_fix_gridpack_perms_cron ; return 1 ; } ;
+    #echo cms_cvmfs_mgmt_fix_gridpack_perms > $HOME/cron_install_cmssw.lock
+    #echo INFO $HOME/cron_install_cmssw.lock created
+    n=0
+    for f in $(find /cvmfs/cms.cern.ch/phys_generator/gridpacks/ -type f -name "*" -print) ; do
+       themode=$(/usr/bin/stat -c %a $f)
+       if [ $themode -lt 400 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 644 $f
+          chmod 644 $f
+       fi
+       if [ $(echo $themode | cut -c2-) -lt 40 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 644 $f
+          chmod 644 $f
+       fi
+       if [ $(echo $themode | cut -c3-) -lt 4 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 644 $f
+          chmod 644 $f
+       fi
+    done
+    for d in $(find /cvmfs/cms.cern.ch/phys_generator/gridpacks/ -type d -name "*" -print) ; do
+       themode=$(/usr/bin/stat -c %a $d)
+       if [ $themode -lt 500 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 755 $d
+          chmod 755 $d
+       fi
+       if [ $(echo $themode | cut -c2-) -lt 50 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 755 $d
+          chmod 755 $d
+       fi
+       if [ $(echo $themode | cut -c3-) -lt 5 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 755 $d
+          chmod 755 $d
+       fi
+    done
+    if [ $n -gt 0 ] ; then
+       cvmfs_server publish
+    else
+       cvmfs_server abort -f
+    fi
+    #echo INFO removing $HOME/cron_install_cmssw.lock
+    #rm -f $HOME/cron_install_cmssw.lock
+
+}
+
 function cms_cvmfs_mgmt_fix_gridpack_perms () {
     cvmfs_server transaction
     [ $? -eq 0 ] || return 1

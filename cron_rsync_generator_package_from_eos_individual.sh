@@ -210,7 +210,7 @@ if [ $? -eq 0 ] ; then
    echo INFO transaction OK for $what
 else
    echo ERROR transaction check FAILED
-   printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+   printf "$(basename $0): 1 cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
    $EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
    ps auxwww | grep -v grep | grep -q eosfsd
    if [ $? -eq 0 ] ; then
@@ -221,18 +221,244 @@ else
    exit 1
 fi
 
-echo DEBUG check point will execute 
+echo DEBUG check point will execute to see if the update is necessary for individual files 
 #echo rsync -arzuvp $rsync_source $(dirname $rsync_name)
 #rm -f $HOME/rsync+generator+package+from+eos.log
 #rsync -arzuvp $rsync_source $(dirname $rsync_name) 2>&1 | tee $HOME/rsync+generator+package+from+eos.log
-echo rsync -arzuvp --delete $rsync_source $(dirname $rsync_name)
+echo rsync -arzuvp --delete --dry-run $rsync_source $(dirname $rsync_name)
 #echo rsync -arzuvp $rsync_source $(dirname $rsync_name)
 thelog=$HOME/logs/rsync+generator+package+from+eos.log
 rm -f $thelog
-rsync -arzuvp --delete $rsync_source $(dirname $rsync_name) > $thelog 2>&1
+rsync -arzuvp --delete --dry-run $rsync_source $(dirname $rsync_name) > $thelog 2>&1
 #rsync -arzuvp $rsync_source $(dirname $rsync_name) > $thelog 2>&1
 status=$?
-cat $thelog
+
+echo INFO for now aborting the rsync to rsync only those files that are new
+( cd ; cvmfs_server abort -f ; ) ;
+
+cvmfs_server transaction
+status=$?
+what="$(basename $0)"
+cvmfs_server_transaction_check $status $what
+if [ $? -eq 0 ] ; then
+   echo INFO transaction OK for $what
+else
+   echo ERROR transaction check FAILED
+   ( cd ; cvmfs_server abort -f ; ) ;
+   printf "$(basename $0): 2 cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+   $EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
+   ps auxwww | grep -v grep | grep -q eosfsd
+   if [ $? -eq 0 ] ; then
+      echo Warning eosforceumount $HOME/eos2
+      eosforceumount $HOME/eos2
+   fi
+   ls $HOME/eos2
+   exit 1
+fi
+
+#cat $thelog
+if [ $status -eq 0 ] ; then
+   publish_needed=0
+   # First delete files/directories that are not on EOS anymore
+   for f in $(grep ^"deleting gridpacks/" $thelog 2>/dev/null | awk '{print $NF}' | grep gridpacks/ ) ; do
+       thefile=$(dirname $rsync_name)/$f
+       echo $thefile | grep -q cvmfscatalog
+       [ $? -eq 0 ] && continue
+       #echo INFO removing $thefile
+       ( cd $(dirname $thefile)
+          pwd | grep -q /cvmfs/cms.cern.ch/phys_generator/gridpacks
+          if [ $? -eq 0 ] ; then
+             echo INFO rm -rf $(basename  $thefile) at $(pwd)
+             rm -rf $(basename  $thefile)
+          fi
+       )
+       publish_needed=1
+   done
+
+   files_with_strange_permission=""
+   i=0
+   for f in $(grep ^$(basename $rsync_source) $thelog 2>/dev/null | grep -v /$) ; do
+      # 
+      # rsync_source="$HOME/eos2/cms/store/group/phys_generator/cvmfs/gridpacks"
+      # rsync_name="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
+      # f is in the form gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.2.2/exo_DMDiJet/v3/DMSpin0_scalar_ggPhibb1j_g1_v2_150_5_805_tarball.tar.xz
+      i=$(expr $i + 1)
+      #[ -f "$(dirname $rsync_source)/$f" ] || { echo "[ $i ] " $(dirname $rsync_source)/$f is not a file $publish_needed ; continue ; } ;
+      [ -f "$(dirname $rsync_source)/$f" ] || continue
+      publish_needed=1
+      destfile=$(dirname $rsync_name)/$f # in the form /cvmfs/cms.cern.ch/phys_generator/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.2.2/exo_DMDiJet/v3/DMSpin0_scalar_ggPhibb1j_g1_v2_150_5_805_tarball.tar.xz
+      if [ ! -d $(dirname $destfile) ] ; then
+         echo INFO creating $(dirname $destfile) #>> $thelog 2>&1
+         mkdir -p $(dirname $destfile)
+      fi
+      echo INFO individual rsync : rsync -arzuvp --delete $(dirname $rsync_source)/$f $(dirname $destfile)
+      rsync -arzuvp --delete $(dirname $rsync_source)/$f $(dirname $destfile) #>> $thelog 2>&1
+      if [ $? -ne 0 ] ; then
+         printf "$(basename $0) ERROR failed: rsync -arzuvp --delete $(dirname $rsync_source)/$f $(dirname $destfile)\n" | mail -s "$(basename $0) ERROR failed: rsync" $notifytowhom
+      fi
+      echo "[ $i ] " $(dirname $rsync_name)/$f is a file $publish_needed
+      INDIVIDUAL_RSYNC_SIZE=$(/usr/bin/du -s $(dirname $rsync_name)/$f | awk '{print $1}')
+      INDIVIDUAL_RSYNC_SIZE=$(echo "scale=2 ; $INDIVIDUAL_RSYNC_SIZE / 1024 / 1024" | bc | cut -d. -f1)
+      [ "x$INDIVIDUAL_RSYNC_SIZE" == "x" ] && INDIVIDUAL_RSYNC_SIZE=0
+      if [ $INDIVIDUAL_RSYNC_SIZE -gt $INDIVIDUAL_RSYNC_SIZE_LIMIT ] ; then
+         echo Warning INDIVIDUAL_RSYNC_SIZE -gt INDIVIDUAL_RSYNC_SIZE_LIMIT $INDIVIDUAL_RSYNC_SIZE -gt $INDIVIDUAL_RSYNC_SIZE_LIMIT
+         printf "$(basename $0) Warning INDIVIDUAL_RSYNC_SIZE > INDIVIDUAL_RSYNC_SIZE_LIMIT : $INDIVIDUAL_RSYNC_SIZE > $INDIVIDUAL_RSYNC_SIZE_LIMIT $(dirname $rsync_name)/$f \n Will not publish the rsync result" | mail -s "$(basename $0) Warning INDIVIDUAL_RSYNC_SIZE > INDIVIDUAL_RSYNC_SIZE_LIMIT" $notifytowhom
+      fi
+      ## begin DRY
+      #publish_needed=0
+      #continue
+      ## end DRY
+      themode=$(/usr/bin/stat -c %a $(dirname $rsync_name)/$f)
+      original_file=$(echo $(dirname $rsync_name)/$f | sed "s#$rsync_name#$rsync_source#")
+      original_mode=$(/usr/bin/stat -c %a $original_file)
+      original_user=$(/usr/bin/stat -c %U $original_file)
+      if [ $themode -lt 400 ] ; then
+         theuser=$(/usr/bin/stat -c %U $(dirname $rsync_name)/$f)
+         files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/${f}"
+      fi
+      if [ $(echo $themode | cut -c2-) -lt 40 ] ; then
+         theuser=$(/usr/bin/stat -c %U $(dirname $rsync_name)/$f)
+         echo "$files_with_strange_permission" | grep -q "+$(dirname $rsync_name)/$f" || files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/$f"
+      fi
+      if [ $(echo $themode | cut -c3-) -lt 4 ] ; then
+         theuser=$(/usr/bin/stat -c %U $(dirname $rsync_name)/$f)
+         #files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/$f"
+         echo "$files_with_strange_permission" | grep -q "+$(dirname $rsync_name)/$f" || files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/$f"
+      fi
+   done
+   if [ "x$files_with_strange_permission" != "x" ] ; then
+         printout=$(printf "$(basename $0) Found files with strange permsion\n$(for f in $files_with_strange_permission ; do echo $f ; done)\n")
+         for f in $files_with_strange_permission ; do
+           thefile=$(echo $f | sed 's#+# #g' | awk '{print $NF}')
+           chmod 644 $thefile
+         done
+         printf "$printout\nStrange files after changing the perm\n$(for f in $files_with_strange_permission ; do ls -al $f ; done)\n" | mail -s "$(basename $0) Warning Found files with strange permsion" $notifytowhom
+   fi
+   echo INFO check point publish_needed $publish_needed
+
+   if [ $publish_needed -eq 0 ] ; then
+      echo INFO publish was not needed, So ending the transaction
+      ( cd ; cvmfs_server abort -f ; ) ;
+   else
+      echo INFO publish necessary
+      echo INFO updating $updated_list
+
+      # db updated_list
+      date_s_now=$(echo $(/bin/date +%s) $(/bin/date -u))
+      grep -q "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" $updated_list
+      if [ $? -eq 0 ] ; then
+        echo Warning "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" is already in the $updated_list
+      else
+        echo INFO adding "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" to $updated_list
+        echo "gridpacks $(echo $f | cut -d/ -f2) $date_s_now" >> $updated_list
+      fi
+      thestring="gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')"
+
+      echo INFO adding 'phys_generator/gridpacks/slc*/*/*' to /cvmfs/cms.cern.ch/.cvmfsdirtab
+      # nested stuff
+      grep -q /phys_generator/gridpacks/slc /cvmfs/cms.cern.ch/.cvmfsdirtab
+      if [ $? -ne 0 ] ; then
+         echo '/phys_generator/gridpacks/slc*/*/*' >> /cvmfs/cms.cern.ch/.cvmfsdirtab
+      fi
+
+      # fix all wrong perms if any
+      echo INFO fixing all wrong perms if any
+      n=0
+      for f in $(find /cvmfs/cms.cern.ch/phys_generator/gridpacks/ -type f -name "*" -print) ; do
+       themode=$(/usr/bin/stat -c %a $f)
+       if [ $themode -lt 400 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 644 $f
+          chmod 644 $f
+       fi
+       if [ $(echo $themode | cut -c2-) -lt 40 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 644 $f
+          chmod 644 $f
+       fi
+       if [ $(echo $themode | cut -c3-) -lt 4 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 644 $f
+          chmod 644 $f
+       fi
+      done
+      for d in $(find /cvmfs/cms.cern.ch/phys_generator/gridpacks/ -type d -name "*" -print) ; do
+       themode=$(/usr/bin/stat -c %a $d)
+       if [ $themode -lt 500 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 755 $d
+          chmod 755 $d
+       fi
+       if [ $(echo $themode | cut -c2-) -lt 50 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 755 $d
+          chmod 755 $d
+       fi
+       if [ $(echo $themode | cut -c3-) -lt 5 ] ; then
+          n=$(expr $n + 1)
+          echo chmod 755 $d
+          chmod 755 $d
+       fi
+      done
+
+      # end of fix all wrong perms
+
+
+      echo INFO publishing $rsync_name
+      currdir=$(pwd)
+      cd
+      time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log
+      status=$?
+      cd $currdir
+      if [ $status -eq 0 ] ; then
+         #printf "$(basename $0) cvmfs_server_publish OK \n$(cat $HOME/cvmfs_server+publish+rsync+generator+package+from+eos.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish for $package OK" $notifytowhom
+         printf "$(basename $0) cvmfs_server_publish OK \n$(cat $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log | sed 's#%#%%#g')\n"
+      else
+         ( cd ; echo Warning deleting "$thestring" from $updated_list ; cic_del_line "$thestring" $updated_list ; ) ;
+         echo ERROR failed cvmfs_server publish
+         printf "$(basename $0) cvmfs_server publish failed\n$(cat $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish failed" $notifytowhom
+         ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
+      fi
+   fi
+else
+   echo ERROR failed : rsync -arzuvp $rsync_source $(dirname $rsync_name)
+   printf "$(basename $0) ERROR FAILED: rsync -arzuvp $rsync_source $(dirname $rsync_name)\n" | mail -s "$(basename $0) ERROR FAILED rsync" $notifytowhom
+   ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
+fi
+
+echo INFO eosumount $HOME/eos2
+$EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
+ps auxwww | grep -v grep | grep -q eosfsd
+if [ $? -eq 0 ] ; then
+   echo Warning eosforceumount $HOME/eos2
+   eosforceumount $HOME/eos2
+fi
+echo INFO checking with ls $HOME/eos2
+ls $HOME/eos2
+
+echo script $0 Done
+log=$HOME/logs/$(basename $0 | sed 's#\.sh#\.log#g')
+eos_fuse_logs=
+for f in /tmp/eos-fuse.*.log ; do
+   [ -f "$f" ] && { eos_fuse_logs="$eos_fuse_logs $f" ; rm -f $f ; } ;
+done
+printf "$(basename $0) Done\nEOS Client Version=$EOS_CLIENT_VERSION\nRemoved $eos_fuse_logs\n$(ls -al /tmp)\n$(cat $log 2>&1 | sed 's#%#%%#g')\n"
+#printf "$(basename $0) Done\nEOS Client Version=$EOS_CLIENT_VERSION\nRemoved $eos_fuse_logs\n$(ls -al /tmp)\n$(cat $log 2>&1 | sed 's#%#%%#g')\n" | mail -s "$(basename $0) Done" $notifytowhom
+exit 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 if [ $status -eq 0 ] ; then
    publish_needed=0
    files_with_strange_permission=""
