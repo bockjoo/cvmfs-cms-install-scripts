@@ -407,7 +407,7 @@ if [ $status -eq 0 ] ; then
       echo INFO publishing $rsync_name
       currdir=$(pwd)
       cd
-      time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log
+      time cvmfs_server publish > $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log 2>&1
       status=$?
       cd $currdir
       if [ $status -eq 0 ] ; then
@@ -438,132 +438,6 @@ ls $HOME/eos2
 
 echo script $0 Done
 log=$HOME/logs/$(basename $0 | sed 's#\.sh#\.log#g')
-eos_fuse_logs=
-for f in /tmp/eos-fuse.*.log ; do
-   [ -f "$f" ] && { eos_fuse_logs="$eos_fuse_logs $f" ; rm -f $f ; } ;
-done
-printf "$(basename $0) Done\nEOS Client Version=$EOS_CLIENT_VERSION\nRemoved $eos_fuse_logs\n$(ls -al /tmp)\n$(cat $log 2>&1 | sed 's#%#%%#g')\n"
-#printf "$(basename $0) Done\nEOS Client Version=$EOS_CLIENT_VERSION\nRemoved $eos_fuse_logs\n$(ls -al /tmp)\n$(cat $log 2>&1 | sed 's#%#%%#g')\n" | mail -s "$(basename $0) Done" $notifytowhom
-exit 0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-if [ $status -eq 0 ] ; then
-   publish_needed=0
-   files_with_strange_permission=""
-   i=0
-   for f in $(grep ^$(basename $rsync_source) $thelog 2>/dev/null) ; do
-      i=$(expr $i + 1)
-      [ -f "$(dirname $rsync_name)/$f" ] || { echo "[ $i ] " $(dirname $rsync_name)/$f is not a file $publish_needed ; continue ; } ;
-      publish_needed=1
-      echo "[ $i ] " $(dirname $rsync_name)/$f is a file $publish_needed
-      INDIVIDUAL_RSYNC_SIZE=$(/usr/bin/du -s $(dirname $rsync_name)/$f | awk '{print $1}')
-      INDIVIDUAL_RSYNC_SIZE=$(echo "scale=2 ; $INDIVIDUAL_RSYNC_SIZE / 1024 / 1024" | bc | cut -d. -f1)
-      [ "x$INDIVIDUAL_RSYNC_SIZE" == "x" ] && INDIVIDUAL_RSYNC_SIZE=0
-      if [ $INDIVIDUAL_RSYNC_SIZE -gt $INDIVIDUAL_RSYNC_SIZE_LIMIT ] ; then
-         echo ERROR INDIVIDUAL_RSYNC_SIZE -gt INDIVIDUAL_RSYNC_SIZE_LIMIT $INDIVIDUAL_RSYNC_SIZE -gt $INDIVIDUAL_RSYNC_SIZE_LIMIT
-         printf "$(basename $0) ERROR INDIVIDUAL_RSYNC_SIZE > INDIVIDUAL_RSYNC_SIZE_LIMIT : $INDIVIDUAL_RSYNC_SIZE > $INDIVIDUAL_RSYNC_SIZE_LIMIT $(dirname $rsync_name)/$f \n Will not publish the rsync result" | mail -s "$(basename $0) ERROR ERROR INDIVIDUAL_RSYNC_SIZE > INDIVIDUAL_RSYNC_SIZE_LIMIT" $notifytowhom
-         publish_needed=0
-         break
-      fi
-      themode=$(/usr/bin/stat -c %a $(dirname $rsync_name)/$f)
-      original_file=$(echo $(dirname $rsync_name)/$f | sed "s#$rsync_name#$rsync_source#")
-      original_mode=$(/usr/bin/stat -c %a $original_file)
-      original_user=$(/usr/bin/stat -c %U $original_file)
-      if [ $themode -lt 400 ] ; then
-         theuser=$(/usr/bin/stat -c %U $(dirname $rsync_name)/$f)
-         files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/${f}"
-      fi
-      if [ $(echo $themode | cut -c2-) -lt 40 ] ; then
-         theuser=$(/usr/bin/stat -c %U $(dirname $rsync_name)/$f)
-         echo "$files_with_strange_permission" | grep -q "+$(dirname $rsync_name)/$f" || files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/$f"
-      fi
-      if [ $(echo $themode | cut -c3-) -lt 4 ] ; then
-         theuser=$(/usr/bin/stat -c %U $(dirname $rsync_name)/$f)
-         #files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/$f"
-         echo "$files_with_strange_permission" | grep -q "+$(dirname $rsync_name)/$f" || files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/$f"
-      fi
-   done
-   if [ "x$files_with_strange_permission" != "x" ] ; then
-         printout=$(printf "$(basename $0) Found files with strange permsion\n$(for f in $files_with_strange_permission ; do echo $f ; done)\n")
-         for f in $files_with_strange_permission ; do
-           thefile=$(echo $f | sed 's#+# #g' | awk '{print $NF}')
-           chmod 644 $thefile
-         done
-         printf "$printout\nStrange files after changing the perm\n$(for f in $files_with_strange_permission ; do ls -al $f ; done)\n" | mail -s "$(basename $0) Warning Found files with strange permsion" $notifytowhom
-   fi
-   echo INFO check point publish_needed $publish_needed
-
-   if [ $publish_needed -eq 0 ] ; then
-      echo INFO publish was not needed, So ending the transaction
-      ( cd ; cvmfs_server abort -f ; ) ;
-   else
-      echo INFO publish necessary
-      echo INFO updating $updated_list
-
-      # db updated_list
-      date_s_now=$(echo $(/bin/date +%s) $(/bin/date -u))
-      grep -q "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" $updated_list
-      if [ $? -eq 0 ] ; then
-        echo Warning "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" is already in the $updated_list
-      else
-        echo INFO adding "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" to $updated_list
-        echo "gridpacks $(echo $f | cut -d/ -f2) $date_s_now" >> $updated_list
-      fi
-      thestring="gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')"
-
-      echo INFO adding 'phys_generator/gridpacks/slc*/*/*' to /cvmfs/cms.cern.ch/.cvmfsdirtab
-      # nested stuff
-      grep -q /phys_generator/gridpacks/slc /cvmfs/cms.cern.ch/.cvmfsdirtab
-      if [ $? -ne 0 ] ; then
-         echo '/phys_generator/gridpacks/slc*/*/*' >> /cvmfs/cms.cern.ch/.cvmfsdirtab
-      fi
-
-      echo INFO publishing $rsync_name
-      currdir=$(pwd)
-      cd
-      time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log
-      status=$?
-      cd $currdir
-      if [ $status -eq 0 ] ; then
-         #printf "$(basename $0) cvmfs_server_publish OK \n$(cat $HOME/cvmfs_server+publish+rsync+generator+package+from+eos.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish for $package OK" $notifytowhom
-         printf "$(basename $0) cvmfs_server_publish OK \n$(cat $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log | sed 's#%#%%#g')\n"
-      else
-         ( cd ; echo Warning deleting "$thestring" from $updated_list ; cic_del_line "$thestring" $updated_list ; ) ;
-         echo ERROR failed cvmfs_server publish
-         printf "$(basename $0) cvmfs_server publish failed\n$(cat $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish failed" $notifytowhom
-         ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-      fi
-   fi
-else
-   echo ERROR failed : rsync -arzuvp $rsync_source $(dirname $rsync_name)
-   printf "$(basename $0) ERROR FAILED: rsync -arzuvp $rsync_source $(dirname $rsync_name)\n" | mail -s "$(basename $0) ERROR FAILED rsync" $notifytowhom
-   ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
-fi
-
-echo INFO eosumount $HOME/eos2
-$EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
-ps auxwww | grep -v grep | grep -q eosfsd
-if [ $? -eq 0 ] ; then
-   echo Warning eosforceumount $HOME/eos2
-   eosforceumount $HOME/eos2
-fi
-echo INFO checking with ls $HOME/eos2
-ls $HOME/eos2
-
-echo script $0 Done
-log=$(basename $0 | sed 's#\.sh#\.log#g')
 eos_fuse_logs=
 for f in /tmp/eos-fuse.*.log ; do
    [ -f "$f" ] && { eos_fuse_logs="$eos_fuse_logs $f" ; rm -f $f ; } ;
