@@ -236,6 +236,14 @@ status=$?
 echo INFO for now aborting the rsync to rsync only those files that are new
 ( cd ; cvmfs_server abort -f ; ) ;
 
+echo INFO gridpakcs to be rsynced: $(grep "tar.xz\|tar.gz\|tgz" $thelog | grep "^gridpacks/" | wc -l)
+grep "tar.xz\|tar.gz\|tgz" $thelog | grep "^gridpacks/" > $HOME/logs/gridpacks_scheduled_to_be_updated.txt
+if [ -f $HOME/osg/osg-wn-client/setup.sh ] ; then
+   source $HOME/osg/osg-wn-client/setup.sh
+   export X509_USER_PROXY=/home/cvcms/.florida.t2.proxy
+   globus-url-copy -vb file://$HOME/logs/gridpacks_scheduled_to_be_updated.txt gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/cvmfs_installations/gridpacks_scheduled_to_be_updated.txt
+fi
+
 cvmfs_server transaction
 status=$?
 what="$(basename $0)"
@@ -258,12 +266,15 @@ fi
 
 #cat $thelog
 if [ $status -eq 0 ] ; then
+   i=0
    publish_needed=0
    # First delete files/directories that are not on EOS anymore
-   for f in $(grep ^"deleting gridpacks/" $thelog 2>/dev/null | awk '{print $NF}' | grep gridpacks/ ) ; do
+   for f in $(grep ^"deleting gridpacks/" $thelog 2>/dev/null | awk '{print $NF}' | grep gridpacks/ | grep -v /.cvmfscatalog) ; do
        thefile=$(dirname $rsync_name)/$f
        echo $thefile | grep -q cvmfscatalog
        [ $? -eq 0 ] && continue
+       i=$(expr $i + 1)
+       [ $i -gt 10 ] && break
        #echo INFO removing $thefile
        ( cd $(dirname $thefile)
           pwd | grep -q /cvmfs/cms.cern.ch/phys_generator/gridpacks
@@ -274,28 +285,91 @@ if [ $status -eq 0 ] ; then
        )
        publish_needed=1
    done
-
+   if [ $publish_needed -eq 1 ] ; then
+      time cvmfs_server publish > $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos_individual_delete.log 2>&1
+      cvmfs_server transaction
+      #publish_needed=0
+  fi
    files_with_strange_permission=""
+   destfiles=""
    i=0
-   for f in $(grep ^$(basename $rsync_source) $thelog 2>/dev/null | grep -v /$) ; do
+   publish_needed=0
+   for f in $(grep ^$(basename $rsync_source) $thelog 2>/dev/null | grep -v "/.sys.v#" | grep -v /$) ; do
       # 
       # rsync_source="$HOME/eos2/cms/store/group/phys_generator/cvmfs/gridpacks"
       # rsync_name="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
       # f is in the form gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.2.2/exo_DMDiJet/v3/DMSpin0_scalar_ggPhibb1j_g1_v2_150_5_805_tarball.tar.xz
-      i=$(expr $i + 1)
       #[ -f "$(dirname $rsync_source)/$f" ] || { echo "[ $i ] " $(dirname $rsync_source)/$f is not a file $publish_needed ; continue ; } ;
       [ -f "$(dirname $rsync_source)/$f" ] || continue
       publish_needed=1
       destfile=$(dirname $rsync_name)/$f # in the form /cvmfs/cms.cern.ch/phys_generator/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.2.2/exo_DMDiJet/v3/DMSpin0_scalar_ggPhibb1j_g1_v2_150_5_805_tarball.tar.xz
+      destfiles="$destfiles $destfile"
       if [ ! -d $(dirname $destfile) ] ; then
          echo INFO creating $(dirname $destfile) #>> $thelog 2>&1
-         mkdir -p $(dirname $destfile)
+         mkdir -p $(dirname $destfile) > $HOME/logs/eos_mkdir_log 2>&1
+         grep -q "File exists" $HOME/logs/eos_mkdir_log
+         if [ $? -eq 0 ] ; then
+            if [ -f $(dirname $destfile) ] ; then
+               rm -rf $(dirname $destfile)
+               printf "$(basename $0) ERROR failed: $(dirname $destfile) supposed to be a directory. Something went wrong\n" | mail -s "$(basename $0) ERROR failed: mkdir -p $(dirname $destfile) " $notifytowhom
+               #echo DRY rm -rf $(dirname $destfile)
+               time cvmfs_server publish > $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log 2>&1
+               [ $? -eq 0 ] ||  ( cd ; cvmfs_server abort -f ; ) ;
+               echo INFO eosumount $HOME/eos2
+               $EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
+               ps auxwww | grep -v grep | grep -q eosfsd
+               if [ $? -eq 0 ] ; then
+                  echo Warning eosforceumount $HOME/eos2
+                  eosforceumount $HOME/eos2
+               fi
+               echo INFO checking with ls $HOME/eos2
+               ls $HOME/eos2
+               echo script $0 Done
+               log=$HOME/logs/$(basename $0 | sed 's#\.sh#\.log#g')
+               eos_fuse_logs=
+               for f in /tmp/eos-fuse.*.log ; do
+                  [ -f "$f" ] && { eos_fuse_logs="$eos_fuse_logs $f" ; rm -f $f ; } ;
+               done
+               exit 1
+            fi
+         fi
       fi
+      if [ ! -f $(dirname $rsync_source)/$f ] ; then
+           echo Warning $(dirname $rsync_source)/$f does not exist. Maybe, it is deleted 
+           #publish_needed=1
+           continue
+      fi
+      # To upload new files only 
+      if [ ] ; then
+      if [ -f $destfile ] ; then
+         #echo DEBUG checking $(dirname $rsync_source)/$f
+         #ls -al $(dirname $rsync_source)/$f
+         #echo DEBUG checking $(dirname $rsync_name)/$f
+         #ls -al $(dirname $rsync_name)/$f
+         #echo DEBUG $destfile exists
+         continue
+      fi
+      # To upload new files only 
+      fi # if [ ] ; then
+      #echo DEBUG checking $(dirname $rsync_source)/$f
+      #ls -al $(dirname $rsync_source)/$f
+      #echo DEBUG checking $(dirname $rsync_name)/$f
+      #ls -al $(dirname $rsync_name)/$f
       echo INFO individual rsync : rsync -arzuvp --delete $(dirname $rsync_source)/$f $(dirname $destfile)
-      rsync -arzuvp --delete $(dirname $rsync_source)/$f $(dirname $destfile) #>> $thelog 2>&1
+      rsync -arzuvp --delete $(dirname $rsync_source)/$f $(dirname $destfile) 2>&1
       if [ $? -ne 0 ] ; then
          printf "$(basename $0) ERROR failed: rsync -arzuvp --delete $(dirname $rsync_source)/$f $(dirname $destfile)\n" | mail -s "$(basename $0) ERROR failed: rsync" $notifytowhom
+         continue
       fi
+       
+      #if [ $(echo $(ls -al $(dirname $rsync_source)/$f | awk '{print $5}')) -ne $(echo $(ls -al $destfile | awk '{print $5}')) ] ; then
+      #   echo ERROR $(dirname $rsync_source)/$f and $destfile are different after rsync. $destfile removed
+      #   rm -f $destfile
+      #   printf "$(basename $0) ERROR failed: $(dirname $rsync_source)/$f and $destfile are different after rsync $destfile removed \n$(ls -al $(dirname $rsync_source)/$f)\n$(ls -al $destfile)" | mail -s "$(basename $0) ERROR failed: rsync II" $notifytowhom
+      #   continue
+      #fi
+
+      i=$(expr $i + 1)
       echo "[ $i ] " $(dirname $rsync_name)/$f is a file $publish_needed
       INDIVIDUAL_RSYNC_SIZE=$(/usr/bin/du -s $(dirname $rsync_name)/$f | awk '{print $1}')
       INDIVIDUAL_RSYNC_SIZE=$(echo "scale=2 ; $INDIVIDUAL_RSYNC_SIZE / 1024 / 1024" | bc | cut -d. -f1)
@@ -325,14 +399,28 @@ if [ $status -eq 0 ] ; then
          #files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/$f"
          echo "$files_with_strange_permission" | grep -q "+$(dirname $rsync_name)/$f" || files_with_strange_permission="$files_with_strange_permission ${original_mode}+${original_user}+${themode}+${theuser}+$(dirname $rsync_name)/$f"
       fi
+      #time cvmfs_server publish > $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos_individual.log 2>&1
+      if [ $publish_needed -eq 1 ] ; then
+         #echo INFO doing cvmfs_server publish for $(dirname $rsync_source)/$f $(dirname $destfile)/$(basename $f)
+         #time cvmfs_server publish > $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos_individual.log 2>&1
+         #cvmfs_server transaction
+         #publish_needed=0
+         [ $i -gt 50 ] && break
+      fi
    done
+   #if [ $publish_needed -eq 1 ] ; then
+   #   cvmfs_server transaction
+   #fi
    if [ "x$files_with_strange_permission" != "x" ] ; then
          printout=$(printf "$(basename $0) Found files with strange permsion\n$(for f in $files_with_strange_permission ; do echo $f ; done)\n")
          for f in $files_with_strange_permission ; do
            thefile=$(echo $f | sed 's#+# #g' | awk '{print $NF}')
            chmod 644 $thefile
          done
-         printf "$printout\nStrange files after changing the perm\n$(for f in $files_with_strange_permission ; do ls -al $f ; done)\n" | mail -s "$(basename $0) Warning Found files with strange permsion" $notifytowhom
+         printf "$printout\nStrange files after changing the perm\n$(for f in $files_with_strange_permission ; do ls -al $(echo $f | cut -d+ -f5-) ; done)\n" | mail -s "$(basename $0) Warning Found files with strange permsion" $notifytowhom
+   fi
+   if [ "x$destfiles" != "x" ] ; then
+      printf "$(basename $0) INFO added files\n$(for f in $destfiles ; do echo $f ; done)\n" | mail -s "$(basename $0) INFO gridpack added" $notifytowhom
    fi
    echo INFO check point publish_needed $publish_needed
 

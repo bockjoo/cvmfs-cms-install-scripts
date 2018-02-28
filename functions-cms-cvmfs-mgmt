@@ -16,6 +16,38 @@ function cms_cvmfs_umount_eos () {
    return $?
 }
 
+function cms_cvmfs_check_gridpacks() {
+   mounted_here=0
+   if [ ! -d /home/eos2/cms/store/group/phys_generator/cvmfs/gridpacks ] ; then
+      cms_cvmfs_mount_eos
+      echo INFO EOS mount status $?
+      mounted_here=1
+   fi
+   rsync_source="$HOME/eos2/cms/store/group/phys_generator/cvmfs/gridpacks"
+   rsync_name="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
+   grep "tar.xz\|tar.gz\|tgz" $thelog | grep "^gridpacks/" | sort -u | \
+   while read f ; do 
+        ls -al /home/cvcms/eos2/cms/store/group/phys_generator/cvmfs/$f
+        ls -al /cvmfs/cms.cern.ch/phys_generator/$f
+   done
+   if [ $mounted_here -eq 1 ] ; then
+      cms_cvmfs_umount_eos
+   fi
+}
+
+function cms_cvmfs_upload_file_to_florida () {
+   source /home/cvcms/osg/osg-wn-client/setup.sh
+   source_file=$1
+   if [ -f "$source_file" ] ; then
+      echo ERROR $source_file does not exist
+      return 1
+   fi
+   grep -q ^/ $source_file
+   [ $? -eq 0 ] || source_file=$(cd $(dirname $sourcefile) ; pwd)/$(basename $source_file)
+   globus-url-copy -vb file://$source_file gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/cvmfs_installations/$(basename $source_file)
+   return $?
+}
+
 function cms_cvmfs_mgmt_fix_gridpack_perms_cron () {
     cvmfs_server transaction
     [ $? -eq 0 ] || { echo ERROR cvmfs_server transaction failed in cms_cvmfs_mgmt_fix_gridpack_perms_cron ; return 1 ; } ;

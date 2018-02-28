@@ -114,8 +114,8 @@ fi
 
 # Maintenance
 [ -f /etc/nologin ] && echo "Cron disabled due to nologin" && exit
-if [ "X$(date +%Y%m%d)" == "X20160701" ] ; then
- if [ $(date +%d%H) -ge 107 -a $(date +%d%H) -lt 108 ] ; then #
+if [ "X$(date +%Y%m%d)" == "X20180227" ] ; then
+ if [ $(date +%d%H) -ge 2705 -a $(date +%d%H) -lt 2706 ] ; then #
    echo "lxcvmfs73 -> lxcvmfs74"
    printf "$(basename $0) Exiting for the system upgrade\n$(cat $HOME/crontab | sed 's#%#%%#g')\nlxcvmfs73 to lxcvmfs74\nUpdate $HOME/cron_install_cmssw.config" | mail -s "Exiting for upgrade" $notifytowhom
    exit 0
@@ -144,7 +144,7 @@ fi
 
 slcs_excluded="_ia32_"
 archs_excluded="slc5_amd64_gcc434\|slc5_amd64_gcc451\|slc5_amd64_gcc4621|slc5_amd64_gcc462"
-cmssws_excluded="CMSSW_4_2_8_SLHCstd_patch1 CMSSW_4_1_3_patch1 CMSSW_4_2_0 CMSSW_4_2_0_pre6 CMSSW_4_2_2_SLHC_pre1 CMSSW_4_2_3_SLHC_pre1 CMSSW_4_2_8_SLHC1_patch1 MSSW_4_2_8_SLHCstd_patch1 CMSSW_4_3_0_pre7 CMSSW_4_4_2_p10JEmalloc CMSSW_5_0_0_g4emtest CMSSW_5_0_0_pre5_root532rc1 CMSSW_4_2_3_onlpatch2 CMSSW_4_2_3_onlpatch4 CMSSW_4_2_7_hinpatch1 CMSSW_4_2_7_onlpatch2 CMSSW_4_2_9_HLT2_onlpatch1 CMSSW_4_4_2_onlpatch1 CMSSW_5_1_0_pre1 CMSSW_5_1_0_pre2 CMSSW_5_2_0_pre2_TS113282 CMSSW_5_2_0_pre3HLT CMSSW_5_3_4_TS125616patch1 CMSSW_5_3_X CMSSW_6_2_X CMSSW_6_2_X_SLHC CMSSW_7_0_X CMSSW_7_1_X CMSSW_7_2_X CMSSW_7_3_X CMSSW_7_4_X CMSSW_7_1_50 CMSSW_10_1_X"
+cmssws_excluded="CMSSW_4_2_8_SLHCstd_patch1 CMSSW_4_1_3_patch1 CMSSW_4_2_0 CMSSW_4_2_0_pre6 CMSSW_4_2_2_SLHC_pre1 CMSSW_4_2_3_SLHC_pre1 CMSSW_4_2_8_SLHC1_patch1 MSSW_4_2_8_SLHCstd_patch1 CMSSW_4_3_0_pre7 CMSSW_4_4_2_p10JEmalloc CMSSW_5_0_0_g4emtest CMSSW_5_0_0_pre5_root532rc1 CMSSW_4_2_3_onlpatch2 CMSSW_4_2_3_onlpatch4 CMSSW_4_2_7_hinpatch1 CMSSW_4_2_7_onlpatch2 CMSSW_4_2_9_HLT2_onlpatch1 CMSSW_4_4_2_onlpatch1 CMSSW_5_1_0_pre1 CMSSW_5_1_0_pre2 CMSSW_5_2_0_pre2_TS113282 CMSSW_5_2_0_pre3HLT CMSSW_5_3_4_TS125616patch1 CMSSW_5_3_X CMSSW_6_2_X CMSSW_6_2_X_SLHC CMSSW_7_0_X CMSSW_7_1_X CMSSW_7_2_X CMSSW_7_3_X CMSSW_7_4_X CMSSW_7_1_50 CMSSW_10_1_X CMSSW_9_4_MAOD_X CMSSW_9_4_AN_X"
 
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
 cvmfs_self_mon=/cvmfs/cms.cern.ch/oo77
