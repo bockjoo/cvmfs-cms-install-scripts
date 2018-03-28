@@ -32,6 +32,32 @@ EOS_CLIENT_VERSION=${EOS_CLIENT_VERSION:-0.3.15}
 export EOSSYS=/home/cvcms/eos_installation/${EOS_CLIENT_VERSION}
 #export EOSSYS=/afs/cern.ch/project/eos/installation/${EOS_CLIENT_VERSION}
 
+function higher_priority_gridpacks () {
+printf "
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_s-channel-M400_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_s-channel-M500_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_s-channel-M800_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_s-channel-M1200_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_t-channel-M500_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_t-channel-M1200_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_t-channel-M1500_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M400_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M500_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M600_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M800_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M900_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M1200_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M1500_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M2000_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.3.3/ggh01_M125_Toa01a01_M50_Totautautautau/v1/ggh01_M125_Toa01a01_M50_Totautautautau_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.3.3/LLJJ_aTGC_EWK_SM_5f_LO/LLJJ_aTGC_EWK_SM_5f_LO_tarball-fixedMadspinCard_V1.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.3.3/ChargedHiggs_GMmodel_HToWZ/SinglyChargedHiggsGMmodel_HWZ_M500_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.3.3/ChargedHiggs_GMmodel_HToWZ/SinglyChargedHiggsGMmodel_HWZ_M500_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.3.3/ggh01_M125_Toa01a01_M25_Tomumubb/v2/ggh01_M125_Toa01a01_M25_Tomumubb_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.3.3/ggh01_M125_Toa01a01_M30_Tomumubb/v2/ggh01_M125_Toa01a01_M30_Tomumubb_tarball.tar.xz\n"
+
+}
+
 function eos () {
   $EOSSYS/bin/eos.select
   return $?
@@ -144,6 +170,7 @@ echo INFO proxy timeleft $timeleft
 
 rsync_source="$HOME/eos2/cms/store/group/phys_generator/cvmfs/gridpacks"
 rsync_name="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
+rsync_destination="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
 
 echo INFO Checking mounting eos
 
@@ -232,17 +259,12 @@ rm -f $thelog
 rsync -arzuvp --delete --dry-run $rsync_source $(dirname $rsync_name) > $thelog 2>&1
 #rsync -arzuvp $rsync_source $(dirname $rsync_name) > $thelog 2>&1
 status=$?
-
 echo INFO for now aborting the rsync to rsync only those files that are new
 ( cd ; cvmfs_server abort -f ; ) ;
-
-echo INFO gridpakcs to be rsynced: $(grep "tar.xz\|tar.gz\|tgz" $thelog | grep "^gridpacks/" | wc -l)
-grep "tar.xz\|tar.gz\|tgz" $thelog | grep "^gridpacks/" > $HOME/logs/gridpacks_scheduled_to_be_updated.txt
-if [ -f $HOME/osg/osg-wn-client/setup.sh ] ; then
-   source $HOME/osg/osg-wn-client/setup.sh
-   export X509_USER_PROXY=/home/cvcms/.florida.t2.proxy
-   globus-url-copy -vb file://$HOME/logs/gridpacks_scheduled_to_be_updated.txt gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/cvmfs_installations/gridpacks_scheduled_to_be_updated.txt
-fi
+NGRIDPACKS=120
+NEWGRIDPACKS_ONLY= # NEWGRIDPACKS_ONLY=1
+#echo INFO gridpakcs to be rsynced: $(grep "tar.xz\|tar.gz\|tgz" $thelog | grep "^gridpacks/" | wc -l)
+echo INFO gridpakcs to be rsynced: $(grep "tar.xz\|tar.gz\|tgz" $thelog | grep "^gridpacks/" | grep -v "_noiter" | wc -l)
 
 cvmfs_server transaction
 status=$?
@@ -264,37 +286,63 @@ else
    exit 1
 fi
 
+source $HOME/functions-cms-cvmfs-mgmt
+
 #cat $thelog
 if [ $status -eq 0 ] ; then
    i=0
    publish_needed=0
    # First delete files/directories that are not on EOS anymore
+   THOSE_FILES_DELETED=
+   ndeletions=$(for f in $(grep ^"deleting gridpacks/" $thelog 2>/dev/null | awk '{print $NF}' | grep gridpacks/ | grep -v /.cvmfscatalog) ; do echo $f ; done | wc -l)
    for f in $(grep ^"deleting gridpacks/" $thelog 2>/dev/null | awk '{print $NF}' | grep gridpacks/ | grep -v /.cvmfscatalog) ; do
        thefile=$(dirname $rsync_name)/$f
        echo $thefile | grep -q cvmfscatalog
        [ $? -eq 0 ] && continue
        i=$(expr $i + 1)
-       [ $i -gt 10 ] && break
+       [ $i -gt $NGRIDPACKS ] && break
        #echo INFO removing $thefile
-       ( cd $(dirname $thefile)
+       if [ -f "$thefile" ] ; then
+        ( cd $(dirname $thefile)
           pwd | grep -q /cvmfs/cms.cern.ch/phys_generator/gridpacks
           if [ $? -eq 0 ] ; then
              echo INFO rm -rf $(basename  $thefile) at $(pwd)
              rm -rf $(basename  $thefile)
+             #THOSE_FILES_DELETED="$THOSE_FILES_DELETED $thefile"
+             #else
+             #THOSE_FILES_DELETED="$THOSE_FILES_DELETED $(pwd)_does_not_have_/cvmfs/cms.cern.ch/phys_generator/gridpacks"
           fi
-       )
-       publish_needed=1
+        )
+        THOSE_FILES_DELETED="$THOSE_FILES_DELETED $thefile"
+        publish_needed=1
+       fi
    done
    if [ $publish_needed -eq 1 ] ; then
       time cvmfs_server publish > $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos_individual_delete.log 2>&1
       cvmfs_server transaction
       #publish_needed=0
+      printf "$(basename $0) INFO $NGRIDPACKS / $ndeletions are deleted from /cvms/cms.cern.ch\nNFILES=$(echo $THOSE_FILES_DELETED | wc -w)\n$(for f in $THOSE_FILES_DELETED ; do echo $f ; done)\n" | mail -s "$(basename $0) INFO files deleted" $notifytowhom
   fi
    files_with_strange_permission=""
    destfiles=""
    i=0
    publish_needed=0
-   for f in $(grep ^$(basename $rsync_source) $thelog 2>/dev/null | grep -v "/.sys.v#" | grep -v /$) ; do
+   grep "tar.xz\|tar.gz\|tgz" $thelog | grep "^gridpacks/" | grep -v "_noiter" | grep -v "sys.v\|sys.a" > $HOME/logs/gridpacks_schedule.txt
+   #
+   # New ones first and the update later 
+   # 
+   #for f in $(grep ^$(basename $rsync_source) $thelog 2>/dev/null | grep -v "/.sys.v#\|/.sys.a#" | grep -v /$) ; do
+   cms_cvmfs_check_gridpacks_diff 2>/dev/null | grep "^1 " | awk '{print $NF}' | sed "s#$(dirname $rsync_source)# #g" | awk '{print $NF}'  > $HOME/logs/gridpacks_normal_priority.txt
+   rm -f $HOME/logs/gridpacks_high_priority.txt
+   touch $HOME/logs/gridpacks_high_priority.txt
+   for gridpack in $(higher_priority_gridpacks  | sed "s#/eos/cms/store/group/phys_generator/cvmfs/gridpacks/# gridpacks/#g" | awk '{print $NF}') ; do
+       grep -q $gridpack $HOME/logs/gridpacks_normal_priority.txt
+       [ $? -eq 0 ] || continue # its not in the rsync list it is already in the cvmfs
+       sed -i "/$(echo $gridpack | sed 's^/^\\\/^g')/ d" $HOME/logs/gridpacks_normal_priority.txt
+       echo $gridpack >> $HOME/logs/gridpacks_high_priority.txt
+   done
+   UPDATED_GRIDPACKS=
+   for f in $(cat $HOME/logs/gridpacks_high_priority.txt) $(cms_cvmfs_check_gridpacks_diff 2>/dev/null | grep "^2 \|^3 \|^4" | awk '{print $NF}' | sed "s#$(dirname $rsync_source)/# #g" | awk '{print $NF}') $(cat $HOME/logs/gridpacks_normal_priority.txt) ; do
       # 
       # rsync_source="$HOME/eos2/cms/store/group/phys_generator/cvmfs/gridpacks"
       # rsync_name="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
@@ -339,9 +387,11 @@ if [ $status -eq 0 ] ; then
            #publish_needed=1
            continue
       fi
-      # To upload new files only 
-      if [ ] ; then
+      # To upload new files only
+      echo DEBUG  NEWGRIDPACKS_ONLY=$NEWGRIDPACKS_ONLY
+      if [ $NEWGRIDPACKS_ONLY ] ; then
       if [ -f $destfile ] ; then
+         echo INFO NEWGRIDPACKS_ONLY=$NEWGRIDPACKS_ONLY: $destfile exists so continue
          #echo DEBUG checking $(dirname $rsync_source)/$f
          #ls -al $(dirname $rsync_source)/$f
          #echo DEBUG checking $(dirname $rsync_name)/$f
@@ -350,7 +400,7 @@ if [ $status -eq 0 ] ; then
          continue
       fi
       # To upload new files only 
-      fi # if [ ] ; then
+      fi # if [  ] ; then
       #echo DEBUG checking $(dirname $rsync_source)/$f
       #ls -al $(dirname $rsync_source)/$f
       #echo DEBUG checking $(dirname $rsync_name)/$f
@@ -358,6 +408,7 @@ if [ $status -eq 0 ] ; then
       echo INFO individual rsync : rsync -arzuvp --delete $(dirname $rsync_source)/$f $(dirname $destfile)
       rsync -arzuvp --delete $(dirname $rsync_source)/$f $(dirname $destfile) 2>&1
       if [ $? -ne 0 ] ; then
+         printf "$(basename $0) ERROR failed: rsync -arzuvp --delete $(dirname $rsync_source)/$f $(dirname $destfile)\n"
          printf "$(basename $0) ERROR failed: rsync -arzuvp --delete $(dirname $rsync_source)/$f $(dirname $destfile)\n" | mail -s "$(basename $0) ERROR failed: rsync" $notifytowhom
          continue
       fi
@@ -405,8 +456,9 @@ if [ $status -eq 0 ] ; then
          #time cvmfs_server publish > $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos_individual.log 2>&1
          #cvmfs_server transaction
          #publish_needed=0
-         [ $i -gt 50 ] && break
+         [ $i -gt $NGRIDPACKS ] && break
       fi
+      UPDATED_GRIDPACKS="$UPDATED_GRIDPACKS $f"
    done
    #if [ $publish_needed -eq 1 ] ; then
    #   cvmfs_server transaction
@@ -513,6 +565,84 @@ else
    printf "$(basename $0) ERROR FAILED: rsync -arzuvp $rsync_source $(dirname $rsync_name)\n" | mail -s "$(basename $0) ERROR FAILED rsync" $notifytowhom
    ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
 fi
+
+next_update=$(crontab -l | grep ^[0-9] | grep cron_install_cmssw.sh | awk '{print $1}')
+minutenow=$(date -u +%M)
+minutediff=$(expr $next_update - $minutenow )
+[ $next_update -lt $minutenow ] && minutediff=$(expr $next_update + 60 - $minutenow )
+
+echo "At cms.cern.ch $(date -u)" > $HOME/logs/cms.cern.ch_space.txt
+echo "Next update in $minutediff minutes later" >> $HOME/logs/cms.cern.ch_space.txt
+df -h >> $HOME/logs/cms.cern.ch_space.txt
+minutenow=$(date -u +%M)
+#ngridpacklist=$(grep "tar.xz\|tar.gz\|tgz" $HOME/logs/rsync+generator+package+from+eos.log | grep "^gridpacks/" | grep -v "_noiter" | grep -v "sys.v\|sys.a" | wc -l)
+
+# to run cms_cvmfs_check_gridpacks_diff 
+grep "tar.xz\|tar.gz\|tgz" $HOME/logs/rsync+generator+package+from+eos.log | grep "^gridpacks/" | grep -v "_noiter" | grep -v "sys.v\|sys.a" > $HOME/logs/gridpacks_schedule.txt
+
+#source $HOME/functions-cms-cvmfs-mgmt
+ngridpacklist1=$(cms_cvmfs_check_gridpacks_diff | grep "^1" | wc -l)
+ngridpacklist=$(cms_cvmfs_check_gridpacks_diff | grep "^2 \|^3 \|^4" | wc -l)
+ngridpackfiles=$(cms_cvmfs_check_gridpacks_diff 2>/dev/null | grep "^2 \|^3 \|^4" | sed 's#%#%%#g')
+alllist=$(expr $ngridpacklist1 + $ngridpacklist)
+if [ $alllist -lt $NGRIDPACKS ] ; then
+   sinpl="gridpacks are"
+   [ $alllist -lt 2 ] && sinpl="gridpack is"
+   echo "At cms.cern.ch $(date -u) : $alllist $sinpl added to /cvmfs/cms.cern.ch this time" > $HOME/logs/gridpacks_schedule.txt
+
+   echo "Added new gridpack list starts here " >> $HOME/logs/gridpacks_schedule.txt
+   printf "$ngridpackfiles\n" >> $HOME/logs/gridpacks_schedule.txt
+   echo "Added new gridpack list ends here " >> $HOME/logs/gridpacks_schedule.txt
+   echo "  " >> $HOME/logs/gridpacks_schedule.txt
+   echo "Unfinished priority list starts here (if empty, then it is done)" >> $HOME/logs/gridpacks_schedule.txt
+   for gridpack in $(higher_priority_gridpacks | sed "s#/gridpacks/# /#g" | awk '{print $NF}') ; do [ $(ls -al $rsync_source$gridpack | awk '{print $5}') -eq $(ls -al $rsync_destination$gridpack | awk '{print $5}') ] || echo $gridpack  ; done >> $HOME/logs/gridpacks_schedule.txt
+   echo "Unfinished priority list ends here " >> $HOME/logs/gridpacks_schedule.txt
+   echo "  " >> $HOME/logs/gridpacks_schedule.txt
+
+
+   echo "Updated gridpacks (including new ones ) starts here "  >> $HOME/logs/gridpacks_schedule.txt
+   for f in $UPDATED_GRIDPACKS ; do echo $f ; done   >> $HOME/logs/gridpacks_schedule.txt
+   echo "Updated gridpacks starts here "  >> $HOME/logs/gridpacks_schedule.txt
+
+   echo "" >> $HOME/logs/gridpacks_schedule.txt
+   echo "" >> $HOME/logs/gridpacks_schedule.txt
+   echo "" >> $HOME/logs/gridpacks_schedule.txt
+else
+   echo "At cms.cern.ch $(date -u) : $NGRIDPACKS of $alllist ( = $ngridpacklist1 + $ngridpacklist ) in the following list is added to /cvmfs/cms.cern.ch this time" > $HOME/logs/gridpacks_schedule.txt
+
+   echo "Added new gridpack list starts here " >> $HOME/logs/gridpacks_schedule.txt
+   printf "$ngridpackfiles\n" >> $HOME/logs/gridpacks_schedule.txt
+   echo "Added new gridpack list ends here " >> $HOME/logs/gridpacks_schedule.txt
+   echo "  " >> $HOME/logs/gridpacks_schedule.txt
+
+   echo "Unfinished priority list starts here (if empty, then it is done) " >> $HOME/logs/gridpacks_schedule.txt
+   for gridpack in $(higher_priority_gridpacks | sed "s#/gridpacks/# /#g" | awk '{print $NF}') ; do [ $(ls -al $rsync_source$gridpack | awk '{print $5}') -eq $(ls -al $rsync_destination$gridpack | awk '{print $5}') ] || echo $gridpack  ; done >> $HOME/logs/gridpacks_schedule.txt
+   echo "Unfinished priority list ends here " >> $HOME/logs/gridpacks_schedule.txt
+   echo "  " >> $HOME/logs/gridpacks_schedule.txt
+
+   echo "Updated gridpacks (including new ones ) starts here "  >> $HOME/logs/gridpacks_schedule.txt
+   for f in $UPDATED_GRIDPACKS ; do echo $f ; done   >> $HOME/logs/gridpacks_schedule.txt
+   echo "Updated gridpacks starts here "  >> $HOME/logs/gridpacks_schedule.txt
+
+   echo "" >> $HOME/logs/gridpacks_schedule.txt
+   echo "" >> $HOME/logs/gridpacks_schedule.txt
+   echo "" >> $HOME/logs/gridpacks_schedule.txt
+fi
+
+
+
+minutediff=$(expr $next_update - $minutenow )
+[ $next_update -lt $minutenow ] && minutediff=$(expr $next_update + 60 - $minutenow )
+
+echo "Next update in $minutediff minutes later" >> $HOME/logs/gridpacks_schedule.txt
+grep "tar.xz\|tar.gz\|tgz" $HOME/logs/rsync+generator+package+from+eos.log | grep "^gridpacks/" | grep -v "_noiter" | grep -v "sys.v\|sys.a" >> $HOME/logs/gridpacks_schedule.txt
+if [ -f $HOME/osg/osg-wn-client/setup.sh ] ; then
+   source $HOME/osg/osg-wn-client/setup.sh
+   export X509_USER_PROXY=/home/cvcms/.florida.t2.proxy
+   globus-url-copy -vb file://$HOME/logs/cms.cern.ch_space.txt gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/cvmfs_installations/cms.cern.ch_space.txt
+   globus-url-copy -vb file://$HOME/logs/gridpacks_schedule.txt gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/cvmfs_installations/gridpacks_schedule.txt
+fi
+
 
 echo INFO eosumount $HOME/eos2
 $EOSSYS/bin/eos.select -b fuse umount $HOME/eos2

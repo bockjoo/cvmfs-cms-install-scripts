@@ -2,6 +2,28 @@
 ####### BEGIN Functions 12345
 notifytowhom=bockjoo@phys.ufl.edu
 # Functions
+rsync_source="$HOME/eos2/cms/store/group/phys_generator/cvmfs/gridpacks"
+rsync_name="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
+rsync_destination="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
+function cms_cvmfs_check_gridpacks_diff () {
+  [ -d $rsync_source ] || cms_cvmfs_mount_eos
+  for f in $(grep ^gridpacks/ $HOME/logs/gridpacks_schedule.txt ) ; do
+    if [ -f $(dirname $rsync_source)/$f ] ; then
+       if [ -f $(dirname $rsync_name)/$f ] ; then
+          echo 1 $f
+       else
+          echo 2 $(ls -al $(dirname $rsync_source)/$f) $(ls -al $(dirname $rsync_name)/$f)
+       fi
+    else
+       if [ -f $(dirname $rsync_name)/$f ] ; then
+          echo 3 $f
+       else
+          echo 4 $f
+       fi
+    fi
+  done
+}
+
 function cms_cvmfs_mount_eos () {
    EOS_CLIENT_VERSION=${EOS_CLIENT_VERSION:-0.3.15}
    export EOSSYS=/home/cvcms/eos_installation/${EOS_CLIENT_VERSION}
