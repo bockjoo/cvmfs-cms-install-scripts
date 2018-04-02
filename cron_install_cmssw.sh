@@ -144,7 +144,7 @@ fi
 
 slcs_excluded="_ia32_"
 archs_excluded="slc5_amd64_gcc434\|slc5_amd64_gcc451\|slc5_amd64_gcc4621|slc5_amd64_gcc462"
-cmssws_excluded="CMSSW_4_2_8_SLHCstd_patch1 CMSSW_4_1_3_patch1 CMSSW_4_2_0 CMSSW_4_2_0_pre6 CMSSW_4_2_2_SLHC_pre1 CMSSW_4_2_3_SLHC_pre1 CMSSW_4_2_8_SLHC1_patch1 MSSW_4_2_8_SLHCstd_patch1 CMSSW_4_3_0_pre7 CMSSW_4_4_2_p10JEmalloc CMSSW_5_0_0_g4emtest CMSSW_5_0_0_pre5_root532rc1 CMSSW_4_2_3_onlpatch2 CMSSW_4_2_3_onlpatch4 CMSSW_4_2_7_hinpatch1 CMSSW_4_2_7_onlpatch2 CMSSW_4_2_9_HLT2_onlpatch1 CMSSW_4_4_2_onlpatch1 CMSSW_5_1_0_pre1 CMSSW_5_1_0_pre2 CMSSW_5_2_0_pre2_TS113282 CMSSW_5_2_0_pre3HLT CMSSW_5_3_4_TS125616patch1 CMSSW_5_3_X CMSSW_6_2_X CMSSW_6_2_X_SLHC CMSSW_7_0_X CMSSW_7_1_X CMSSW_7_2_X CMSSW_7_3_X CMSSW_7_4_X CMSSW_7_1_50 CMSSW_10_1_X CMSSW_9_4_MAOD_X CMSSW_9_4_AN_X"
+cmssws_excluded="CMSSW_4_2_8_SLHCstd_patch1 CMSSW_4_1_3_patch1 CMSSW_4_2_0 CMSSW_4_2_0_pre6 CMSSW_4_2_2_SLHC_pre1 CMSSW_4_2_3_SLHC_pre1 CMSSW_4_2_8_SLHC1_patch1 MSSW_4_2_8_SLHCstd_patch1 CMSSW_4_3_0_pre7 CMSSW_4_4_2_p10JEmalloc CMSSW_5_0_0_g4emtest CMSSW_5_0_0_pre5_root532rc1 CMSSW_4_2_3_onlpatch2 CMSSW_4_2_3_onlpatch4 CMSSW_4_2_7_hinpatch1 CMSSW_4_2_7_onlpatch2 CMSSW_4_2_9_HLT2_onlpatch1 CMSSW_4_4_2_onlpatch1 CMSSW_5_1_0_pre1 CMSSW_5_1_0_pre2 CMSSW_5_2_0_pre2_TS113282 CMSSW_5_2_0_pre3HLT CMSSW_5_3_4_TS125616patch1 CMSSW_5_3_X CMSSW_6_2_X CMSSW_6_2_X_SLHC CMSSW_7_0_X CMSSW_7_1_X CMSSW_7_2_X CMSSW_7_3_X CMSSW_7_4_X CMSSW_7_1_50 CMSSW_10_1_X CMSSW_9_4_MAOD_X CMSSW_9_4_AN_X CMSSW_10_2_X"
 
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
 cvmfs_self_mon=/cvmfs/cms.cern.ch/oo77
@@ -443,6 +443,8 @@ for arch in $archs ; do
      fi
      echo $cmssw | grep -q CMSSW_10_0_X
      [ $? -eq 0 ] && continue
+     echo $cmssw | grep -q [0-9]_X$
+     [ $? -eq 0 ] && { echo Warning $cmssw is excluded so continue ; continue ; } ;
      #echo $arch | grep -q "slc7_amd64_gcc630\|slc7_amd64_gcc530"
      #[ $? -eq 0 ] && { echo $cmssw | grep -q CMSSW_9_1_0_pre3 ; [ $? -eq 0 ] && printf "Warning $0 Skipping CMSSW_9_1_0_pre3 and $arch\n" | mail -s "Warning:Skipping CMSSW_9_1_0_pre3 and $arch" $notifytowhom ; continue ; } ;
 
