@@ -114,13 +114,15 @@ fi
 
 # Maintenance
 [ -f /etc/nologin ] && echo "Cron disabled due to nologin" && exit
-if [ "X$(date +%Y%m%d)" == "X20180227" ] ; then
- if [ $(date +%d%H) -ge 2705 -a $(date +%d%H) -lt 2706 ] ; then #
-   echo "lxcvmfs73 -> lxcvmfs74"
-   printf "$(basename $0) Exiting for the system upgrade\n$(cat $HOME/crontab | sed 's#%#%%#g')\nlxcvmfs73 to lxcvmfs74\nUpdate $HOME/cron_install_cmssw.config" | mail -s "Exiting for upgrade" $notifytowhom
-   exit 0
- fi
-fi
+#
+#if [ "X$(date +%Y%m%d)" == "X20180410" ] ; then
+# if [ $(date +%d%H) -ge 1008 -a $(date +%d%H) -lt 1015 ] ; then #
+#   message="Storage Swap"
+#   printf "$(basename $0) Exiting for $message\n$(cat $HOME/crontab | sed 's#%#%%#g')\n" | mail -s "Exiting for $message" $notifytowhom
+#   exit 0
+# fi
+#fi
+#
 
 # Hour and Minute Now
 date_H=$(date +%H)

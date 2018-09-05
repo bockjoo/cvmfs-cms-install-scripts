@@ -26,6 +26,8 @@ SKIP_SITES="T3_US_ANL"
 EXC_LOCK=""
 TMP_AREA="/tmp/cvmfs_tmp"
 ERR_FILE="/tmp/stcnf_$$.err"
+EVERY_X_HOUR=4
+
 echo DEBUG TMP_AREA=$TMP_AREA
 trap 'exit 1' 1 2 3 15
 trap '(/bin/rm -rf ${EXC_LOCK} ${TMP_AREA} ${ERR_FILE}) 1> /dev/null 2>&1' 0
@@ -273,7 +275,7 @@ fi
 #
 # make list of CMS site names:
 echo DEBUG content of sitedb 
-cat ${TMP_AREA}/sitedb.json 
+echo cat ${TMP_AREA}/sitedb.json 
 /bin/rm -f ${TMP_AREA}/sitedb.list
 /usr/bin/awk -f ${TMP_AREA}/sitedb.awk ${TMP_AREA}/sitedb.json 1>${TMP_AREA}/sitedb.list
 /bin/rm ${TMP_AREA}/sitedb.json
@@ -330,7 +332,7 @@ echo "[3] Fetching list of GitLab projects/sites..."
 SUCC=0
 FAIL=0
 for PAGE in 1 2 3 4 5 6 7 8 9; do
-   /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=90 -O ${TMP_AREA}/gitlab_${PAGE}.json 'https://gitlab.cern.ch/api/v3/groups/SITECONF/projects?per_page=100&page='${PAGE} 1>>${ERR_FILE} 2>&1
+   /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=90 -O ${TMP_AREA}/gitlab_${PAGE}.json 'https://gitlab.cern.ch/api/v4/groups/SITECONF/projects?per_page=100&page='${PAGE} 1>>${ERR_FILE} 2>&1
    RC=$?
    echo DEBUG gitlab page:
    cat ${TMP_AREA}/gitlab_${PAGE}.json
@@ -449,7 +451,9 @@ echo "[5] loop over SiteDB sites and update SYNC_DIR as needed"
 /bin/cp /dev/null ${ERR_FILE} 1>/dev/null 2>&1
 list_sites_updated=""
 FAIL=0
+isite=0
 for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
+   isite=$(expr $isite + 1)
    echo DEBUG doing SITE=$SITE
    NEWT=`/usr/bin/awk -F: '{if($1=="'${SITE}'"){print $2}}' ${TMP_AREA}/.timestamp 2>/dev/null`
    if [ -z "${NEWT}" ]; then
@@ -462,8 +466,16 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
       if [ "${NEWT}" = "${OLDT}" ]; then
          # SYNC_DIR up-to-date
          echo DEBUG SITE=$SITE SYNC_DIR up-to-date. Continuing... OLDT=$OLDT NEWT=$NEWT
-         continue
-      fi
+         #
+         # 02APR2018
+         # timestamp in https://gitlab.cern.ch/api/v3/groups/SITECONF/projects?per_page=100&page=1
+         # is not fine-grained. If the change happens in less than 5 minutes, the timestamp does not change
+         # so I am ignoring timestamp-based update every four hour.
+         # every four hour all sites that changed are updated
+         #
+         # continue
+         [ $(expr $(date +%H) % $EVERY_X_HOUR) -eq 0 ] || { echo DEBUG "[ $isite ]" SITE=$SITE HOUR=$(date +%H) so ignore timestamp for once ; continue ; } ;
+     fi
    fi
 
    #for site in $SKIP_SITES ; do echo $site ; done | grep -q ^${SITE}$
@@ -497,6 +509,14 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
    TAR_DIR=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{print $1;exit}') 2>/dev/null`
    TAR_LST=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{if((($2=="JobConfig")&&(match($3,".*site-local-config.*\\.xml$")!=0))||(($2=="JobConfig")&&(match($3,"^cmsset_.*\\.c?sh$")!=0))||(($2=="PhEDEx")&&(match($3,".*storage.*\\.xml$")!=0))||(($2=="Tier0")&&($3=="override_catalog.xml"))||(($2=="GlideinConfig")&&($3=="")))print $0}') 2>/dev/null`
    #
+   # 17JUL2018 forget about sites that do not have xml files in the gitlab
+   if [ -s ${TMP_AREA}/archive_${SITE}.tgz ] ; then
+      tar tzvf ${TMP_AREA}/archive_${SITE}.tgz 2>&1 | grep -q xml
+      if [ $? -ne 0 ] ; then
+         echo "   Warning: ${TMP_AREA}/archive_${SITE}.tgz does not have config files not extracting tar archive"
+         continue
+      fi
+   fi
    if [ -n "${TAR_LST}" ]; then
       echo "   extracting tar archive"
       (cd ${SYNC_DIR}/SITECONF; /bin/tar -xzf ${TMP_AREA}/archive_${SITE}.tgz ${TAR_LST}) 1>>${ERR_FILE} 2>&1
@@ -612,6 +632,13 @@ fi
 #
 #if [ "x$UPDATED_SITES" == "x" ] ; then
 #echo DEBUG updated_sites are empty
+#
+# Ensure the $HOME/SITECONF/SITECONF has some content
+if [ $(ls $SYNC_DIR/SITECONF 2>/dev/null | wc -l) -le 1 ] ; then
+      echo ERROR $SYNC_DIR/SITECONF empty
+      printf "functions-cms-cvmfs-mgmt: check_and_update_siteconf () ERROR $SYNC_DIR/SITECONF empty\nls $SYNC_DIR/SITECONF\necho INFO probably execute this command: rsync -arzuvp --exclude=.cvmfscatalog --delete ${rsync_name} $rsync_source/" | mail -s "ERROR: check_and_update_siteconf() $SYNC_DIR/SITECONF empty" $notifytowhom      
+      exit 1
+fi
 sites_cvmfs=$(ls /cvmfs/cms.cern.ch/SITECONF | sort -u | grep T[0-9])
 sites_sync_dir=$(ls $SYNC_DIR/SITECONF | sort -u | grep T[0-9])
    
@@ -625,6 +652,7 @@ for s in $sites_cvmfs ; do
 done
 #fi
 echo UPDATED_SITES=\"$(echo $list_sites_updated)\"
+#[ $(expr $(date +%H) % $EVERY_X_HOUR) -eq 0 ] && { HOUR=$(date +%H) ; printf "$(basename $0) $(date) \nHOUR=$HOUR so ignore timestamp for once \nUPDATED_SITES=$UPDATED_SITES\n" | mail -s "HOUR=$HOUR so ignore timestamp for once" $EMAIL_ADDR ; } ;
 
 #echo UPDATED_SITES=
 #cp -pR /cvmfs/cms.cern.ch/SITECONF/local ${SYNC_DIR}/SITECONF/

@@ -24,11 +24,11 @@ updated_list=$VO_CMS_SW_DIR/cvmfs-cms.cern.ch-updates
 #reference_list=http://oo.ihepa.ufl.edu:8080/cmssoft/lhapdf_list.txt
 reference_list=$HOME/lhapdf_list.txt
 
-# Format: dest
-lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c 6.1.d 6.1.e 6.1.f 6.1.g 6.1.h 6.2 6.2.1"
+# Format: dest This should be a real release + .a or .b or .c or .d etc # /cvmfs/cms.cern.ch/lhapdf/pdfsets/<lhapdfweb_update>
+lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c 6.1.d 6.1.e 6.1.f 6.1.g 6.1.h 6.2 6.2.1 6.2.1.a"
 
 # Format: dest|symlink
-needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b 6.1.d|6.1.5d 6.1.e|6.1.5e 6.1.f|6.1.5f 6.1.g|6.1.6 6.1.h|6.1.6a 6.2|6.2.0a 6.2.1|6.2.1a" # 6.1.6 -> 6.1.g
+needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b 6.1.d|6.1.5d 6.1.e|6.1.5e 6.1.f|6.1.5f 6.1.g|6.1.6 6.1.h|6.1.6a 6.2|6.2.0a 6.2.1|6.2.1a 6.2.1.a|6.2.1b" # 6.1.6 -> 6.1.g
 previous_release=$(echo $lhapdfweb_updates | awk '{print $(NF-1)}')
 
 #lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c"
@@ -200,7 +200,6 @@ for v in $releases $lhapdfweb_updates ; do
       fi
       #relnum_origin=$relnum
    fi
-   #echo DEBUG reltgz=$reltgz major=$major minor=$minor subv=$subv 
    #relnum=$(expr $major \* 1000000 + $minor \* 1000 + $subv)
    #if [ "x$subv" == "x" ] ; then
    #   if [ $major -gt 5 ] ; then
@@ -216,6 +215,7 @@ for v in $releases $lhapdfweb_updates ; do
    relv=$(echo $reldir | cut -d- -f2-)
    dest=pdfsets/$relv
    echo DEBUG dest = $dest
+   echo DEBUG major=$major minor=$minor subv=$subv relnum=$relnum reldir=$reldir relv=$relv dest=$dest
 
    grep -q "lhapdf $dest " $updated_list
    if [ $? -eq 0 ] ; then
@@ -237,7 +237,7 @@ for v in $releases $lhapdfweb_updates ; do
    dest_nested_catalog=${dest}
 
    echo "${dest}" | cut -d/ -f2 | grep -q "[a-z]\|[A-Z]"
-   if [ $? -eq 0 ] ; then
+   if [ $? -eq 0 ] ; then # if the hard directory has an alphabet
    #if [ $? -eq 0 ] ; then
    #   dest=pdfsets/$(echo $relv | sed "s#[a-z]##g" | sed "s#[A-Z]##g")
    #fi
@@ -251,7 +251,7 @@ for v in $releases $lhapdfweb_updates ; do
     fi
    fi
 
-   echo DEBUG will get it from dest=$dest
+   echo INFO we will get the tarball from ${lhapdfweb}/$dest to /cvmfs/cms.cern.ch/lhapdf/$dest_nested_catalog # if it was 6.2.1.a, it will get from 6.2.1 
 
    # 
    #
@@ -288,10 +288,14 @@ for v in $releases $lhapdfweb_updates ; do
            echo DEBUG checking $lhapdf_top/pdfsets/${previous_release}/$(echo $f | sed 's#\.tar\.gz##')
            if [ -d $lhapdf_top/pdfsets/${previous_release}/$(echo $f | sed 's#\.tar\.gz##') ] ; then
               echo Warning it exists in $previous_release
-              echo Warning creating the artificial one
-              ( cd $lhapdf_top/pdfsets/${previous_release} ; tar czvf $lhapdf_top/${dest_nested_catalog}/$f $(echo $f | sed 's#\.tar\.gz##') ; exit $? )
-              status=$?
+              printf "$(basename $0) ERROR failed : $f\nTry wget -q --no-check-certificate -O $lhapdf_top/${dest_nested_catalog}/$f  ${lhapdfweb}/$dest/$f\nCould be due to a permission error\n$(cat $THELOG | sed 's#%#%%#g')" | mail -s "ERROR: $(basename $0) Downloading failed" $notifytowhom
+              if [ ] ; then
+                 echo Warning creating the artificial one
+                 ( cd $lhapdf_top/pdfsets/${previous_release} ; tar czvf $lhapdf_top/${dest_nested_catalog}/$f $(echo $f | sed 's#\.tar\.gz##') ; exit $? )
+                 status=$?
+              fi # if [ ] ; then
            fi
+           exit $status
         fi # v 0.3.2 take the one from previous release if permission error
         #cd $lhapdf_top/${dest_nested_catalog} # new 22JUL2015 0.2.4
         echo INFO "[ $i ] Status $status"
