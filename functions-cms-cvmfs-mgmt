@@ -2894,11 +2894,13 @@ function install_cms_common () {
    [ $? -eq 0 ] && new_version=$($VO_CMS_SW_DIR/common/cmspkg -a $new_arch show cms+cms-common+1.0 | grep '^Version: '  | sed 's|.* 1-||')
    cvmfs_server abort -f
    [ $? -eq 0 ] || new_version=
+   echo DEBUG new_arch=$new_arch new_version=$new_version
    if [ "x$new_version" != "x" ] ; then
       if [ "x$new_arch" != "x" ] ; then
          cms_common_version_archs="$cms_common_version_archs ${new_version}+${new_arch}"
       fi
    fi
+   echo DEBUG cms_common_version_archs="$cms_common_version_archs"
    for cms_common_v_a in $cms_common_version_archs ; do
       cms_common_v=$(echo $cms_common_v_a | cut -d+ -f1)
       cms_common_a=$(echo $cms_common_v_a | cut -d+ -f2)
@@ -2950,7 +2952,9 @@ function install_cms_common () {
             if [ $? -eq 0 ] ; then
                echo INFO transaction for $what is OK
             fi
-            echo "CMSSW_cms_common_1.0+${cms_common_v} $cms_common_a $(/bin/date +%s) $(/bin/date -u)" >> $updated_list
+            #cms_common_v=$($VO_CMS_SW_DIR/common/cmspkg -a $scram_arch show cms+cms-common+1.0 | grep '^Version: '  | sed 's|.* 1-||')""
+            grep -q "CMSSW_cms_common_1.0+${cms_common_v} $cms_common_a" $updated_list
+            [ $? -eq 0 ] || echo "CMSSW_cms_common_1.0+${cms_common_v} $cms_common_a $(/bin/date +%s) $(/bin/date -u)" >> $updated_list
             #cvmfs_server abort -f
             time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
             status=$?
@@ -3116,7 +3120,8 @@ function cmspkg_install_cms_common () {
   CMSPKG="$VO_CMS_SW_DIR/common/cmspkg -a $scram_arch"
 
   echo INFO checking cms-common before installing it
-  rpm -qa | grep cms-common | grep -q ${version}
+  # rpm -qa | grep cms-common | grep -q "${version}"
+  ( RPM_PROFILE=$(echo /cvmfs/cms.cern.ch/${scram_arch}/external/rpm/*/etc/profile.d/init.sh) ; [ -f $RPM_PROFILE ] && source $RPM_PROFILE ; rpm -qa | grep cms-common | grep -q ${version} ; exit $? ; ) ;
   if [ $? -eq 0 ] ; then
      grep -q "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
      if [ $? -eq 0 ] ; then
@@ -3125,7 +3130,8 @@ function cmspkg_install_cms_common () {
      fi
   fi
 
-  rpm -qa | grep cms-common
+  #rpm -qa | grep cms-common
+  ( RPM_PROFILE=$(echo /cvmfs/cms.cern.ch/${scram_arch}/external/rpm/*/etc/profile.d/init.sh) ; [ -f $RPM_PROFILE ] && source $RPM_PROFILE ; rpm -qa | grep cms-common ; ) ;
   printf "cmspkg_install_cms_common () Starting cvmfs_server transaction\n" | mail -s "cvmfs_server transaction started" $notifytowhom
 
   echo INFO starting server transaction
@@ -3174,12 +3180,14 @@ function cmspkg_install_cms_common () {
   $CMSPKG -f install cms+cms-common+1.0 #apt-get install '--assume-yes' cms+cms-common+1.0
 
   echo INFO checking cms-common after installing
-  rpm -qa | grep cms-common | grep -q ${version}
+  #rpm -qa | grep cms-common | grep -q ${version}
+  ( RPM_PROFILE=$(echo /cvmfs/cms.cern.ch/${scram_arch}/external/rpm/*/etc/profile.d/init.sh) ; [ -f $RPM_PROFILE ] && source $RPM_PROFILE  ; rpm -qa | grep cms-common | grep -q ${version} ; exit $? ; ) ;
   if [ $? -eq 0 ] ; then
-     echo INFO cms-common version=$version is installed
-     rpm -qa | grep cms-common
+     echo INFO cms-common version=$version is installed according to rpm
+     #rpm -qa | grep cms-common
+     ( RPM_PROFILE=$(echo /cvmfs/cms.cern.ch/${scram_arch}/external/rpm/*/etc/profile.d/init.sh) ; [ -f $RPM_PROFILE ] && source $RPM_PROFILE  ; rpm -qa | grep -q cms-common ; exit $? ; ) ;
      status=0
-     grep -q "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
+     grep "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
      if [ $? -eq 0 ] ; then
         echo INFO $version found
         time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
@@ -3196,14 +3204,19 @@ function cmspkg_install_cms_common () {
         if [ $status -eq 0 ] ; then
            grep -q "$version" /cvmfs/cms.cern.ch/etc/cms-common/revision
            status=$?
+           [ $status -eq 0 ] || { grep -q $($VO_CMS_SW_DIR/common/cmspkg -a $scram_arch show cms+cms-common+1.0 | grep '^Version: '  | sed 's|.* 1-||')"" /cvmfs/cms.cern.ch/etc/cms-common/revision ; status=$? ; } ;
+           status=$?
            if [ $status -eq 0 ] ; then
+              version=$($VO_CMS_SW_DIR/common/cmspkg -a $scram_arch show cms+cms-common+1.0 | grep '^Version: '  | sed 's|.* 1-||')
+              grep -q "CMSSW_cms_common_1.0+${version} $scram_arch " $updated_list
+              [ $? -eq 0 ] || echo "CMSSW_cms_common_1.0+${version} $scram_arch "$(/bin/date +%s) $(/bin/date -u) >> $updated_list
               time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
               status=$?
               cd $currdir
               return $status
            else
               echo ERROR $version still not found after reinstalling it # apt-get '--assume-yes' reinstall cms+cms-common+1.0
-              printf "cmspkg_install_cms_common: cms-common reinstall  failed\n" | mail -s "ERROR: cms-common resintall failed" $notifytowhom
+              printf "1 cmspkg_install_cms_common: cms-common reinstall $scram_arch $version failed\nrpm -qa found cms-common $version but the version is not found in /cvmfs/cms.cern.ch/etc/cms-common/revision\n$(cat /cvmfs/cms.cern.ch/etc/cms-common/revision)\n" | mail -s "ERROR: cms-common resintall failed" $notifytowhom
               cvmfs_server abort -f
               cd $currdir
               return 1
@@ -3240,7 +3253,7 @@ function cmspkg_install_cms_common () {
               return $status
            else
               echo ERROR $version still not found after reinstalling it # apt-get '--assume-yes' reinstall cms+cms-common+1.0                                                     
-              printf "cmspkg_install_cms_common: cms-common reinstall  failed\n" | mail -s "ERROR: cms-common resintall failed" $notifytowhom
+              printf "2 cmspkg_install_cms_common: cms-common reinstall $scram_arch $version failed\nrpm -qa did not find cms-common $version \n" | mail -s "ERROR: cms-common resintall failed" $notifytowhom
               cvmfs_server abort -f
               cd $currdir
               return 1
