@@ -61,6 +61,7 @@ if [ $(date +%d) -eq 12 ] ; then # Every month 12-th day
 fi
 fi # if [ ] ; then
 exit 0
+<<<<<<< HEAD
 # The following is the old update script suggested by Andrew Melo
 #printf "$(basename $0) Starting cvmfs_server transaction \n" | mail -s "cvmfs_server transaction started" $notifytowhom
 cvmfs_server transaction
@@ -199,6 +200,8 @@ if [ $status -ne 0 ] ; then
 fi
 #printf "$(basename $0) $(basename $0) $1 executed \n$(cat $HOME/update_cmssw_git_mirror.daily.log)\n" | mail -s "$(basename $0) $(basename $0) $1 executed" $notifytowhom
 exit 0
+=======
+>>>>>>> 2d7800c5fe05812c3d8012af795ea40ab0365535
 
 ####### BEGIN Functions 12345
 # Functions
