@@ -44,10 +44,24 @@ fi
 source $functions
 rm -f $functions
 
-# Doing the one suggested by Shahzad
+# Doing the one suggested by Shahzad: I switched to this one from Andrew's old prescription for some reason
+#                                     ( I think some fetch errors that I have been seeing )
 echo INFO Doing the one suggested by Shahzad
 create_local_workspace_patch
+if [ ] ; then
+if [ $(date +%d) -eq 12 ] ; then # Every month 12-th day
+    echo DEBUG it is the 12-th day of the month
+    if [ $(date +%H) == 03 ] ; then # 08 PM
+       echo DEBUG it is 02
+       if [ $(expr $(date +%M) + 0) -ge 2 ] ; then
+          echo DEBUG running  create_local_workspace_patch_monthly
+          create_local_workspace_patch_monthly
+       fi
+    fi
+fi
+fi # if [ ] ; then
 exit 0
+# The following is the old update script suggested by Andrew Melo
 #printf "$(basename $0) Starting cvmfs_server transaction \n" | mail -s "cvmfs_server transaction started" $notifytowhom
 cvmfs_server transaction
 status=$?
@@ -188,6 +202,40 @@ exit 0
 
 ####### BEGIN Functions 12345
 # Functions
+function create_local_workspace_patch_monthly () {
+
+WORKSPACE=/tmp/cvcms
+GH_REPO=cmssw
+MIRROR=/cvmfs/cms.cern.ch/${GH_REPO}.git
+[ -d $WORKSPACE ] || mkdir -p $WORKSPACE
+echo DEBUG inside create_local_workspace_patch_monthly 1
+if [ -d ${MIRROR}.backup ] ; then
+   printf "ERROR create_local_workspace_patch_monthly ${MIRROR}.backup exists " | mail -s "ERROR ${MIRROR}.backup exists" $notifytowhom
+   return 1
+fi
+echo DEBUG inside create_local_workspace_patch_monthly 2
+cvmfs_server transaction && mv  ${MIRROR}  ${MIRROR}.backup && cvmfs_server publish
+if [ $? -ne 0 ] ; then
+   printf "ERROR create_local_workspace_patch_monthly mv  ${MIRROR}  ${MIRROR}.backup failed" | mail -s "ERROR mv  ${MIRROR}  ${MIRROR}.backup failed" $notifytowhom
+   return 1
+fi
+echo DEBUG inside create_local_workspace_patch_monthly 3
+if [ ! -d ${MIRROR} ] ; then
+   echo INFO creating ${MIRROR}
+   cvmfs_server transaction && mkdir -p ${MIRROR} && cvmfs_server publish
+fi
+cd $WORKSPACE
+echo INFO starting all over again
+rm -rf ${GH_REPO}.git
+echo INFO creating git config
+git config --global http.postBuffer 209715200
+echo INFO creating local worksapce patch
+(git clone --bare https://github.com/cms-sw/${GH_REPO}.git && cvmfs_server transaction && rsync -a --delete ${GH_REPO}.git/ ${MIRROR}/  && cvmfs_server publish) || printf "ERROR create_local_workspace_patch failed\n" | mail -s "ERROR cmssw git create_local_workspace_patch failed" $notifytowhom
+rm -rf ${GH_REPO}.git
+printf "Warning all went well ${MIRROR}.backup should be removed" | mail -s "Warning remove ${MIRROR}.backup failed" $notifytowhom
+
+}
+
 function create_local_workspace_patch () {
 
 WORKSPACE=/tmp/cvcms

@@ -295,7 +295,7 @@ archs=$(list_announced_cmssw_archs | grep -v "$slcs_excluded")
 
 narchs=$(echo $archs | wc -w)
 
-## [] Download the archs list every 2 hours for collect_power_arch_rpms_page
+# [] Download the archs list every 2 hours for collect_power_arch_rpms_page
 #status_rpms_list=0
 #if [ $(expr $(date +%H) % 2) -eq 0 ] ; then
 #   wget --no-check-certificate -q -O $archs_list "$rpms_list"
@@ -643,7 +643,8 @@ echo INFO Next git mirror update will be checked and updated as needed
 echo
 # run daily at 01 AM CERN time
 THEHOUR=$(date +%H)
-RUN_WHEN=20
+#RUN_WHEN=20
+RUN_WHEN=03
 if [ "x$THEHOUR" == "x$RUN_WHEN" ] ; then
       $HOME/update_cmssw_git_mirror.sh daily > $HOME/logs/update_cmssw_git_mirror.daily.log 2>&1
 fi

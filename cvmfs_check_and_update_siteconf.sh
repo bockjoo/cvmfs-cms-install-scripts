@@ -274,11 +274,15 @@ fi
 /bin/rm ${ERR_FILE} 1>/dev/null 2>&1
 #
 # make list of CMS site names:
-echo DEBUG content of sitedb 
+echo DEBUG content of sitedb.json
 echo cat ${TMP_AREA}/sitedb.json 
+echo DEBUG end of content of sitedb.json
 /bin/rm -f ${TMP_AREA}/sitedb.list
 /usr/bin/awk -f ${TMP_AREA}/sitedb.awk ${TMP_AREA}/sitedb.json 1>${TMP_AREA}/sitedb.list
 /bin/rm ${TMP_AREA}/sitedb.json
+echo DEBUG ${TMP_AREA}/sitedb.list
+cat ${TMP_AREA}/sitedb.list
+echo DEBUG end of ${TMP_AREA}/sitedb.list
 #
 # sanity check of SiteDB sites:
 if [ `/usr/bin/awk 'BEGIN{nl=0}{nl+=1}END{print nl}' ${TMP_AREA}/sitedb.list 2>/dev/null` -lt 100 ]; then
@@ -335,13 +339,14 @@ for PAGE in 1 2 3 4 5 6 7 8 9; do
    /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=90 -O ${TMP_AREA}/gitlab_${PAGE}.json 'https://gitlab.cern.ch/api/v4/groups/SITECONF/projects?per_page=100&page='${PAGE} 1>>${ERR_FILE} 2>&1
    RC=$?
    echo DEBUG gitlab page:
-   cat ${TMP_AREA}/gitlab_${PAGE}.json
+   #cat ${TMP_AREA}/gitlab_${PAGE}.json
    if [ ${RC} -eq 0 ]; then
       SUCC=1
       /bin/grep name ${TMP_AREA}/gitlab_${PAGE}.json 1>/dev/null 2>&1
       if [ $? -ne 0 ]; then
          break
       fi
+      echo DEBUG gitlab_${PAGE}.json PAGE=$PAGE OK
    else
       FAIL=1
       MSG="failed to query GitLab projects, page ${PAGE}, wget=${RC}"
@@ -350,6 +355,7 @@ for PAGE in 1 2 3 4 5 6 7 8 9; do
          echo "${MSG}" >> ${ERR_FILE}
          echo "" >> ${ERR_FILE}
       fi
+      echo DEBUG gitlab_${PAGE}.json PAGE=$PAGE OK
    fi
 done
 if [ ${FAIL} -ne 0 ]; then
@@ -366,15 +372,60 @@ if [ ${SUCC} -eq 0 ]; then
 fi
 /bin/rm ${ERR_FILE} 1>/dev/null 2>&1
 #
-#echo DEBUG /bin/rm -f ${TMP_AREA}/.timestamp
+echo DEBUG ${TMP_AREA}/.timestamp
+cat ${TMP_AREA}/.timestamp
+
+echo DEBUG /bin/rm -f ${TMP_AREA}/.timestamp
 /bin/rm -f ${TMP_AREA}/.timestamp
 #echo DEBUG ${TMP_AREA}/gitlab_\*.json
 #for f in ${TMP_AREA}/gitlab_\*.json ; do
 #   echo DEBUG $f
 #done
+for f in in ${TMP_AREA}/gitlab_[0-9]*.json ; do
+   echo DEBUG cat $f
+   cat $f
+done
 #echo DEBUG /usr/bin/awk -f ${TMP_AREA}/gitlab.awk ${TMP_AREA}/gitlab_\*.json
 #/usr/bin/awk -f ${TMP_AREA}/gitlab.awk ${TMP_AREA}/gitlab_*.json 1>${TMP_AREA}/.timestamp
-/usr/bin/awk -f ${TMP_AREA}/gitlab.awk ${TMP_AREA}/gitlab_*.json 1>${TMP_AREA}/.timestamp1
+#echo DEBUG checking ${TMP_AREA}/gitlab.awk
+#cat  ${TMP_AREA}/gitlab.awk
+if [ ] ; then
+   /usr/bin/awk -f ${TMP_AREA}/gitlab.awk ${TMP_AREA}/gitlab_*.json 1>${TMP_AREA}/.timestamp1
+else
+   #for f in ${TMP_AREA}/gitlab_*.json ; do
+   #   /bin/cp $f $HOME/$(basename $f).$(date +%Y%m%d)
+   #done
+   #sed "s#SITECONF/T#\nSITECONF/T#g" ${TMP_AREA}/gitlab_[0-9]*.json | grep last_activity_at | \
+   #while read line ; do 
+   #   site_last_activity=$(echo $line | sed 's#,#\n#g' | grep "SITECONF/T\|last_activity_at")
+   #   site=$(echo $site_last_activity | cut -d/ -f2 | cut -d\" -f1)
+   #   timestamp=$(echo $site_last_activity | cut -d: -f2- | cut -d. -f1)\"
+   #   timestamp=$(date -d "$(echo $timestamp | sed 's#\"##g')" +%s)
+   #   echo $site:$timestamp | sed 's#"##g'
+   #done > ${TMP_AREA}/.timestamp # | grep "T3_US_UMiss\|UMISS\|Florida\|T3_US_TAMU\|T0_CH_CERN\|T2_CH_CERN\|T3_KR_KISTI\|T3_US_Colorado\|T2_FR_GRIF_LLR\|T3_BY_NCPHEP\|T3_IT_Trieste\|T3_KR_UOS\|T3_US_UCR\|T3_CH_Volunteer\|T3_US_NotreDame\|T2_KR_KISTI\|T3_US_UMD\|T3_US_Rutgers\|T2_BE_UCL\|T3_FR_IPNL\|T3_CH_PSI\|T3_US_OSG\|T3_US_TACC\|T2_US_MIT\|T2_IT_Pisa\|T2_FI_HIP" > ${TMP_AREA}/.timestamp
+   sed 's#"name":"T#\n"name":"T#g' ${TMP_AREA}/gitlab_[0-9]*.json | grep last_activity_at | \
+   while read line ; do 
+      site_last_activity=$(echo $line | sed 's#,#^\n#g' | grep "\"name\":\"T\|last_activity_at")
+      site=$(echo $site_last_activity | cut -d\^ -f1 | cut -d: -f2 | sed 's#"##g')
+      timestamp=$(echo $site_last_activity | cut -d\^ -f2 | cut -d: -f2- | cut -d. -f1 | sed 's#"##g')
+      timestamp=$(date -d "$timestamp" +%s)
+      echo $site:$timestamp
+   done > ${TMP_AREA}/.timestamp
+fi
+
+if [ ] ; then
+echo DEBUG checking ${TMP_AREA}/.timestamp1
+cat ${TMP_AREA}/.timestamp1
+echo DEBUG checking ${TMP_AREA}/.timestamp2
+cat ${TMP_AREA}/.timestamp2
+while read line ; do
+   site=$(echo $line | cut -d: -f1)
+   t1=$(echo $line | cut -d: -f2)
+   t2=$(echo $line | cut -d: -f3-)
+   #[ "x$site" == "xT2_CH_CERN_HLT" ] && { t2cern=$(expr $(date --date "$t2" +%s) + 3600) ; echo ${site}:$t2cern ; continue ; }
+   echo DEBUG t1=$t1 t2=$t2 t2 should be in time format
+   echo ${site}:$(date --date "$t2" +%s)
+done < ${TMP_AREA}/.timestamp1
 
 while read line ; do
    site=$(echo $line | cut -d: -f1)
@@ -383,11 +434,13 @@ while read line ; do
    #[ "x$site" == "xT2_CH_CERN_HLT" ] && { t2cern=$(expr $(date --date "$t2" +%s) + 3600) ; echo ${site}:$t2cern ; continue ; }
    echo ${site}:$(date --date "$t2" +%s)
 done < ${TMP_AREA}/.timestamp1 > ${TMP_AREA}/.timestamp
+fi
+
 #cp ${TMP_AREA}/.timestamp2 ${TMP_AREA}/.timestamp
-echo DEBUG timestamp1
-cat ${TMP_AREA}/.timestamp1
-echo DEBUG timestamp
+echo DEBUG timestamp "(should not be empty)"
 cat ${TMP_AREA}/.timestamp
+#echo DEBUG timestamp
+#cat ${TMP_AREA}/.timestamp
 
 #echo DEBUG content of timestamp at $(date)
 #ls -al ${TMP_AREA}/.timestamp
