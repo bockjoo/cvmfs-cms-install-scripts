@@ -646,7 +646,17 @@ THEHOUR=$(date +%H)
 #RUN_WHEN=20
 RUN_WHEN=03
 if [ "x$THEHOUR" == "x$RUN_WHEN" ] ; then
-      $HOME/update_cmssw_git_mirror.sh daily > $HOME/logs/update_cmssw_git_mirror.daily.log 2>&1
+      # $HOME/update_cmssw_git_mirror.sh daily > $HOME/logs/update_cmssw_git_mirror.daily.log 2>&1
+      cvmfs_server transaction
+      $HOME/cvmfs_update_cmssw_git_mirror.sh daily > $HOME/logs/cvmfs_update_cmssw_git_mirror.daily.log 2>&1
+      status=$?
+      if [ $status -eq  0 ] ; then
+         cvmfs_server publish
+         printf "$(/bin/hostname -s) $(basename $0) \n" | mail -s "INFO cmssw.git update success" -a $HOME/logs/cvmfs_update_cmssw_git_mirror.daily.log $notifytowhom      
+      else
+         cvmfs_server abort -f
+         printf "$(/bin/hostname -s) $(basename $0) \n" | mail -s "ERROR cmssw.git update fail status=$status" -a $HOME/logs/cvmfs_update_cmssw_git_mirror.daily.log $notifytowhom      
+      fi
 fi
 echo INFO Done git mirror check
 # Check Point 5
