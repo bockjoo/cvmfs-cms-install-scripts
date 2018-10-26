@@ -27,19 +27,22 @@ if [[ $(date +"%-d") -eq 10 ]]; then
     git repack -a -d --window=50 --max-pack-size=64M
     [ $? -eq 0 ] || status=5
     popd
+    # sync daily mirror only every month
+    rm -rf "$DAY_PATH"
+    [ $? -eq 0 ] || status=6
+    cp -a "$MONTH_PATH" "$DAY_PATH"
+    [ $? -eq 0 ] || status=7
 fi
 
 # Build the daily repo off the monthly repo to ensure the base doesnt 
 # change. Since the file content is the same, CVMFS also will only store
 # the underlying bytes once
-rm -rf "$DAY_PATH"
-[ $? -eq 0 ] || status=6
-cp -a "$MONTH_PATH" "$DAY_PATH"
-[ $? -eq 0 ] || status=7
+[ -d "$DAY_PATH" ] || cp -a "$MONTH_PATH" "$DAY_PATH"
+[ $? -eq 0 ] || status=8
 pushd "$DAY_PATH"
 git fetch
-[ $? -eq 0 ] || status=8
-git repack --max-pack-size=64M
 [ $? -eq 0 ] || status=9
+git repack --max-pack-size=64M
+[ $? -eq 0 ] || status=10
 popd
 exit $status
