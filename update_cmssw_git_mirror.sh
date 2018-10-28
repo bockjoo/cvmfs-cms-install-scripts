@@ -47,7 +47,8 @@ rm -f $functions
 # Doing the one suggested by Shahzad: I switched to this one from Andrew's old prescription for some reason
 #                                     ( I think some fetch errors that I have been seeing )
 echo INFO Doing the one suggested by Shahzad
-create_local_workspace_patch
+#create_local_workspace_patch
+create_local_workspace_patch_month_and_day
 if [ ] ; then
 if [ $(date +%d) -eq 12 ] ; then # Every month 12-th day
     echo DEBUG it is the 12-th day of the month
@@ -255,6 +256,55 @@ echo INFO creating local worksapce patch
 (git clone --bare https://github.com/cms-sw/${GH_REPO}.git && cvmfs_server transaction && rsync -a --delete ${GH_REPO}.git/ ${MIRROR}/  && cvmfs_server publish) || printf "ERROR create_local_workspace_patch failed\n" | mail -s "ERROR cmssw git create_local_workspace_patch failed" $notifytowhom
 rm -rf ${GH_REPO}.git
 
+}
+
+
+function create_local_workspace_patch_month_and_day () {
+
+WORKSPACE=/tmp/cvcms
+GH_REPO=cmssw
+MIRROR=/cvmfs/cms.cern.ch/${GH_REPO}.git.daily
+MIRROR_MONTHLY=/cvmfs/cms.cern.ch/${GH_REPO}.git
+[ -d $WORKSPACE ] || mkdir -p $WORKSPACE
+if [ ! -d ${MIRROR} ] ; then
+   echo INFO creating ${MIRROR}
+   cvmfs_server transaction && mkdir -p ${MIRROR} && cvmfs_server publish
+fi
+if [ ! -d ${MIRROR_MONTHLY} ] ; then
+   echo INFO creating ${MIRROR_MONTHLY}
+   cvmfs_server transaction && mkdir -p ${MIRROR_MONTHLY} && cvmfs_server publish
+fi
+cd $WORKSPACE
+echo INFO starting all over again
+rm -rf ${GH_REPO}.git
+echo INFO creating git config
+git config --global http.postBuffer 209715200
+git config --global gc.auto 0
+echo INFO creating local worksapce patch
+(
+  git clone --bare https://github.com/cms-sw/${GH_REPO}.git && git repack -a -d --window=50 --max-pack-size=64M
+  if [ $? -eq 0 ] ; then
+     cvmfs_server transaction && rsync -a --delete ${GH_REPO}.git/ ${MIRROR}/  && cvmfs_server publish
+     exit $?
+  fi
+  exit 1 
+) || printf "ERROR create_local_workspace_patch_month_and_day failed\n" | mail -s "ERROR cmssw git create_local_workspace_patch_month_and_day failed" $notifytowhom
+rm -rf ${GH_REPO}.git
+if [ $(date +%d) -eq 12 ] ; then # Every month 12-th day
+   echo INFO creating git config
+   git config --global http.postBuffer 209715200
+   git config --global gc.auto 0
+   echo INFO creating local worksapce patch
+   (
+     git clone --bare https://github.com/cms-sw/${GH_REPO}.git && git repack -a -d --window=50 --max-pack-size=64M
+     if [ $? -eq 0 ] ; then
+        cvmfs_server transaction && rsync -a --delete ${GH_REPO}.git/ ${MIRROR_MONTHLY}/  && cvmfs_server publish
+        exit $?
+     fi
+     exit 1 
+   ) || printf "ERROR create_local_workspace_patch_month_and_day for the month failed\n" | mail -s "ERROR cmssw git create_local_workspace_patch_month_and_day for the month failed" $notifytowhom
+   rm -rf ${GH_REPO}.git
+fi
 }
 
 function create_mirror_bare_cmssw_git_tmp () {

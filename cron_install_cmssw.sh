@@ -643,20 +643,31 @@ echo INFO Next git mirror update will be checked and updated as needed
 echo
 # run daily at 01 AM CERN time
 THEHOUR=$(date +%H)
-#RUN_WHEN=20
-RUN_WHEN=03
+RUN_WHEN=02
 if [ "x$THEHOUR" == "x$RUN_WHEN" ] ; then
-      # $HOME/update_cmssw_git_mirror.sh daily > $HOME/logs/update_cmssw_git_mirror.daily.log 2>&1
-      cvmfs_server transaction
-      $HOME/cvmfs_update_cmssw_git_mirror.sh daily > $HOME/logs/cvmfs_update_cmssw_git_mirror.daily.log 2>&1
-      status=$?
-      if [ $status -eq  0 ] ; then
-         cvmfs_server publish
-         printf "$(/bin/hostname -s) $(basename $0) \n" | mail -s "INFO cmssw.git update success" -a $HOME/logs/cvmfs_update_cmssw_git_mirror.daily.log $notifytowhom      
-      else
-         cvmfs_server abort -f
-         printf "$(/bin/hostname -s) $(basename $0) \n" | mail -s "ERROR cmssw.git update fail status=$status" -a $HOME/logs/cvmfs_update_cmssw_git_mirror.daily.log $notifytowhom      
-      fi
+      echo INFO executing $HOME/cvmfs_update_cmssw_git_mirror_v3.sh
+      $HOME/cvmfs_update_cmssw_git_mirror_v3.sh > $HOME/logs/cvmfs_update_cmssw_git_mirror.log 2>&1 &
+      theps=$!
+      i=0
+      while : ; do
+            #echo DEBUG $i seconds $(ps auxwww | grep -v grep | awk '{print "+"$2"+"}' | grep "+${theps}+")
+            [ $(ps auxwww | grep -v grep | awk '{print "+"$2"+"}' | grep -q "+${theps}+" ; echo $?) -eq 0 ] || break
+            if [ $i -gt 3600 ] ; then
+               ps auxwww | grep -v grep | awk '{print "+"$2"+"}' | grep -q "+${theps}+"
+               if [ $? -eq 0 ] ; then
+                  git_pses=$(pstree -a -l -p $theps | grep \\-git | cut -d, -f2 | awk '{print $1}')
+                  kill $git_pses
+               fi # && kill $theps # FIXME kill git processes instead of the parent.
+               #echo DEBUG timeout reached. Breaking...
+               break
+            fi
+            #echo DEBUG $i seconds passed. pstree follows for FIXME kill git processes instead of the parent.
+            #pstree -alp $theps
+            i=$(expr $i + 1)
+            sleep 1
+      done
+      wait $theps
+      echo INFO status of cvmfs_update_cmssw_git_mirror_v3.sh execution : $?
 fi
 echo INFO Done git mirror check
 # Check Point 5
