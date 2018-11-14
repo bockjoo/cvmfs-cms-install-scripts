@@ -146,7 +146,7 @@ fi
 
 slcs_excluded="_ia32_"
 archs_excluded="slc5_amd64_gcc434\|slc5_amd64_gcc451\|slc5_amd64_gcc4621|slc5_amd64_gcc462"
-cmssws_excluded="CMSSW_4_2_8_SLHCstd_patch1 CMSSW_4_1_3_patch1 CMSSW_4_2_0 CMSSW_4_2_0_pre6 CMSSW_4_2_2_SLHC_pre1 CMSSW_4_2_3_SLHC_pre1 CMSSW_4_2_8_SLHC1_patch1 MSSW_4_2_8_SLHCstd_patch1 CMSSW_4_3_0_pre7 CMSSW_4_4_2_p10JEmalloc CMSSW_5_0_0_g4emtest CMSSW_5_0_0_pre5_root532rc1 CMSSW_4_2_3_onlpatch2 CMSSW_4_2_3_onlpatch4 CMSSW_4_2_7_hinpatch1 CMSSW_4_2_7_onlpatch2 CMSSW_4_2_9_HLT2_onlpatch1 CMSSW_4_4_2_onlpatch1 CMSSW_5_1_0_pre1 CMSSW_5_1_0_pre2 CMSSW_5_2_0_pre2_TS113282 CMSSW_5_2_0_pre3HLT CMSSW_5_3_4_TS125616patch1 CMSSW_5_3_X CMSSW_6_2_X CMSSW_6_2_X_SLHC CMSSW_7_0_X CMSSW_7_1_X CMSSW_7_2_X CMSSW_7_3_X CMSSW_7_4_X CMSSW_7_1_50 CMSSW_10_1_X CMSSW_9_4_MAOD_X CMSSW_9_4_AN_X CMSSW_10_2_X"
+cmssws_excluded="CMSSW_4_2_8_SLHCstd_patch1 CMSSW_4_1_3_patch1 CMSSW_4_2_0 CMSSW_4_2_0_pre6 CMSSW_4_2_2_SLHC_pre1 CMSSW_4_2_3_SLHC_pre1 CMSSW_4_2_8_SLHC1_patch1 MSSW_4_2_8_SLHCstd_patch1 CMSSW_4_3_0_pre7 CMSSW_4_4_2_p10JEmalloc CMSSW_5_0_0_g4emtest CMSSW_5_0_0_pre5_root532rc1 CMSSW_4_2_3_onlpatch2 CMSSW_4_2_3_onlpatch4 CMSSW_4_2_7_hinpatch1 CMSSW_4_2_7_onlpatch2 CMSSW_4_2_9_HLT2_onlpatch1 CMSSW_4_4_2_onlpatch1 CMSSW_5_1_0_pre1 CMSSW_5_1_0_pre2 CMSSW_5_2_0_pre2_TS113282 CMSSW_5_2_0_pre3HLT CMSSW_5_3_4_TS125616patch1 CMSSW_5_3_X CMSSW_6_2_X CMSSW_6_2_X_SLHC CMSSW_7_0_X CMSSW_7_1_X CMSSW_7_2_X CMSSW_7_3_X CMSSW_7_4_X CMSSW_7_1_50 CMSSW_10_1_X CMSSW_9_4_MAOD_X CMSSW_9_4_AN_X CMSSW_10_2_X CMSSW_10_4_0_pre2"
 
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
 cvmfs_self_mon=/cvmfs/cms.cern.ch/oo77
@@ -356,13 +356,14 @@ done
 #exit 0
 
 # [] cms-common
-install_cms_common
+#install_cms_common
 
 # Check Point 3
 #echo DEBUG done with install_cms_common
 #rm -f $lock
 #exit 0
 
+#if [ ] ; then
 # [] install cmssw
 i=0
 j=$(expr $j + 1)
@@ -551,18 +552,20 @@ echo INFO executing "install_cmssw_centos72_exotic_archs 2>&1 | tee $HOME/logs/i
 install_cmssw_centos72_exotic_archs 2>&1 | tee $HOME/logs/cvmfs_install_cmssw_centos72_exotic_archs.log
 echo
 echo INFO Done CMSSW installation part of the script
+#fi # # [] install cmssw # if [ ]
 
 # Check Point 4
 #rm -f $lock
 #exit 0
 
-# [] siteconf
+# [] siteconf still active in cron
 echo INFO Next check_and_update_siteconf using gitlab
 echo
 check_and_update_siteconf > $HOME/logs/check_and_update_siteconf.log 2>&1
 echo INFO Done check_and_update_siteconf using gitlab
 echo
 
+#if [ ] ; then
 # [] CRAB3
 echo INFO Next CRAB3 EL6 gcc493 update will be checked and updated as needed
 echo
@@ -596,11 +599,13 @@ install_slc6_amd64_gcc493_xrootd_client
 echo
 echo INFO Done xrootd_client EL6 gcc493 check and update part of the script
 echo
+#fi # if [ ] ; then
+
 
 echo INFO Next LHAPDF update will be checked and updated as needed
 echo
 
-# [] lhapdf
+# [] lhapdf still active in cron
 $HOME/cron_download_lhapdf.sh 2>&1 | tee $HOME/logs/cron_download_lhapdf.log
 lha_pdfsets_version=$(grep ^lhapdfweb_updates= $HOME/cron_download_lhapdf.sh | awk '{print $NF}' | cut -d\" -f1)
 grep -q "INFO publishing" $HOME/logs/cron_download_lhapdf.log
@@ -612,7 +617,7 @@ fi
 echo
 echo INFO Done LHAPDF check and update part of the script
 
-# [] gridpacks
+# [] gridpacks still active in cron
 echo INFO Execute only the first half of the even hours
 echo INFO Next cron_rsync_generator_package_from_eos as needed
 echo
@@ -621,6 +626,7 @@ $HOME/cron_rsync_generator_package_from_eos_individual.sh > $HOME/logs/cron_rsyn
 #cms_cvmfs_mgmt_fix_gridpack_perms_cron > $HOME/logs/cms_cvmfs_mgmt_fix_gridpack_perms_cron.log 2>&1
 #printf "$(/bin/hostname -f): $(basename $0) \n$(cat $HOME/logs/cms_cvmfs_mgmt_fix_gridpack_perms_cron.log | sed 's#%#%%#g')\n" | mail -s "INFO gridpack_perms fix" $notifytowhom
 
+#if [ ] ; then
 echo
 echo INFO Done cron_rsync_generator_package_from_eos part of the script
 echo
@@ -673,6 +679,9 @@ echo INFO Done git mirror check
 # Check Point 5
 #rm -f $lock
 #exit 0
+#fi # if [ ] ; then
+
+# [] The host's CA/CRL update for grid operations still active in cron
 echo INFO Next CA/CRL update
 $HOME/update_ca_crl.sh> $HOME/logs/update_ca_crl.log 2>&1
 echo INFO Done CA/CRL update
