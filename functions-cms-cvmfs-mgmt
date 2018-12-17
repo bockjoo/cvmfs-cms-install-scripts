@@ -471,7 +471,7 @@ function dockerrun()
       echo INFO running docker run --net=host --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} $DOCKER_TAG sh -c "$ARGS"
       #docker run --rm -it -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} -u $(whoami) $DOCKER_TAG sh -c "$ARGS"
       #docker run --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} -u $(whoami) $DOCKER_TAG sh -c "$ARGS"
-      docker run --net=host --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} $DOCKER_TAG sh -c "$ARGS"
+      docker run --net=host --rm -i -v /tmp:/tmp -v /cvmfs:/cvmfs -v ${workdir}:${workdir} $DOCKER_TAG sh -c "$ARGS" 2>&1
       status=$?
       echo INFO done running docker run ...
       return $status
@@ -954,6 +954,8 @@ function bootstrap_arch () {
    if [ $status -eq 0 ] ; then
       tail -1  $HOME/logs/bootstrap_arch_${SCRAM_ARCH}.log | grep -q "+ exit 0"
       if [ $? -eq 0 ] ; then
+         grep -q ^"mutex_set_max " /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         [ $? -eq 0 ] || { echo INFO adding mutex_set_max 10000000 to /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG ; echo mutex_set_max 10000000 >>  /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG ; } ;
          printf "bootstrap_arch() publishing bootstrap for ${SCRAM_ARCH}\n" | mail -s "bootstrap_arch() publishing bootstrap" $notifytowhom
          publish_cmssw_cvmfs bootstrap_for_${SCRAM_ARCH}
       else
@@ -1049,6 +1051,8 @@ function bootstrap_arch_slc7 () {
    if [ $status -eq 0 ] ; then
       tail -1 $workdir/logs/bootstrap_${SCRAM_ARCH}.log | grep -q "+ exit 0"
       if [ $? -eq 0 ] ; then
+         grep -q ^"mutex_set_max " /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         [ $? -eq 0 ] || { echo INFO adding mutex_set_max 10000000 to /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG ; echo mutex_set_max 10000000 >>  /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG ; } ;
          printf "bootstrap_arch_slc7() publishing bootstrap for ${SCRAM_ARCH}\n" | mail -s "bootstrap_arch_slc7() publishing bootstrap" $notifytowhom
          [ "$cvmfs_server_yes" == "yes" ] && publish_cmssw_cvmfs bootstrap_for_${SCRAM_ARCH}
       else

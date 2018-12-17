@@ -27,6 +27,10 @@ EXC_LOCK=""
 TMP_AREA="/tmp/cvmfs_tmp"
 ERR_FILE="/tmp/stcnf_$$.err"
 EVERY_X_HOUR=4
+# 17DEC2018
+siteconf_cat=https://gitlab.cern.ch/api/v4/groups/SITECONF
+notifytowhom=bockjoo@phys.ufl.edu
+# 17DEC2018
 
 echo DEBUG TMP_AREA=$TMP_AREA
 trap 'exit 1' 1 2 3 15
@@ -355,7 +359,7 @@ for PAGE in 1 2 3 4 5 6 7 8 9; do
          echo "${MSG}" >> ${ERR_FILE}
          echo "" >> ${ERR_FILE}
       fi
-      echo DEBUG gitlab_${PAGE}.json PAGE=$PAGE OK
+      echo DEBUG gitlab_${PAGE}.json PAGE=$PAGE FAIL
    fi
 done
 if [ ${FAIL} -ne 0 ]; then
@@ -365,6 +369,9 @@ if [ ${FAIL} -ne 0 ]; then
    echo "   ${MSG}"
    if [ ! -t 0 ]; then
       /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
+      # 17DEC2018
+      printf "$(/bin/hostname) $0: ${MSG}\n$(cat ${ERR_FILE})" | mail -s "ERROR: $MSG" $notifytowhom
+      # 17DEC2018
    fi
 fi
 if [ ${SUCC} -eq 0 ]; then
@@ -381,7 +388,7 @@ echo DEBUG /bin/rm -f ${TMP_AREA}/.timestamp
 #for f in ${TMP_AREA}/gitlab_\*.json ; do
 #   echo DEBUG $f
 #done
-for f in in ${TMP_AREA}/gitlab_[0-9]*.json ; do
+for f in ${TMP_AREA}/gitlab_[0-9]*.json ; do
    echo DEBUG cat $f
    cat $f
 done
@@ -505,9 +512,25 @@ echo "[5] loop over SiteDB sites and update SYNC_DIR as needed"
 list_sites_updated=""
 FAIL=0
 isite=0
+
+# 17DEC2018 We have to use api see email from Lammel and need to fetch SITECONF siteid
+/usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat 2>&1
+if [ $? -ne 0 ] ; then
+   printf "$(/bin/hostname) $0 failed to download $siteconf_cat\nUsing /usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat " mail -s "ERROR: wget $siteconf_cat AUTH failed " $notifytowhom
+   exit 1
+fi
+
+# Sanity check for the downloaded output
+grep -q '"name":"siteconf"' ${TMP_AREA}/siteconf_cat
+if [ $? -ne 0 ] ; then
+   printf "$(/bin/hostname) $0 failed to download $siteconf_cat\nUsing /usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat \n${TMP_AREA}/siteconf_cat wrong" mail -s "ERROR: wget $siteconf_cat ${TMP_AREA}/siteconf_cat wrong " $notifytowhom
+   exit 1
+fi
+# 17DEC2018
+
 for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
    isite=$(expr $isite + 1)
-   echo DEBUG doing SITE=$SITE
+   echo "[5]" DEBUG doing SITE=$SITE
    NEWT=`/usr/bin/awk -F: '{if($1=="'${SITE}'"){print $2}}' ${TMP_AREA}/.timestamp 2>/dev/null`
    if [ -z "${NEWT}" ]; then
       # no repository for this SiteDB site
@@ -516,7 +539,7 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
    fi
    if [ -f ${SYNC_DIR}/SITECONF/.timestamp ]; then
       OLDT=`/usr/bin/awk -F: '{if($1=="'${SITE}'"){print $2}}' ${SYNC_DIR}/SITECONF/.timestamp 2>/dev/null`
-      if [ "${NEWT}" = "${OLDT}" ]; then
+      if [ "${NEWT}" == "${OLDT}" ]; then
          # SYNC_DIR up-to-date
          echo DEBUG SITE=$SITE SYNC_DIR up-to-date. Continuing... OLDT=$OLDT NEWT=$NEWT
          #
@@ -527,8 +550,13 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
          # every four hour all sites that changed are updated
          #
          # continue
-         [ $(expr $(date +%H) % $EVERY_X_HOUR) -eq 0 ] || { echo DEBUG "[ $isite ]" SITE=$SITE HOUR=$(date +%H) so ignore timestamp for once ; continue ; } ;
-     fi
+         if [ $(expr $(date +%H) % $EVERY_X_HOUR) -eq 0 ] ; then
+            echo DEBUG "[ $isite ]" SITE=$SITE HOUR=$(date +%H) so ignore timestamp for once and update the siteconf
+         else
+            echo INFO "[ $isite ]" SITE=$SITE timestamp is same. Skipping this site
+            continue
+         fi
+      fi
    fi
 
    #for site in $SKIP_SITES ; do echo $site ; done | grep -q ^${SITE}$
@@ -541,12 +569,25 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
    # ------------------------
    echo "[5-1] Updating area of site \"${SITE}\":"
    UPPER=`echo ${SITE} | /usr/bin/tr '[:lower:]' '[:upper:]'`
-   /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz 'https://gitlab.cern.ch/SITECONF/'${UPPER}'/repository/archive.tar.gz?ref=master' 1>>${ERR_FILE} 2>&1
+   # 17DEC2018
+   # Need to use api instead /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz 'https://gitlab.cern.ch/SITECONF/'${UPPER}'/repository/archive.tar.gz?ref=master' 1>>${ERR_FILE} 2>&1
+   thesiteid=$(printf "$(cat ${TMP_AREA}/siteconf_cat)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/${UPPER}.git | sed 's#,#\n#g' | grep "^{\"id" | cut -d: -f2)
+   echo "[5-2] Site id for \"${SITE}\":${thesiteid}:"
+   if [ "x$thesiteid" == "x" ] ; then
+         printf "$(/bin/hostname) $0  ERROR: the site id is empty for $SITE. This should not have happened\n" mail -s "ERROR:  the site id empty with $SITE" $notifytowhom
+         continue
+   fi
+   /usr/bin/wget --header="PRIVATE-TOKEN: $(cat .AUTH_TKN)" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz https://gitlab.cern.ch/api/v4/projects/${thesiteid}/repository/archive.tar.gz?ref=master
+   # 17DEC2018
    RC=$?
    if [ ${RC} -ne 0 ]; then
-      /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz 'https://gitlab.cern.ch/SITECONF/'${UPPER}'/repository/archive.tar.gz?ref=master' 2>&1 | grep -q "Authorization failed"
+      # 17DEC2018
+      #/usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz 'https://gitlab.cern.ch/SITECONF/'${UPPER}'/repository/archive.tar.gz?ref=master' 2>&1 | grep -q "Authorization failed"
+      /usr/bin/wget --header="PRIVATE-TOKEN: $(cat .AUTH_TKN)" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz https://gitlab.cern.ch/api/v4/projects/${thesiteid}/repository/archive.tar.gz?ref=master 2>&1 | grep -q "Authorization failed"
+      # 17DEC2018
       if [ $? -eq 0 ] ; then
-         echo Warning: wget Authorization failed with $SITE. This should not have happened
+         echo ERROR: wget Authorization failed with $SITE. This should not have happened
+         printf "$(/bin/hostname) $0  ERROR: wget Authorization failed with $SITE. This should not have happened\n" mail -s "ERROR:  wget Authorization failed with $SITE" $notifytowhom
          continue
       fi
       FAIL=1
@@ -556,8 +597,22 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
          echo "${MSG}" >> ${ERR_FILE}
          echo "" >> ${ERR_FILE}
       fi
+      # 17DEC2018
+      printf "$(/bin/hostname) $0  Warning: failed to fetch GitLab archive of ${SITE} SiteId=$thesiteid , wget=${RC}\n/usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz https://gitlab.cern.ch/api/v4/projects/${thesiteid}/repository/archive.tar.gz?ref=master\n" mail -s "Warning:  wget FAIL with $SITE" $notifytowhom
+      # 17DEC2018
       continue
    fi
+   # 17DEC2018
+   tar tzvf ${TMP_AREA}/archive_${SITE}.tgz | grep -q -i ${SITE}-
+   if [ $? -ne 0 ] ; then
+      FAIL=1
+      MSG="failed to pass tar tzvf ${TMP_AREA}/archive_${SITE}.tgz for $SITE"
+      echo "${MSG}" >> ${ERR_FILE}
+      echo "" >> ${ERR_FILE}
+      printf "$(/bin/hostname) $0  Warning: failed to pass tar tzvf ${TMP_AREA}/archive_${SITE}.tgz | grep -q -i $SITE\n" mail -s "Warning:  wget FAIL with $SITE Wrong download" $notifytowhom
+      continue
+   fi
+   # 17DEC2018
    #
    TAR_DIR=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{print $1;exit}') 2>/dev/null`
    TAR_LST=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{if((($2=="JobConfig")&&(match($3,".*site-local-config.*\\.xml$")!=0))||(($2=="JobConfig")&&(match($3,"^cmsset_.*\\.c?sh$")!=0))||(($2=="PhEDEx")&&(match($3,".*storage.*\\.xml$")!=0))||(($2=="Tier0")&&($3=="override_catalog.xml"))||(($2=="GlideinConfig")&&($3=="")))print $0}') 2>/dev/null`
@@ -673,7 +728,10 @@ if [ ${FAIL} -ne 0 ]; then
    /bin/cat ${ERR_FILE}
    echo "   ${MSG}"
    if [ ! -t 0 ]; then
-      /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
+      # 17DEC2018
+      #/usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
+      printf "$(/bin/hostname) $0: ${MSG}\n$(cat ${ERR_FILE})" | mail -s "ERROR: $MSG" $notifytowhom
+      # 17DEC2018
    fi
    exit 1
 fi
