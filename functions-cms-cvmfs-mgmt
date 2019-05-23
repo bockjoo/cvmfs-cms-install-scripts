@@ -5336,6 +5336,7 @@ function check_and_update_siteconf () {
       printf "$what failed  $HOME/cvmfs_check_and_update_siteconf.sh\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "ERROR: $what cvmfs_check_and_update_siteconf.sh execution failed" $notifytowhom
       return 1
    fi
+   printf "cvmfs_check_and_update_siteconf $(/bin/hostname)\n" | mail -s "Log: cvmfs_check_and_update_siteconf" -a $thelog $notifytowhom 
    UPDATED_SITES=
    eval $(grep ^UPDATED_SITES= $thelog 2>/dev/null)
    if [ "x$UPDATED_SITES" == "x" ] ; then

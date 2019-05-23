@@ -487,10 +487,10 @@ if [ $status -eq 0 ] ; then
       date_s_now=$(echo $(/bin/date +%s) $(/bin/date -u))
       grep -q "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" $updated_list
       if [ $? -eq 0 ] ; then
-        echo Warning "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" is already in the $updated_list
+        echo Warning "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" is already in the $updated_list $f
       else
-        echo INFO adding "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" to $updated_list
-        echo "gridpacks $(echo $f | cut -d/ -f2) $date_s_now" >> $updated_list
+        echo INFO adding "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" to $updated_list for $f
+        #echo "gridpacks $(echo $f | cut -d/ -f2) $date_s_now" >> $updated_list
       fi
       thestring="gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')"
 

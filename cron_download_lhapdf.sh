@@ -5,7 +5,7 @@
 #
 # 0.2.2: downloads pdfsets.index as well
 # versiono 0.3.2
-version=0.3.2
+version=1.0.6.2.1.c
 export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
 workdir=/tmp/lhapdf
 thehome=$HOME # /home/shared # /scratch/shared/cms
@@ -18,6 +18,12 @@ min_relnum=5009001 # minim release number is 5.9.1
 min_relnum=6001000 # minim release number is 6.1.0
 #min_relnum=600100000 # minim release number is 6.1.000
 lhapdfweb=http://www.hepforge.org/archive/lhapdf
+#http://www.hepforge.org/archive/lhapdf/pdfsets/6.2.1 # upto 6.2.1.a|6.2.1b
+#https://lhapdf.hepforge.org/downloads?f=pdfsets/6.2.1 # from 6.2.1.b|6.2.1c
+lhapdfweb=http://www.hepforge.org/archive/lhapdf
+lhapdfweb_download="http://www.hepforge.org/archive/lhapdf/"
+lhapdfweb_download="https://lhapdf.hepforge.org/downloads?f="
+lhapdfweb_download="http://oo.ihepa.ufl.edu:8080/lhapdf/"
 #CERN CVMFS
 db=$HOME/$(basename $0 | sed "s#\.sh##g").db.txt
 updated_list=$VO_CMS_SW_DIR/cvmfs-cms.cern.ch-updates
@@ -25,10 +31,10 @@ updated_list=$VO_CMS_SW_DIR/cvmfs-cms.cern.ch-updates
 reference_list=$HOME/lhapdf_list.txt
 
 # Format: dest This should be a real release + .a or .b or .c or .d etc # /cvmfs/cms.cern.ch/lhapdf/pdfsets/<lhapdfweb_update>
-lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c 6.1.d 6.1.e 6.1.f 6.1.g 6.1.h 6.2 6.2.1 6.2.1.a"
+lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c 6.1.d 6.1.e 6.1.f 6.1.g 6.1.h 6.2 6.2.1 6.2.1.a 6.2.1.b 6.2.1.c"
 
 # Format: dest|symlink
-needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b 6.1.d|6.1.5d 6.1.e|6.1.5e 6.1.f|6.1.5f 6.1.g|6.1.6 6.1.h|6.1.6a 6.2|6.2.0a 6.2.1|6.2.1a 6.2.1.a|6.2.1b" # 6.1.6 -> 6.1.g
+needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b 6.1.d|6.1.5d 6.1.e|6.1.5e 6.1.f|6.1.5f 6.1.g|6.1.6 6.1.h|6.1.6a 6.2|6.2.0a 6.2.1|6.2.1a 6.2.1.a|6.2.1b 6.2.1.b|6.2.1c 6.2.1.c|6.2.1d" # 6.1.6 -> 6.1.g
 previous_release=$(echo $lhapdfweb_updates | awk '{print $(NF-1)}')
 
 #lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c"
@@ -251,7 +257,7 @@ for v in $releases $lhapdfweb_updates ; do
     fi
    fi
 
-   echo INFO we will get the tarball from ${lhapdfweb}/$dest to /cvmfs/cms.cern.ch/lhapdf/$dest_nested_catalog # if it was 6.2.1.a, it will get from 6.2.1 
+   echo INFO we will get the tarball from ${lhapdfweb_download}$dest to /cvmfs/cms.cern.ch/lhapdf/$dest_nested_catalog # if it was 6.2.1.a, it will get from 6.2.1 
 
    # 
    #
@@ -269,8 +275,14 @@ for v in $releases $lhapdfweb_updates ; do
    fi
    printf "$(basename $0) INFO starting lhapdf download for $v\n" | mail -s "$(basename $0) INFO lhapdf $v download started" $notifytowhom
 
-   files=$(wget -q --no-check-certificate -O- ${lhapdfweb}/$dest | grep "pdfsets.index\|tar.gz" | sed 's#href="#|#g' | cut -d\| -f2 | cut -d\" -f1)
+   #files=$(wget -q --no-check-certificate -O- ${lhapdfweb_download}$dest | grep "pdfsets.index\|tar.gz" | sed 's#href="#|#g' | cut -d\| -f2 | cut -d\" -f1 | cut -d= -f2)
+   #1.0.6.2.1.c files=$(wget -q --no-check-certificate -O- ${lhapdfweb_download}$dest | grep "pdfsets.index\|tar.gz" | sed 's#href="#|#g' | cut -d/ -f3 | cut -d\" -f1 | grep -v \\.\\.tar.gz | sort -u)
+   files=$(wget -q --no-check-certificate -O- ${lhapdfweb_download}$dest | grep "pdfsets.index\|tar.gz" | sed 's#href="#|#g' | cut -d\| -f2 | cut -d\" -f1 | cut -d/ -f3 | grep -v \\.\\.tar.gz | sort -u)
+   #http://www.hepforge.org/archive/lhapdf/pdfsets/6.2.1
+   #https://lhapdf.hepforge.org/downloads?f=pdfsets/6.2.1
    i=0
+   nfiles=$(echo $files | wc -w)
+   nfiles_half=$(expr $nfiles / 2)
    for f in $files ; do
       i=$(expr $i + 1)
       ( [ -d $lhapdf_top/$dest_nested_catalog ] || { echo INFO creating $lhapdf_top/$dest_nested_catalog ; mkdir -p $lhapdf_top/$dest_nested_catalog ; } ;
@@ -278,7 +290,7 @@ for v in $releases $lhapdfweb_updates ; do
         while [ $j -lt $ntry ] ; do
            echo INFO "[ $i ] Trial=$j Downloading $f"
            # example: wget --no-check-certificate -O /cvmfs/cms.cern.ch/lhapdf/pdfsets/6.1.h/HERAPDF20_NNLO_ALPHAS_118.tar.gz http://www.hepforge.org/archive/lhapdf/pdfsets/6.1/HERAPDF20_NNLO_ALPHAS_118.tar.gz
-           wget -q --no-check-certificate -O $lhapdf_top/${dest_nested_catalog}/$f  ${lhapdfweb}/$dest/$f
+           wget -q --no-check-certificate -O $lhapdf_top/${dest_nested_catalog}/$f  ${lhapdfweb_download}$dest/$f
            status=$?
            [ $status -eq 0 ] && break
            j=$(expr $j + 1)
@@ -288,7 +300,7 @@ for v in $releases $lhapdfweb_updates ; do
            echo DEBUG checking $lhapdf_top/pdfsets/${previous_release}/$(echo $f | sed 's#\.tar\.gz##')
            if [ -d $lhapdf_top/pdfsets/${previous_release}/$(echo $f | sed 's#\.tar\.gz##') ] ; then
               echo Warning it exists in $previous_release
-              printf "$(basename $0) ERROR failed : $f\nTry wget -q --no-check-certificate -O $lhapdf_top/${dest_nested_catalog}/$f  ${lhapdfweb}/$dest/$f\nCould be due to a permission error\n$(cat $THELOG | sed 's#%#%%#g')" | mail -s "ERROR: $(basename $0) Downloading failed" $notifytowhom
+              printf "$(basename $0) ERROR failed : $f\nTry wget -q --no-check-certificate -O $lhapdf_top/${dest_nested_catalog}/$f  ${lhapdfweb_download}$dest/$f\nCould be due to a permission error\n$(cat $THELOG | sed 's#%#%%#g')" | mail -s "ERROR: $(basename $0) Downloading failed" $notifytowhom
               if [ ] ; then
                  echo Warning creating the artificial one
                  ( cd $lhapdf_top/pdfsets/${previous_release} ; tar czvf $lhapdf_top/${dest_nested_catalog}/$f $(echo $f | sed 's#\.tar\.gz##') ; exit $? )
@@ -304,6 +316,7 @@ for v in $releases $lhapdfweb_updates ; do
            cd $lhapdf_top/$dest_nested_catalog
            echo INFO "[ $i ] Unpacking"
            cd $lhapdf_top/${dest_nested_catalog}
+           df_h_info=$(df -h .) ; echo $df_h_info  counter: $i -eq $nfiles_half -o $i -eq 646 ; echo $(df -h /) ; echo $(df -h /home/cvcms) echo $(df -h /srv/cvmfs/cms.cern.ch) ; df -h
            tar xzf $f
            status=$(expr $status + $?)
            rm -f $lhapdf_top/${dest_nested_catalog}/$f
@@ -318,7 +331,7 @@ for v in $releases $lhapdfweb_updates ; do
         exit $status        
       )
       if [ $? -ne 0 ] ; then
-          printf "$(basename $0) ERROR failed : $f\nTry wget -q --no-check-certificate -O $lhapdf_top/${dest_nested_catalog}/$f  ${lhapdfweb}/$dest/$f\n$(cat $THELOG | sed 's#%#%%#g')" | mail -s "$(basename $0) Unpacking failed" $notifytowhom
+          printf "$(basename $0) ERROR failed : $f\nTry wget -q --no-check-certificate -O $lhapdf_top/${dest_nested_catalog}/$f  ${lhapdfweb_download}$dest/$f\n$(cat $THELOG | sed 's#%#%%#g')" | mail -s "$(basename $0) Unpacking failed" $notifytowhom
 
          # 0.1.6 20NOV2014 soft-link manipulation
          if [ "x$dest_temp" != "x" ] ; then
@@ -390,6 +403,30 @@ for v in $releases $lhapdfweb_updates ; do
          exit 1
        fi
       fi # if [ $? -eq 0 ] ; then
+      # half-way through publish it
+
+      if [ $i -eq $nfiles_half -o $i -eq 646 ] ; then
+         echo INFO $i is $nfiles_half : halfway through
+         dirnow=$(pwd)
+         cd
+         time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish+lhapdf_halfway.log
+         status=$?
+         #cd $dirnow
+         if [ $status -eq 0 ] ; then
+            echo INFO cvmfs_server publish fine
+            cvmfs_server transaction 2>&1
+            cd $dirnow
+         else
+            #printf "$(basename $0) cvmfs_server_publish OK \n$(cat $HOME/logs/cvmfs_server+publish+lhapdf.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish for $dest OK" $notifytowhom
+            #begin_transaction=0
+            #cp $THELOG $HOME/logs/cron_download_lhapdf+${dest_nested_catalog}.log
+            #else
+            echo ERROR failed cvmfs_server publish
+            printf "$(basename $0) cvmfs_server publish failed\n$(cat $HOME/logs/cvmfs_server+publish+lhapdf_halfway.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) cvmfs_server publish failed" $notifytowhom
+            ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
+            exit 1
+         fi
+      fi
    done
 
    echo INFO So far so good check $lhapdf_top/$dest_nested_catalog
