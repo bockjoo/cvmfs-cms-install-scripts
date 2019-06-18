@@ -574,6 +574,13 @@ install_slc6_amd64_gcc493_crab3
 echo
 echo INFO Done CRAB3 EL6 gcc493 check and update part of the script
 echo
+# [] Rucio Client
+#echo INFO Next Rucio Client
+#echo
+#$HOME/install_rucio_client.sh 2>&1 | tee $HOME/logs/install_rucio_client.log
+#echo
+#echo INFO Done Next Rucio Client
+#echo
 
 # [] PHEDEX
 echo INFO Next PhEDEXAgents EL6 gcc493 update will be checked and updated as needed
