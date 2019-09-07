@@ -197,7 +197,9 @@ export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
 export LANG="C"
 #DOCKER_TAG=bockjoo/slc7:test
 DOCKER_TAG=cmssw/slc7:current
-DOCKER_TAG=cmssw/slc7-installer:cvcms # the one that Shahzad built and pulled from hub
+DOCKER_TAG=cmssw/slc7-installer:cvcms     # the one that Shahzad built and pulled from hub
+DOCKER_TAG=cmssw/slc7-installer:usercvcms # the one built from oo to have libaio
+#DOCKER_TAG=cmssw/slc7-installer:latest    # hn-cms-sw-develtools@cern.ch Subject:Re: bootstrap fails due to missing libaio
 
 functions=$HOME/functions-cms-cvmfs-mgmt # $workdir/$(basename $0 | sed "s#\.sh##g")-functions # .$(date -u +%s)
 
@@ -391,7 +393,7 @@ for arch in $archs ; do
         echo $arch | grep -q slc7
         if [ $? -eq 0 ] ; then
            #bootstrap_arch_tarball $arch > $HOME/bootstrap_${arch}.log 2>&1
-           bootstrap_arch_slc7 $arch > $workdir/logs/bootstrap_arch_slc7_${arch}.log
+           bootstrap_arch_slc7 $arch > $workdir/logs/bootstrap_arch_slc7_${arch}.log 2>&1
            if [ $? -eq 0 ] ; then
               printf "$(basename $0) $(hostname -f) Success: bootstrap_arch_tarball $arch \n$(cat $VO_CMS_SW_DIR/bootstrap_${arch}.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) $(hostname -f) Success: bootstrap_arch_tarball $arch " $notifytowhom
            else
@@ -582,6 +584,7 @@ echo
 #echo INFO Done Next Rucio Client
 #echo
 
+if [ ] ; then
 # [] PHEDEX
 echo INFO Next PhEDEXAgents EL6 gcc493 update will be checked and updated as needed
 echo
@@ -606,7 +609,7 @@ install_slc6_amd64_gcc493_xrootd_client
 echo
 echo INFO Done xrootd_client EL6 gcc493 check and update part of the script
 echo
-#fi # if [ ] ; then
+fi # if [ ] ; then
 
 
 echo INFO Next LHAPDF update will be checked and updated as needed
@@ -728,6 +731,13 @@ currdir=$(pwd)
 cd
 time cvmfs_server publish 2>&1 | tee $HOME/logs/cvmfs_server+publish.log
 cd $currdir
+
+echo INFO Next CRAB3 EL7 gcc630 update will be checked and updated as needed
+echo
+echo INFO installing slc7 gcc630 crab3
+install_slc7_amd64_gcc630_crab3 > $HOME/logs/install_slc7_amd64_gcc630_crab3.log 2>&1
+echo
+echo INFO Done CRAB3 EL7 gcc630 check and update part of the script
 
 #backup_installation 2>&1 | tee $HOME/logs/backup_installation.log
 #it takes longer than 8 hours: backup_installation_one slc6_amd64_gcc472 2>&1 | tee $HOME/logs/backup_installation_one_slc6_amd64_gcc472.log

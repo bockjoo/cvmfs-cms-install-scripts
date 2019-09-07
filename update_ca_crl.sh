@@ -20,6 +20,8 @@ if [ ! -d $rsync_dir ] ; then
    echo mkdir -p $rsync_dir
    mkdir -p $rsync_dir
 fi
+echo INFO do vomses
+cat /etc/vomses/* > $rsync_dir/vomses
 echo INFO rsync -arupq --delete $input_dir $rsync_dir
 
 rsync -arupq --delete $input_dir $rsync_dir

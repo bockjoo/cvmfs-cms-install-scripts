@@ -147,17 +147,6 @@ if [ $? -eq 0 ] ; then
 fi
 cvmfs_server transaction 2>&1
 [ $? -eq 0 ] || { printf "$(basename $0) ERROR cvmfs_server transaction failed\n$(cat $THELOG | sed 's#%#%%#g')\nChecking ps\n$(ps auxwww | sed 's#%#%%#g' | grep $(/usr/bin/whoami) | grep -v grep)\n" | mail -s "$(basename $0) cvmfs_server transaction lock failed" $notifytowhom ; exit 1 ; } ;
-if [ ] ; then
-status=$?
-what="$(basename $0)"
-cvmfs_server_transaction_check $status $what
-if [ $? -eq 0 ] ; then
-   echo INFO transaction OK for $what
-else
-   printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
-   exit 1
-fi
-fi # if [ ] ; then
 
 begin_transaction=1
 #releases=$(wget -q -O- ${lhapdfweb}/ | grep lhapdf | grep tar.gz | cut -d\> -f7 | cut -d\< -f1 | grep -v nopdf | sed 's#lhapdf-##g' | sed 's#.tar.gz##g')

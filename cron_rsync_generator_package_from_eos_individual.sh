@@ -133,27 +133,36 @@ voms-proxy-info -timeleft 2>&1
 #   printf "$(basename $0) ERROR failed to download $X509_USER_PROXY\n$(/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://${X509_USER_PROXY}.copy 2>&1 | sed 's#%#%%#g')n" | mail -s "$(basename $0) ERROR proxy download failed" $notifytowhom
 #fi
 #/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+echo DEBUG checking /usr/bin/lcg-cp
+ldd /usr/bin/lcg-cp 2>&1
+
 /usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
 if [ $? -eq 0 ] ; then
    cp $X509_USER_PROXY.copy $X509_USER_PROXY
       voms-proxy-info -all
 else
       printf "$(basename $0) ERROR failed to download $X509_USER_PROXY\n$(/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://${X509_USER_PROXY}.copy 2>&1 | sed 's#%#%%#g')n" | mail -s "$(basename $0) ERROR proxy download failed" $notifytowhom
+      source $HOME/osg/osg-wn-client/setup.sh
+      globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+      if [ $? -eq 0 ] ; then
+         cp $X509_USER_PROXY.copy $X509_USER_PROXY
+      fi
 fi
 
 timeleft=$(voms-proxy-info -timeleft 2>/dev/null)
 if [ $timeleft -lt 1900 ] ; then # 1800 + 100
    #/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY
    /usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
-   [ $? -eq 0 ] && cp $X509_USER_PROXY.copy $X509_USER_PROXY
-if [ ] ; then
-   echo INFO creating the grid proxy
-   voms-proxy-init -cert $x509cert -key $x509certkey -out $X509_USER_PROXY -valid ${x509proxyvalid} 2>&1
-   if [ $? -ne 0 ] ; then
-      printf "$(basename $0) ERROR voms-proxy-init failed\n" | mail -s "$(basename $0) ERROR voms-proxy-init failed" $notifytowhom
-      exit 1
+   status=$?
+   echo DEBUG lcg-cp status=$status
+   if [ $status -eq 0 ] ; then
+      cp $X509_USER_PROXY.copy $X509_USER_PROXY
+   else
+      globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+      if [ $? -eq 0 ] ; then
+         cp $X509_USER_PROXY.copy $X509_USER_PROXY
+      fi
    fi
-fi
    timeleft=$(voms-proxy-info -timeleft 2>/dev/null)
 fi
 
