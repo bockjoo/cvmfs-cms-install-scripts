@@ -1,6 +1,6 @@
 #!/bin/bash
 ####### BEGIN Functions 12345
-notifytowhom=bockjoo@phys.ufl.edu
+notifytowhom=bockjoo@gmail.com
 # Functions
 rsync_source="$HOME/eos2/cms/store/group/phys_generator/cvmfs/gridpacks"
 rsync_name="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
@@ -3788,7 +3788,7 @@ function install_slc6_crab3 () {
   return 0
 }
 
-function install_slc6_amd64_gcc493_crab3 () {
+function install_slc6_amd64_gcc493_crab3_old () {
   export crab3_REPO=comp # $crab3repos 
   export crab3_SCRAM_ARCH=slc6_amd64_gcc493  
   export SCRAM_ARCH=$crab3_SCRAM_ARCH
@@ -3876,6 +3876,141 @@ function install_slc6_amd64_gcc493_crab3 () {
      printf "install_slc6_amd64_gcc493_crab3() installing crabclient ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n" | mail -s "[0] install_slc6_amd64_gcc493_crab3() installing crabclient ${release}" $notifytowhom
      echo INFO installing $release under $VO_CMS_SW_DIR : install_crab3.sh $VO_CMS_SW_DIR $release ${crab3_REPO} ${crab3_SCRAM_ARCH}
      $HOME/install_crab3.sh $VO_CMS_SW_DIR $release ${crab3_REPO} ${crab3_SCRAM_ARCH} > $HOME/logs/install_crab3.${release}.log 2>&1
+     status=$?
+     printf "New CRAB3 Client Installed with status=$?\n$(cat $HOME/logs/install_crab3.${release}.log | sed 's#%#%%#g')\n" | mail -s "INFO: New CRAB3 Client Installed" $notifytowhom
+     #cp /dev/null $HOME/install_crab3.log
+     echo DEBUG status=$status at install_slc6_amd64_gcc493_crab3
+     if [ $status -eq 0 ] ; then
+        grep -q "crabclient $release ${crab3_SCRAM_ARCH} " $updated_list
+        if [ $? -eq 0 ] ; then
+           echo Warning crabclient $release for ${crab3_SCRAM_ARCH} installed
+        else
+           printf "install_slc6_amd64_gcc493_crab3 () Starting cvmfs_server transaction\n" | mail -s "cvmfs_server transaction started" $notifytowhom
+           cvmfs_server transaction
+           status=$?
+           what="install_slc6_amd64_gcc493_crab3 ()"
+           cvmfs_server_transaction_check $status $what
+           if [ $? -eq 0 ] ; then
+              echo INFO transaction OK for $what
+           else
+              printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+              cd $currdir
+              return 1
+           fi
+           echo INFO adding crabclient $release for ${crab3_SCRAM_ARCH} to local $updated_list
+           echo crabclient ${release} ${crab3_SCRAM_ARCH} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
+           currdir=$(pwd)
+           cd
+           time cvmfs_server publish 2>&1 |  tee $HOME/logs/cvmfs_server+publish.log
+           cd $currdir
+           printf "install_crab3 () published  \n$(cat $HOME/logs/cvmfs_server+publish.log | sed 's#%#%%#g')\n" | mail -s "cvmfs_server publish Done" $notifytowhom
+           if [ "x$cvmfs_server_yes" == "xno" ] ; then # if [ ! -x /usr/bin/cvmfs_server ] ; then
+             grep -q "CMSSW_crabclient ${release}+${crab3_SCRAM_ARCH}" "$HOME/${crab3_SCRAM_ARCH}.rsync.ready"
+             [ $? -eq 0 ] || echo "CMSSW_crabclient ${release}+${crab3_SCRAM_ARCH}" >> "$HOME/${crab3_SCRAM_ARCH}.rsync.ready"
+           fi
+           printf "install_slc6_amd64_gcc493_crab3() crabclient ${release}+${crab3_SCRAM_ARCH} installed from $(/bin/hostname -f)\n$(cat $HOME/install_crab3.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] install_slc6_amd64_gcc493_crab3() crabclient INSTALLED" $notifytowhom
+           #echo INFO no cvmfs server. will tell the main script not to publish
+        fi
+     else
+        printf "FAILED: install_slc6_amd64_gcc493_crab3() crabclient ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n$(cat $HOME/install_crab3.${release}.log | sed 's#%#%%#g')\n" | mail -s "[1] FAILED: install_slc6_amd64_gcc493_crab3() crabclient installation" $notifytowhom
+        ( cd ; cvmfs_server abort -f ; ) ;
+     fi
+     #break
+  done
+  #done
+
+  return 0
+}
+
+
+function install_slc6_amd64_gcc493_crab3 () {
+  export crab3_REPO=comp # $crab3repos 
+  export crab3_SCRAM_ARCH=slc6_amd64_gcc493  
+  export SCRAM_ARCH=$crab3_SCRAM_ARCH
+  
+  #crab3_RPMS=http://cmsrep.cern.ch/cmssw/${crab3_REPO}/RPMS/${crab3_SCRAM_ARCH}/
+  #echo INFO checking ${crab3_RPMS}
+
+  #crab3s=$(wget -O- $crab3_RPMS 2>/dev/null | grep cms+crabclient+ | cut -d\> -f7 | cut -d\< -f1 | sed 's#slc# slc#g' | sed 's#cms+crabclient+# #g' | sed 's#-1-1.# #g' | sed 's#.rpm##g' | awk '{print $1}')
+  
+  cvmfs_server transaction 2>&1 | tee $HOME/logs/cvmfs_server+transaction.log
+  [ $? -eq 0 ] || { printf "ERROR: function install_slc6_amd64_gcc493_crab3 cvmfs_server transaction failed\n$(cat $HOME/logs/cvmfs_server+transaction.log)\n" | mail -s "ERROR: cvmfs_server transaction failed for the crab3-client installation" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+  
+  export MYTESTAREA=$VO_CMS_SW_DIR/crab3
+  CMSPKG="$MYTESTAREA/common/cmspkg -a $SCRAM_ARCH"
+  if [ -f $MYTESTAREA/common/cmspkg ] ; then
+     echo INFO We use cmspkg
+  else
+     (
+      cd /tmp
+      echo INFO downloading cmspkg.py
+      wget -O cmspkg.py https://raw.githubusercontent.com/cms-sw/cmspkg/production/client/cmspkg.py
+
+      [ $? -eq 0 ] || { echo ERROR wget cmspkg.py failed ; rm -f cmspkg.py ; cd - ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+
+      python cmspkg.py --architecture $SCRAM_ARCH --path $MYTESTAREA --repository $crab3_REPO setup
+      status=$?
+      [ -f $MYTESTAREA/common/cmspkg ] || { echo ERROR cmspkg is not installed ; rm -f cmspkg.py ; return 1 ; } ;
+      rm -f cmspkg.py
+      cd
+      return $status
+     )
+     [ $? -eq 0 ] || { printf "$(basename $0) $MYTESTAREA/common/cmspkg does not exist\nUse \nsource $HOME/cron_install_cmssw-functions\ndeploy_cmspkg /cvmfs/cms.cern.ch/phedexagents slc6_amd64_gcc494 comp\n" | mail -s "ERROR: $MYTESTAREA/common/cmspkg does not exist" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ;return 1 ; } ;
+  fi
+  echo INFO executing $CMSPKG -y upgrade
+  $CMSPKG -y upgrade
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG -y upgrade upgrade failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+  $CMSPKG update 2>&1
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG update failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+
+  crab3s=$($CMSPKG search cms+crabclient+ | awk '{print $1}' | sed 's#cms+crabclient+##g')
+  ( cd ; cvmfs_server abort -f ; ) ; # do not apply the change yet
+
+  currdir=$(pwd)
+  cd
+  for release in $crab3s ; do
+     echo "$release" | grep -q pre
+     [ $? -eq 0 ] && { echo INFO skipping pre release per Marco\'s request ; continue ; } ;
+     #grep -q "crabclient$release ${crab3_SCRAM_ARCH} " $updated_list
+     grep -q "crabclient $release ${crab3_SCRAM_ARCH} " $updated_list
+     if [ $? -eq 0 ] ; then
+        echo Warning crabclient $release ${crab3_SCRAM_ARCH} installed according to $updated_list
+        continue
+     fi
+     if [ "x$cvmfs_server_yes" == "xno" ] ; then
+        ls -al $HOME/slc*.lock 2>/dev/null 1>/dev/null
+        if [ $? -eq 0 ] ; then
+           echo Warning rsync may be in progress from the cvmfs server
+           printf "install_slc6_amd64_gcc493_crab3() Warning rsync may be in progress from the cvmfs server. We will wait for the next opportunity for crabclient $release ${crab3_SCRAM_ARCH} \n" | mail -s "[0] install_slc6_amd64_gcc493_crab3() something is locked. Wait for the next opp." $notifytowhom
+           continue
+        fi
+        ( printf "install_slc6_amd64_gcc493_crab3() locking installation for crabclient $release ${crab3_SCRAM_ARCH}\n" | mail -s "[0] install_slc6_amd64_gcc493_crab3() LOCK installation" $notifytowhom ; cd ; touch ${crab3_SCRAM_ARCH}.lock ; )
+     fi
+     printf "install_slc6_amd64_gcc493_crab3 () Starting cvmfs_server transaction\n" | mail -s "cvmfs_server transaction started" $notifytowhom
+     cvmfs_server transaction
+     status=$?
+     what="install_slc6_amd64_gcc493_crab3 ()"
+     cvmfs_server_transaction_check $status $what
+     if [ $? -eq 0 ] ; then
+        echo INFO transaction OK for $what
+     else
+        printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+        cd $currdir
+        return 1
+     fi
+     printf "install_slc6_amd64_gcc493_crab3() installing crabclient ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n" | mail -s "[0] install_slc6_amd64_gcc493_crab3() installing crabclient ${release}" $notifytowhom
+     echo INFO installing $release under $VO_CMS_SW_DIR : install_crab3.sh $VO_CMS_SW_DIR $release ${crab3_REPO} ${crab3_SCRAM_ARCH}
+     $HOME/install_slc6_amd64_gcc493_crab3.sh $VO_CMS_SW_DIR $release ${crab3_REPO} ${crab3_SCRAM_ARCH} > $HOME/logs/install_crab3.${release}.log 2>&1
      status=$?
      printf "New CRAB3 Client Installed with status=$?\n$(cat $HOME/logs/install_crab3.${release}.log | sed 's#%#%%#g')\n" | mail -s "INFO: New CRAB3 Client Installed" $notifytowhom
      #cp /dev/null $HOME/install_crab3.log
@@ -4141,7 +4276,8 @@ fi # if [ ] ; then
      i=$(expr $i + 1)
      echo "${release}" | grep -q -e "pre\|rc"
      [ $? -eq 0 ] && pre_or_not="_pre"
-     for what in "" _standalone ; do
+     #for what in "" _standalone ; do
+     for what in _standalone ; do
        for f in /cvmfs/cms.cern.ch/crab3/crab_${gccv}${pre_or_not}${what}.*sh ; do
          if [ "x$f" == "x/cvmfs/cms.cern.ch/crab3/crab_slc7${pre_or_not}${what}.*sh" ] ; then
             ( cd $MYTESTAREA
@@ -4265,7 +4401,367 @@ fi # if [ ] ; then
   done
 
   return 0
-}
+} # install_slc7_amd64_gcc630_crab3_old
+
+function install_slc7_amd64_gcc630_crab3 () {
+  export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
+  export crab3_REPO=comp # $crab3repos 
+  export crab3_SCRAM_ARCH=slc7_amd64_gcc630  
+  export SCRAM_ARCH=$crab3_SCRAM_ARCH
+  install_function_name=install_slc7_amd64_gcc630_crab3
+  
+  #crab3_RPMS=http://cmsrep.cern.ch/cmssw/${crab3_REPO}/RPMS/${crab3_SCRAM_ARCH}/
+  #echo INFO checking ${crab3_RPMS}
+
+  #crab3s=$(wget -O- $crab3_RPMS 2>/dev/null | grep cms+crabclient+ | cut -d\> -f7 | cut -d\< -f1 | sed 's#slc# slc#g' | sed 's#cms+crabclient+# #g' | sed 's#-1-1.# #g' | sed 's#.rpm##g' | awk '{print $1}')
+  
+  cvmfs_server transaction 2>&1 | tee $HOME/logs/cvmfs_server+transaction.log
+  [ $? -eq 0 ] || { printf "ERROR: function $install_function_name cvmfs_server transaction failed\n$(cat $HOME/logs/cvmfs_server+transaction.log)\n" | mail -s "ERROR: cvmfs_server transaction failed for the crab3-client installation" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+  
+  export MYTESTAREA=$VO_CMS_SW_DIR/crab3
+  CMSPKG="$MYTESTAREA/common/cmspkg -a $SCRAM_ARCH"
+  if [ -f $MYTESTAREA/common/cmspkg ] ; then
+     echo INFO We use $MYTESTAREA/common/cmspkg
+  else
+     (
+      cd /tmp
+      echo INFO downloading cmspkg.py
+      wget -O cmspkg.py https://raw.githubusercontent.com/cms-sw/cmspkg/production/client/cmspkg.py
+
+      [ $? -eq 0 ] || { echo ERROR wget cmspkg.py failed ; rm -f cmspkg.py ; cd - ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+
+      python cmspkg.py --architecture $SCRAM_ARCH --path $MYTESTAREA --repository $crab3_REPO setup
+      status=$?
+      [ -f $MYTESTAREA/common/cmspkg ] || { echo ERROR cmspkg is not installed ; rm -f cmspkg.py ; return 1 ; } ;
+      rm -f cmspkg.py
+      cd
+      return $status
+     )
+     [ $? -eq 0 ] || { printf "$install_function_name $MYTESTAREA/common/cmspkg does not exist\nUse \nsource $HOME/cron_install_cmssw-functions\ndeploy_cmspkg /cvmfs/cms.cern.ch/phedexagents slc6_amd64_gcc494 comp\n" | mail -s "ERROR: $MYTESTAREA/common/cmspkg does not exist" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ;return 1 ; } ;
+  fi
+  ls -al $MYTESTAREA/${SCRAM_ARCH}/cms/cmspkg/*/cmspkg.py 2>/dev/null 1>/dev/null
+  if [ $? -eq 0 ] ; then
+     echo INFO cmspkg.py exists
+  else
+     (
+      cd /tmp
+      echo INFO downloading cmspkg.py
+      wget -O cmspkg.py https://raw.githubusercontent.com/cms-sw/cmspkg/production/client/cmspkg.py
+
+      [ $? -eq 0 ] || { echo ERROR wget cmspkg.py failed ; rm -f cmspkg.py ; cd - ; ( cd ; cvmfs_server abort -f ; ) ; return 1 ; } ;
+
+      python cmspkg.py --architecture $SCRAM_ARCH --path $MYTESTAREA --repository $crab3_REPO setup
+      status=$?
+      ls -al $MYTESTAREA/${SCRAM_ARCH}/cms/cmspkg/*/cmspkg.py 2>/dev/null 1>/dev/null
+      [ $? -eq 0 ] || { echo ERROR cmspkg is not installed ; rm -f cmspkg.py ; return 1 ; } ;
+      rm -f cmspkg.py
+      cd
+      return $status
+     )
+     [ $? -eq 0 ] || { printf "$install_function_name ERROR $MYTESTAREA/${SCRAM_ARCH} setup\n" | mail -s "ERROR: $MYTESTAREA/${SCRAM_ARCH} setup FAILED" $notifytowhom ; ( cd ; cvmfs_server abort -f ; ) ;return 1 ; } ;
+  fi
+  echo INFO executing $CMSPKG -y upgrade
+  $CMSPKG -y upgrade
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG -y upgrade upgrade failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+  $CMSPKG update 2>&1
+  status=$?
+  if [ $status -ne 0 ] ; then
+     echo ERROR $CMSPKG update failed
+     ( cd ; cvmfs_server abort -f ; ) ;
+     return 1
+  fi
+
+  # One output of $CMSPKG search cms+crabclient+
+  # cms+crabclient+3.3.1909 - CMS Experiment package SpecChecksum:cf872c6aa29b99ebafd034250c217185
+  crab3s=$($CMSPKG search cms+crabclient+ | awk '{print $1}' | sed 's#cms+crabclient+##g')
+  ( cd ; cvmfs_server abort -f ; ) ; # do not apply the change yet
+
+  currdir=$(pwd)
+  cd
+  min_crab3_release=331808 # 3.3.1808
+  for release in $crab3s ; do
+     echo "$release" | grep -q pre
+     [ $? -eq 0 ] && { echo INFO skipping pre release per Marco\'s request ; continue ; } ;
+     echo "[1]" DEBUG $(echo "$release" | cut -d. -f1,2,3 | sed "s#\.##g") -gt $min_crab3_release
+     [ $(echo "$release" | cut -d. -f1,2,3 | sed "s#\.##g") -gt $min_crab3_release ] || { echo INFO skipping $release ; continue ; } ;
+     echo DEBUG grep -q "crabclient $release ${crab3_SCRAM_ARCH} " $updated_list
+     grep -q "crabclient $release ${crab3_SCRAM_ARCH} " $updated_list
+     if [ $? -eq 0 ] ; then
+        echo Warning crabclient $release ${crab3_SCRAM_ARCH} installed according to $updated_list
+        continue
+     fi
+     ls -al $MYTESTAREA/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null
+     if [ $? -eq 0 ] ; then
+        echo INFO bootstrap unnecessary for ${SCRAM_ARCH} in crab3
+     else
+        # bootstrap_crab3_arch_slc7 completes cvmfs_server transaction/abort/publish process
+        echo INFO checking bootstrap as needed        
+        bootstrap_crab3_arch_slc7 ${SCRAM_ARCH} crab3 comp > $HOME/logs/bootstrap_crab3_arch_slc7.${SCRAM_ARCH}.crab3.comp.log 2>&1
+        if [ $? -ne 0 ] ; then
+           #( cd ; cvmfs_server abort -f ; ) ;
+           return 1
+        fi
+     fi
+
+     # Start transaction for CRAB3 client installation
+     cvmfs_server transaction
+     status=$?
+     what="$install_function_name"
+     cvmfs_server_transaction_check $status $what
+     if [ $? -eq 0 ] ; then
+        echo INFO transaction OK for $what
+     else
+        printf "cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
+        cd $currdir
+        ( cd ; cvmfs_server abort -f ; ) ;
+        return 1
+     fi
+
+     echo INFO "[$i]" executing $CMSPKG -y upgrade # apt-get upgrade
+     $CMSPKG -y upgrade # apt-get --assume-yes upgrade
+     status=$?
+     if [ $status -ne 0 ] ; then
+        echo ERROR $CMSPKG -y upgrade upgrade failed
+        printf "$install_function_name $CMSPKG -y upgrade FAILED ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n" | mail -s "[FAILED] $install_function_name installing crabclient ${release}" $notifytowhom
+        ( cd ; cvmfs_server abort -f ; ) ;
+        return 1
+     fi
+
+# This cause Repository unavailable under http://localhost/cvmfs/cms.cern.ch because curl binary goes viral
+if [ ] ; then
+     # Check if mutex error exists
+     echo INFO check if mutex error exists
+     # First pick the right rpm
+     rpm_init_env=$(ls -t $MYTESTAREA/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh | head -1)
+     if [ -f $rpm_init_env ] ; then
+       source $rpm_init_env
+     else
+       echo Warning $rpm_init_env does not exist
+       ( cd ; cvmfs_server abort -f ; ) ;
+       printf "$install_function_name $rpm_init_env does not exist FAILED ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n" | mail -s "[FAILED] $install_function_name $rpm_init_env does not exist FAILED while installing crabclient ${release}" $notifytowhom
+       return 1
+     fi
+
+     echo INFO first which rpm"?: " $(which rpm) 
+     rpm -qa --queryformat '%{NAME} %{RELEASE}' > $HOME/logs/rpm_qa_NAME_RELEASE.crab3.${SCRAM_ARCH}.log 2>&1
+     grep "unable to allocate memory for mutex" $HOME/logs/rpm_qa_NAME_RELEASE.crab3.${SCRAM_ARCH}.log | grep -q "resize mutex region"
+     if [ $? -eq 0 ] ; then
+      grep -q "mutex_set_max 10000000" $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+      if [ $? -ne 0 ] ; then
+         echo INFO adding mutex_set_max 1000000 to $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         echo mutex_set_max 10000000 >> $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         echo INFO rebuilding the DB
+         rpmdb --define "_rpmlock_path $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/lock" --rebuilddb --dbpath $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm 2>&1 | tee $HOME/logs/rpmdb_rebuild.crab3.${SCRAM_ARCH}.log
+      fi
+     fi    
+fi # if [ ] ; then
+
+     echo INFO executing dockerrun $CMSPKG update
+     dockerrun "${CMSPKG} update > $HOME/logs/dockerrun_cmspkg_update.log 2>&1 ; status=\$? ; " 2>&1
+     status=$?
+     if [ $status -ne 0 ] ; then
+        echo ERROR $CMSPKG update failed
+        printf "$install_function_name $CMSPKG update FAILED ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n" | mail -s "[FAILED] $install_function_name $CMSPKG update FAILED ${release}" $notifytowhom
+        ( cd ; cvmfs_server abort -f ; ) ;
+        return 1
+     fi
+
+     #printf "$install_function_name installing crabclient ${release}+${crab3_SCRAM_ARCH} from $(/bin/hostname -f)\n" | mail -s "[0] $install_function_name installing crabclient ${release}" $notifytowhom
+     echo INFO installing $release under $VO_CMS_SW_DIR : $install_function_name $VO_CMS_SW_DIR $release ${crab3_REPO} ${crab3_SCRAM_ARCH}
+ 
+     dockerrun "$CMSPKG -y install cms+crabclient+$release ; exit \$?" > $HOME/logs/dockerrun.install.log 2>&1
+     status=$?
+     echo "[2]" DEBUG dockerrun "$CMSPKG -y install cms+crabclient+$release ; " status=$status
+     if [ $status -eq 0 ] ; then
+      printf "$install_function_name $CMSPKG -y install cms+crabclient+$release SUCCESS\nCheck $MYTESTAREA/${SCRAM_ARCH}/cms\n$(ls -al  $MYTESTAREA/${SCRAM_ARCH}/cms)\n$(cat $HOME/logs/dockerrun.install.log)\n"
+      #echo "INFO docker_install_nn_cmssw() cmspkg -a ${SCRAM_ARCH} install -y cms+cmssw${second_plus}+$cmssw_release succeeded"
+      printf "$install_function_name $CMSPKG -y install cms+crabclient+$release SUCCESS\nCheck $MYTESTAREA/${SCRAM_ARCH}/cms\n$(ls -al  $MYTESTAREA/${SCRAM_ARCH}/cms)\n$(cat $HOME/logs/dockerrun.install.log | sed 's#%#%%#g')\n" | mail -s "$install_function_name INFO cms+crabclient+$releas ${SCRAM_ARCH} installed" $notifytowhom
+     else
+      mutex_error=
+      grep "unable to allocate memory for mutex" $HOME/logs/dockerrun.install.log | grep -q "resize mutex region"
+      if [ $? -eq 0 ] ; then
+         echo "Required: echo mutex_set_max 10000000 >> $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG"
+         #mutex_error="Required: echo mutex_set_max 10000000 >> /cvmfs/cms.cern.ch/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG"
+         echo mutex_set_max 10000000 >> $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG
+         rpm_init_env=$(ls -t $MYTESTAREA/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh | head -1)
+         echo INFO rebuilding the DB
+         dockerrun "source $rpm_init_env ; rpmdb --define \"_rpmlock_path $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm/lock\" '--rebuilddb' '--dbpath' $MYTESTAREA/${SCRAM_ARCH}/var/lib/rpm ; exit \$?" > $HOME/logs/dockerrun_rpmdb_rebuild.${SCRAM_ARCH}.log 2>&1
+         if [ $? -eq 0 ] ; then
+            echo "[2-1]" DEBUG take 2 dockerrun "$CMSPKG -y install cms+crabclient+$release ; " status=$status
+            dockerrun "$CMSPKG -y install cms+crabclient+$release ; exit \$?" > $HOME/logs/dockerrun.install.log 2>&1
+            status=$?
+            echo INFO content of $HOME/logs/dockerrun.install.log
+            cat $HOME/logs/dockerrun.install.log
+            #cp $HOME/logs/dockerrun.install.log $workdir/logs/cmspkg+${SCRAM_ARCH}+install+cms+cmssw${second_plus}+$cmssw_release.log
+         else
+            printf "$install_function_name rpmdb rebuild failed for cms+crabclient+$release ${SCRAM_ARCH}\n$(cat $HOME/logs/dockerrun_rpmdb_rebuild.${SCRAM_ARCH}.log | sed 's#%#%%#g')\n" | mail -s "$install_function_name ERROR rpmdb rebuild failed for cms+crabclient+$release $SCRAM_ARCH" $notifytowhom
+            [ "$cvmfs_server_yes" == "yes" ] && ( cd ; cvmfs_server abort -f ; ) ;
+            return 1
+         fi
+      fi
+      if [ $status -eq 0 ] ; then
+         printf "$install_function_name install cms+crabclient+$release ${SCRAM_ARCH} SUCCESS\n$(cat $HOME/logs/dockerrun.install.log | sed 's#%#%%#g')\n" | mail -s "$install_function_name INFO cms+crabclient+$release ${SCRAM_ARCH} installed" $notifytowhom
+      else
+         printf "$install_function_name install cms+crabclient+$release ${SCRAM_ARCH} FAILED\n$(cat $HOME/logs/dockerrun.install.log | sed 's#%#%%#g')\n" | mail -s "$install_function_name ERROR cms+crabclient+$release ${SCRAM_ARCH} FAILDE" $notifytowhom
+         [ "$cvmfs_server_yes" == "yes" ] && ( cd ; cvmfs_server abort -f ; ) ;
+         return 1
+      fi
+     fi
+
+     # create crab3 setup files
+     echo INFO creating crab3 setup files
+     gccv=slc7
+     pre_or_not=
+     
+     i=0
+     i=$(expr $i + 1)
+     echo "${release}" | grep -q -e "pre\|rc"
+     [ $? -eq 0 ] && pre_or_not="_pre"
+     #for what in "" _standalone ; do
+     #for what in _standalone ; do
+     [ -f /cvmfs/cms.cern.ch/crab3/ExampleConfiguration_slc7.py ] && rm -f /cvmfs/cms.cern.ch/crab3/ExampleConfiguration_slc7.py
+     [ -f /cvmfs/cms.cern.ch/crab3/FullConfiguration_slc7.py ] && rm -f /cvmfs/cms.cern.ch/crab3/FullConfiguration_slc7.py
+     for what in "" ; do
+       for f in /cvmfs/cms.cern.ch/crab3/crab${pre_or_not}${what}.*sh ; do
+         if [ "x$f" == "x/cvmfs/cms.cern.ch/crab3/crab${pre_or_not}${what}.*sh" ] ; then
+            for f in /cvmfs/cms.cern.ch/crab3/*.*sh ; do
+              [ -L $f ] || continue
+              readlink -f $f | grep -q ${SCRAM_ARCH}
+              [ $? -eq 0 ] && { echo ls $f ; ls $f ; echo rm -f $f ; rm -f $f ; } ;
+            done
+            [ -f /cvmfs/cms.cern.ch/crab3/crab_slc7.sh ] && rm -f  /cvmfs/cms.cern.ch/crab3/crab_slc7.sh
+            [ -f /cvmfs/cms.cern.ch/crab3/crab_slc7.csh ] && rm -f  /cvmfs/cms.cern.ch/crab3/crab_slc7.csh
+            ( cd $MYTESTAREA
+              echo DEBUG ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init.sh crab${pre_or_not}${what}.sh
+              echo DEBUG ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init.csh crab${pre_or_not}${what}.csh
+              rm -f crab${pre_or_not}${what}.*sh
+              ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init.sh crab${pre_or_not}${what}.sh
+              ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init.csh crab${pre_or_not}${what}.csh
+            )
+            break
+         fi
+         echo "[ $i ]" f=$f
+         real_file=$(readlink -f $f)
+         echo $real_file | grep -q ${SCRAM_ARCH}
+         if [ $? -ne 0 ] ; then
+            echo Warning $f - $real_file is not $SCRAM_ARCH
+            [ -f /cvmfs/cms.cern.ch/crab3/crab_slc7.sh ] && rm -f  /cvmfs/cms.cern.ch/crab3/crab_slc7.sh
+            [ -f /cvmfs/cms.cern.ch/crab3/crab_slc7.csh ] && rm -f  /cvmfs/cms.cern.ch/crab3/crab_slc7.csh
+            ( cd $MYTESTAREA
+              echo DEBUG ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init.sh crab${pre_or_not}${what}.sh
+              echo DEBUG ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init.csh crab${pre_or_not}${what}.csh
+              rm -f crab${pre_or_not}${what}.*sh
+              ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init.sh crab${pre_or_not}${what}.sh
+              ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init.csh crab${pre_or_not}${what}.csh
+            )
+            break
+         fi
+         #PREVIOUS_SCRAM_ARCH=$(echo $real_file | cut -d/ -f5)
+         PREVIOUS_RELEASE=$(echo $real_file | cut -d/ -f8)
+         FILE_TO_LINK=$(echo $real_file | sed "s#$PREVIOUS_RELEASE#$release#")
+         echo DEBUG f=$f real_file=$real_file
+         echo DEBUG PREVIOUS_RELEASE=$PREVIOUS_RELEASE RELEASE=$release
+         echo DEBUG removing $f
+         rm -f $f
+         ( cd $MYTESTAREA
+           ln -s $FILE_TO_LINK $(basename $f)
+         )
+         echo INFO "[$i]" Check $f
+         ls -al $f
+         echo ; echo
+       done
+     done
+
+     theconfig_py_files="ExampleConfiguration.py FullConfiguration.py"
+     for thepy in $theconfig_py_files ; do
+      rm -f $MYTESTAREA/$thepy
+      ( cd $MYTESTAREA
+       ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/$thepy $(echo $thepy | sed "s#\.py#_${gccv}\.py#g")
+      )
+      echo INFO softlink created for $(echo $thepy | sed "s#\.py#_${gccv}\.py#g")
+     done
+
+     grep -q "crabclient $release ${SCRAM_ARCH}" $updated_list
+     if [ $? -eq 0 ] ; then
+       echo Warning crabclient $release ${SCRAM_ARCH} is already in the $updated_list
+     else
+       echo INFO adding crabclient $release ${SCRAM_ARCH} to $updated_list
+       echo crabclient $release ${SCRAM_ARCH} $(/bin/date +%s) $(/bin/date -u) >> $updated_list
+     fi
+     echo "[5]" DEBUG checking tail -1 $updated_list
+     tail -1 $updated_list
+     echo "[6]" DEBUG checking ls -al $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init-light.sh
+
+     ls -al $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init-light.sh
+
+     i=$(expr $i + 1)
+     echo INFO "[$i]" Check $updated_list for $RELEASE
+
+     echo INFO adding nested catalog
+     j=0
+     nslc=$(echo $MYTESTAREA/slc* | wc -w)
+     for thedir in $MYTESTAREA/slc* ; do
+      [ "x$thedir" == "x$MYTESTAREA/slc*" ] && break
+      [ -d $thedir ] || continue
+      j=$(expr $j + 1)
+      ls -al $thedir/.cvmfscatalog 2>/dev/null 1>/dev/null ;
+      if [ $? -eq 0 ] ; then
+         echo INFO "[ $j / $nslc ]" $thedir/.cvmfscatalog exists
+      else
+         echo INFO "[ $j / $nslc ]" creating $thedir/.cvmfscatalog
+         touch $thedir/.cvmfscatalog
+      fi
+      i=$(expr $i + 1)
+      echo INFO "[$i]" Check $thedir/.cvmfscatalog
+      echo INFO now further doing /cvmfs/cms.cern.ch/crab3/"<scram_arch>"/cms/crabclient/"<rel>"/.cvmfscatalog
+      for crab3_rel_dir in $thedir/cms/crabclient/* ; do
+          [ "x$crab3_rel_dir" == "x$thedir/cms/crabclient/*" ] && break
+          [ -d $crab3_rel_dir ] || continue
+          ls -al $crab3_rel_dir/.cvmfscatalog 2>/dev/null 1>/dev/null ;
+          if [ $? -eq 0 ] ; then
+             echo INFO $crab3_rel_dir/.cvmfscatalog exists
+          else
+             echo INFO creating $crab3_rel_dir/.cvmfscatalog
+             touch $crab3_rel_dir/.cvmfscatalog
+          fi
+      done
+     done
+     echo "[7]" DEBUG checking just before publication ls -al $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init-light.sh
+     ls -al $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init-light.sh
+     echo INFO publishing cvmfs
+     echo INFO publishing the installation in the cvmfs
+     currdir=$(pwd)
+     cd
+     
+     cvmfs_server publish -v > $HOME/cvmfs_server+publish+crabclient+install.log 2>&1
+     status=$?
+     echo INFO checking curl -f -I --max-time 20 -L http://localhost/cvmfs/cms.cern.ch/.cvmfspublished
+     which curl 2>&1
+     ldd $(which curl)
+     curl -f -I --max-time 20 -L http://localhost/cvmfs/cms.cern.ch/.cvmfspublished
+     cd $currdir
+     if [ $status -eq 0 ] ; then
+      printf "$install_function_name cvmfs_server_publish OK \n$(cat $HOME/cvmfs_server+publish+crabclient+install.log | sed 's#%#%%#g')\n" | mail -s "$install_function_name cvmfs_server publish for crabclient install OK" $notifytowhom
+     else
+      echo ERROR failed cvmfs_server publish
+      printf "$install_function_name cvmfs_server publish failed\n$(cat $HOME/cvmfs_server+publish+crabclient+install.log | sed 's#%#%%#g')\n" | mail -s "$install_function_name cvmfs_server publish failed" $notifytowhom
+      ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
+      return 1
+     fi
+     echo "[8]" DEBUG checking just  before return "$install_function_name" ls -al $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init-light.sh
+
+     ls -al $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${release}/etc/init-light.sh
+     echo forLoop $release "($SCRAM_ARCH)" Done
+     #break
+  done
+
+  return 0
+} # install_slc7_amd64_gcc630_crab3
 
 function install_slc6_amd64_gcc493_xrootd_client () {
   updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
