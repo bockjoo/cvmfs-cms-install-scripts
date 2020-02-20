@@ -31,6 +31,7 @@ EOS_CLIENT_VERSION=${EOS_CLIENT_VERSION:-0.3.15}
 #alias eosumount='/afs/cern.ch/project/eos/installation/0.3.15/bin/eos.select -b fuse umount'
 export EOSSYS=/home/cvcms/eos_installation/${EOS_CLIENT_VERSION}
 #export EOSSYS=/afs/cern.ch/project/eos/installation/${EOS_CLIENT_VERSION}
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/lib64 # for libreadline.so.5
 
 function higher_priority_gridpacks () {
 printf "
@@ -133,6 +134,7 @@ voms-proxy-info -timeleft 2>&1
 #   printf "$(basename $0) ERROR failed to download $X509_USER_PROXY\n$(/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://${X509_USER_PROXY}.copy 2>&1 | sed 's#%#%%#g')n" | mail -s "$(basename $0) ERROR proxy download failed" $notifytowhom
 #fi
 #/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+if [ ] ; then
 echo DEBUG checking /usr/bin/lcg-cp
 ldd /usr/bin/lcg-cp 2>&1
 
@@ -148,8 +150,18 @@ else
          cp $X509_USER_PROXY.copy $X509_USER_PROXY
       fi
 fi
+fi # if [ ] ; then
+source $HOME/osg/osg-wn-client/setup.sh
+globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+if [ $? -eq 0 ] ; then
+   cp $X509_USER_PROXY.copy $X509_USER_PROXY
+else
+   printf "$(basename $0) ERROR failed to download $X509_USER_PROXY\n$(globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy 2>&1 | sed 's#%#%%#g')\n" | mail -s "$(basename $0) ERROR proxy download failed" $notifytowhom
+fi
+
 
 timeleft=$(voms-proxy-info -timeleft 2>/dev/null)
+if [ ] ; then
 if [ $timeleft -lt 1900 ] ; then # 1800 + 100
    #/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY
    /usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
@@ -165,9 +177,12 @@ if [ $timeleft -lt 1900 ] ; then # 1800 + 100
    fi
    timeleft=$(voms-proxy-info -timeleft 2>/dev/null)
 fi
+fi # if [ ] ; then
 
-echo INFO proxy timeleft $timeleft
-
+if [ $timeleft -lt 1900 ] ; then # 1800 + 100
+    echo INFO proxy timeleft $timeleft
+    printf "$(basename $0) proxy valid only for $timeleft seconds\n" | mail -s "$(basename $0) Warning proxy time left < 1900" $notifytowhom
+fi
 
 #
 # Limit frequency of the execution

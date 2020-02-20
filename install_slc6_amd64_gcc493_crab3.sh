@@ -207,37 +207,48 @@ if [ $? -eq 0 ] ; then
   echo "${RELEASE}" | grep -q -e "pre\|rc"
   [ $? -eq 0 ] && pre_or_not="_pre"
   #for what in "" _standalone ; do
-  for what in _slc6 _standalone ; do
-     for f in /cvmfs/cms.cern.ch/crab3/crab${pre_or_not}${what}.*sh ; do
-       echo "[ $i ]" f=$f
-       real_file=$(ls -al $f | awk '{print $NF}')
-       PREVIOUS_RELEASE=$(echo $real_file | cut -d/ -f8)
-       FILE_TO_LINK=$(echo $real_file | sed "s#$PREVIOUS_RELEASE#$RELEASE#")
-       echo DEBUG f=$f real_file=$real_file
-       echo DEBUG PREVIOUS_RELEASE=$PREVIOUS_RELEASE RELEASE=$RELEASE
-       echo DEBUG removing $f
-       rm -f $f
-       ( cd $MYTESTAREA
-         echo DEBUG Doing ln -s $FILE_TO_LINK $(basename $f) at $(pwd)
-         ln -s $FILE_TO_LINK $(basename $f)
-       )
-       echo INFO "[$i]" Check $f
-       ls -al $f
-       echo ; echo
-       i=$(expr $i + 1)
+  for what in "" ; do
+     for f in /cvmfs/cms.cern.ch/crab3/crab_slc6${pre_or_not}${what}.*sh ; do
+       if [ "x$f" == "x/cvmfs/cms.cern.ch/crab3/crab_slc6${pre_or_not}${what}.*sh" ] ; then
+          for f in /cvmfs/cms.cern.ch/crab3/*.*sh ; do
+              [ -L $f ] || continue
+              readlink -f $f | grep -q ${SCRAM_ARCH}
+              [ $? -eq 0 ] && { echo ls $f ; ls $f ; echo rm -f $f ; rm -f $f ; } ;
+          done
+          ( cd $MYTESTAREA
+            echo DEBUG ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${RELEASE}/etc/profile.d/init.csh crab_slc6${pre_or_not}${what}.sh
+            rm -f crab_slc6${pre_or_not}${what}.sh
+            rm -f crab_slc6${pre_or_not}${what}.csh
+            ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${RELEASE}/etc/profile.d/init.sh crab_slc6${pre_or_not}${what}.sh
+            ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${RELEASE}/etc/profile.d/init.csh crab_slc6${pre_or_not}${what}.csh
+          )
+       else
+          echo "[ $i ]" f=$f
+          real_file=$(readlink -f $f)
+          PREVIOUS_RELEASE=$(echo $real_file | cut -d/ -f8)
+          FILE_TO_LINK=$(echo $real_file | sed "s#$PREVIOUS_RELEASE#$RELEASE#")
+          echo DEBUG f=$f real_file=$real_file
+          echo DEBUG PREVIOUS_RELEASE=$PREVIOUS_RELEASE RELEASE=$RELEASE
+          echo DEBUG removing $f
+          rm -f $f
+          ( cd $MYTESTAREA
+            ln -s $FILE_TO_LINK $(basename $f)
+          )
+          echo INFO "[$i]" Check $f
+          ls -al $f
+          echo ; echo
+       fi
      done
   done
 
-if [ ] ; then
-  theconfig_py_files="ExampleConfiguration.py FullConfiguration.py"
-  for thepy in $theconfig_py_files ; do
-   rm -f $MYTESTAREA/$thepy
-   ( cd $MYTESTAREA
-     ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${RELEASE}/etc/$thepy $(echo $thepy | sed "s#\.py#${gccv}\.py#g")
-   )
-   echo INFO softlink created for $(echo $thepy | sed "s#\.py#${gccv}\.py#g")
-  done
-fi # if [ ] ; then
+  #theconfig_py_files="ExampleConfiguration.py FullConfiguration.py"
+  #for thepy in $theconfig_py_files ; do
+  # rm -f $MYTESTAREA/$thepy
+  # ( cd $MYTESTAREA
+  #   ln -s $MYTESTAREA/${SCRAM_ARCH}/cms/crabclient/${RELEASE}/etc/$thepy $(echo $thepy | sed "s#\.py#${gccv}\.py#g")
+  # )
+  # echo INFO softlink created for $(echo $thepy | sed "s#\.py#${gccv}\.py#g")
+  #done
 fi
 
 if [ "x$cvmfs_server_yes" == "xyes" ] ; then
@@ -303,3 +314,19 @@ fi # if [ "x$cvmfs_server_yes" == "xyes" ] ; then
 #fi # if $updated_list exists thus cvmfs server
 
 exit $status
+(base) [coldhead@oo ~]$  ls /cvmfs/cms.cern.ch/crab3/crab* -al
+lrwxrwxrwx. 1 cvmfs cvmfs   85 Sep  5 11:59 /cvmfs/cms.cern.ch/crab3/crab.csh -> /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1909/etc/init-light.csh
+lrwxrwxrwx. 1 cvmfs cvmfs   89 Feb 28  2019 /cvmfs/cms.cern.ch/crab3/crab_pre.csh -> /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1903.rc2/etc/init-light.csh
+lrwxrwxrwx. 1 cvmfs cvmfs   92 Feb 28  2019 /cvmfs/cms.cern.ch/crab3/crab_pre.sh -> /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1903.rc2/etc/init-light-pre.sh
+lrwxrwxrwx. 1 cvmfs cvmfs   93 Feb 28  2019 /cvmfs/cms.cern.ch/crab3/crab_pre_standalone.csh -> /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1903.rc2/etc/profile.d/init.csh
+lrwxrwxrwx. 1 cvmfs cvmfs   92 Feb 28  2019 /cvmfs/cms.cern.ch/crab3/crab_pre_standalone.sh -> /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1903.rc2/etc/profile.d/init.sh
+lrwxrwxrwx. 1 cvmfs cvmfs   84 Sep  5 11:59 /cvmfs/cms.cern.ch/crab3/crab.sh -> /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1909/etc/init-light.sh
+-rw-r--r--. 1 cvmfs cvmfs   64 Sep  9 11:27 /cvmfs/cms.cern.ch/crab3/crab_slc7.csh
+-rw-r--r--. 1 cvmfs cvmfs 1257 Sep  9 11:27 /cvmfs/cms.cern.ch/crab3/crab_slc7.sh
+lrwxrwxrwx. 1 cvmfs cvmfs   89 Sep  6 19:25 /cvmfs/cms.cern.ch/crab3/crab_slc7_standalone.csh -> /cvmfs/cms.cern.ch/crab3/slc7_amd64_gcc630/cms/crabclient/3.3.1909/etc/profile.d/init.csh
+lrwxrwxrwx. 1 cvmfs cvmfs   88 Sep  6 19:25 /cvmfs/cms.cern.ch/crab3/crab_slc7_standalone.sh -> /cvmfs/cms.cern.ch/crab3/slc7_amd64_gcc630/cms/crabclient/3.3.1909/etc/profile.d/init.sh
+lrwxrwxrwx. 1 cvmfs cvmfs   89 Sep  5 11:59 /cvmfs/cms.cern.ch/crab3/crab_standalone.csh -> /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1909/etc/profile.d/init.csh
+lrwxrwxrwx. 1 cvmfs cvmfs   88 Sep  5 11:59 /cvmfs/cms.cern.ch/crab3/crab_standalone.sh -> /cvmfs/cms.cern.ch/crab3/slc6_amd64_gcc493/cms/crabclient/3.3.1909/etc/profile.d/init.sh
+(base) [coldhead@oo ~]$  ls /cvmfs/cms.cern.ch/crab3/*.py -al
+lrwxrwxrwx. 1 cvmfs cvmfs 94 Sep  6 17:26 /cvmfs/cms.cern.ch/crab3/ExampleConfiguration_slc7.py -> /cvmfs/cms.cern.ch/crab3/slc7_amd64_gcc630/cms/crabclient/3.3.1909/etc/ExampleConfiguration.py
+lrwxrwxrwx. 1 cvmfs cvmfs 91 Sep  6 17:26 /cvmfs/cms.cern.ch/crab3/FullConfiguration_slc7.py -> /cvmfs/cms.cern.ch/crab3/slc7_amd64_gcc630/cms/crabclient/3.3.1909/etc/FullConfiguration.py

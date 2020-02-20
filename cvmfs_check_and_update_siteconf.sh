@@ -29,9 +29,14 @@ ERR_FILE="/tmp/stcnf_$$.err"
 EVERY_X_HOUR=4
 # 17DEC2018
 siteconf_cat=https://gitlab.cern.ch/api/v4/groups/SITECONF
+siteconf_cat=https://gitlab.cern.ch/api/v4/groups/4099/projects # See https://cern.service-now.com/service-portal/view-request.do?n=RQF1526910 
+
 notifytowhom=bockjoo@phys.ufl.edu
 # 17DEC2018
 
+# 12FEB2020
+siteid_list=$HOME/siteid_list.txt
+# 12FEB2020
 echo DEBUG TMP_AREA=$TMP_AREA
 trap 'exit 1' 1 2 3 15
 trap '(/bin/rm -rf ${EXC_LOCK} ${TMP_AREA} ${ERR_FILE}) 1> /dev/null 2>&1' 0
@@ -41,7 +46,7 @@ if [ $# -lt 3 ] ; then
    exit 1
 fi
 SYNC_DIR="$1"        # /cvmfs/cms.cern.ch
-AUTH_TKN="$(cat $2)" # private token
+AUTH_TKN="$(cat $2)" # private token $HOME/.AUTH_TKN
 EMAIL_ADDR="$3"      # your email
 AUTH_CRT="$X509_USER_PROXY"
 AUTH_KEY="$X509_USER_PROXY"
@@ -514,16 +519,45 @@ FAIL=0
 isite=0
 
 # 17DEC2018 We have to use api see email from Lammel and need to fetch SITECONF siteid
+if [ ] ; then
 /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat 2>&1
 if [ $? -ne 0 ] ; then
-   printf "$(/bin/hostname) $0 failed to download $siteconf_cat\nUsing /usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat " mail -s "ERROR: wget $siteconf_cat AUTH failed " $notifytowhom
+   printf "$(/bin/hostname) $0 failed to download $siteconf_cat\nUsing /usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat " | mail -s "ERROR: wget $siteconf_cat AUTH failed " $notifytowhom
    exit 1
 fi
+fi # if [ ] ; then
+
+# if [ ] ; then
+ipages=0
+status=0
+while [ $ipages -lt 100 ] ; do
+   ipages=$(expr $ipages + 1)
+   /usr/bin/wget -q --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat.${ipages} "$siteconf_cat?page=${ipages}&per_page=100" 2>&1
+  status=$(expr $status + $?)
+  [ $status -eq 0 ] || break
+  grep -q \\.git ${TMP_AREA}/siteconf_cat.${i}
+  [ $? -eq 0 ] || { rm -f ${TMP_AREA}/siteconf_cat.${i} ; break ; } ;
+  echo INFO check ${TMP_AREA}/siteconf_cat.${i}
+done
+if [ $status -ne 0 ] ; then
+   printf "$(/bin/hostname) $0 failed to download one of the pages in $siteconf_cat\nUsing /usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat " | mail -s "ERROR: wget $siteconf_cat AUTH failed " $notifytowhom
+   exit 1
+fi
+printf "$(cat ${TMP_AREA}/siteconf_cat*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/.*.git | sed 's#,#\n#g' | grep "^{\"id" | cut -d: -f2 | \
+while read id ; do
+  siteconf_sitename=$(printf "$(cat ${TMP_AREA}/siteconf_cat*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/.*.git | sed 's#,#\n#g' | grep -A 2 "^{\"id\":$id" | grep \"name\": | cut -d\" -f4)
+  echo "$siteconf_sitename" | grep -q ^T
+  [ $? -eq 0 ] || { echo Warning $siteconf_sitename does not start with 'T' ; continue ; } ;
+  grep -q "$siteconf_sitename $id" $siteid_list
+  [ $? -eq 0 ] || { echo INFO adding  "$siteconf_sitename $id" to $siteid_list ; echo "$siteconf_sitename $id" >> $siteid_list ; } ;
+done
+
+# fi
 
 # Sanity check for the downloaded output
-grep -q '"name":"siteconf"' ${TMP_AREA}/siteconf_cat
+grep -q '"name":"siteconf"' ${TMP_AREA}/siteconf_cat*
 if [ $? -ne 0 ] ; then
-   printf "$(/bin/hostname) $0 failed to download $siteconf_cat\nUsing /usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat \n${TMP_AREA}/siteconf_cat wrong" mail -s "ERROR: wget $siteconf_cat ${TMP_AREA}/siteconf_cat wrong " $notifytowhom
+   printf "$(/bin/hostname) $0 failed to download $siteconf_cat\nUsing /usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat \n${TMP_AREA}/siteconf_cat wrong" | mail -s "ERROR: wget $siteconf_cat ${TMP_AREA}/siteconf_cat wrong " $notifytowhom
    exit 1
 fi
 # 17DEC2018
@@ -571,10 +605,26 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
    UPPER=`echo ${SITE} | /usr/bin/tr '[:lower:]' '[:upper:]'`
    # 17DEC2018
    # Need to use api instead /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz 'https://gitlab.cern.ch/SITECONF/'${UPPER}'/repository/archive.tar.gz?ref=master' 1>>${ERR_FILE} 2>&1
+   if [ ] ; then
    thesiteid=$(printf "$(cat ${TMP_AREA}/siteconf_cat)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/${UPPER}.git | sed 's#,#\n#g' | grep "^{\"id" | cut -d: -f2)
+   if [ "x$thesiteid" == "x" ] ; then
+      thesiteid=$(grep "${SITE} " $siteid_list 2>/dev/null | awk '{print $2}')
+   fi
+   fi # if [ ] ; then
+   # if [ ] ; then
+   thesiteid=$(printf "$(cat ${TMP_AREA}/siteconf_cat.*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/${UPPER}.git | sed 's#,#\n#g' | grep "^{\"id" | cut -d: -f2)
+   # The pagination for siteconf_cat does not work from time to time, use the siteid from the cache
+   if [ "x$thesiteid" == "x" ] ; then
+      thesiteid=$(grep "${SITE} " $siteid_list 2>/dev/null | awk '{print $2}')
+   fi
+   # fi
+
    echo "[5-2] Site id for \"${SITE}\":${thesiteid}:"
    if [ "x$thesiteid" == "x" ] ; then
-         printf "$(/bin/hostname) $0  ERROR: the site id is empty for $SITE. This should not have happened\n" mail -s "ERROR:  the site id empty with $SITE" $notifytowhom
+         /bin/cp ${TMP_AREA}/siteconf_cat.* $HOME/
+         #printf "$(cat ${TMP_AREA}/siteconf_cat.*)\n"
+         #printf "$(cat ${TMP_AREA}/siteconf_cat.*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/${UPPER}.git | sed 's#%#%%#g' | mail -s "ERROR:  the site id empty with $SITE" $notifytowhom
+         printf "$(/bin/hostname) $0  ERROR: the site id is empty for $SITE. This should not have happened\n" | mail -s "ERROR:  the site id empty with $SITE" $notifytowhom
          continue
    fi
    /usr/bin/wget --header="PRIVATE-TOKEN: $(cat .AUTH_TKN)" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz https://gitlab.cern.ch/api/v4/projects/${thesiteid}/repository/archive.tar.gz?ref=master
@@ -587,7 +637,7 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
       # 17DEC2018
       if [ $? -eq 0 ] ; then
          echo ERROR: wget Authorization failed with $SITE. This should not have happened
-         printf "$(/bin/hostname) $0  ERROR: wget Authorization failed with $SITE. This should not have happened\n" mail -s "ERROR:  wget Authorization failed with $SITE" $notifytowhom
+         printf "$(/bin/hostname) $0  ERROR: wget Authorization failed with $SITE. This should not have happened\n" | mail -s "ERROR:  wget Authorization failed with $SITE" $notifytowhom
          continue
       fi
       FAIL=1
@@ -598,7 +648,7 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
          echo "" >> ${ERR_FILE}
       fi
       # 17DEC2018
-      printf "$(/bin/hostname) $0  Warning: failed to fetch GitLab archive of ${SITE} SiteId=$thesiteid , wget=${RC}\n/usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz https://gitlab.cern.ch/api/v4/projects/${thesiteid}/repository/archive.tar.gz?ref=master\n" mail -s "Warning:  wget FAIL with $SITE" $notifytowhom
+      printf "$(/bin/hostname) $0  Warning: failed to fetch GitLab archive of ${SITE} SiteId=$thesiteid , wget=${RC}\n/usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz https://gitlab.cern.ch/api/v4/projects/${thesiteid}/repository/archive.tar.gz?ref=master\n" | mail -s "Warning:  wget FAIL with $SITE" $notifytowhom
       # 17DEC2018
       continue
    fi
@@ -609,7 +659,7 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
       MSG="failed to pass tar tzvf ${TMP_AREA}/archive_${SITE}.tgz for $SITE"
       echo "${MSG}" >> ${ERR_FILE}
       echo "" >> ${ERR_FILE}
-      printf "$(/bin/hostname) $0  Warning: failed to pass tar tzvf ${TMP_AREA}/archive_${SITE}.tgz | grep -q -i $SITE\n" mail -s "Warning:  wget FAIL with $SITE Wrong download" $notifytowhom
+      printf "$(/bin/hostname) $0  Warning: failed to pass tar tzvf ${TMP_AREA}/archive_${SITE}.tgz | grep -q -i $SITE\n$(tar tzvf ${TMP_AREA}/archive_${SITE}.tgz)\n" | mail -s "Warning:  wget FAIL with $SITE Wrong download" $notifytowhom
       continue
    fi
    # 17DEC2018

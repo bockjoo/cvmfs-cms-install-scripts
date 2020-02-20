@@ -94,10 +94,15 @@ else
      echo INFO downloading bootstrap.sh for ${SCRAM_ARCH}
      wget -q -O $VO_CMS_SW_DIR/$(basename $bootstrap_script) $bootstrap_script
 fi
+echo INFO check if reseeding necessary for next round of installation # check previous proot log
+grep -q 'error: Failed dependencies' $HOME/logs/proot.${exotic_arch}.log
+#[ $? -eq 0 ] && { wget -q -O  $VO_CMS_SW_DIR/bootstrap.sh http://cmsrep.cern.ch/cmssw/bootstrap.sh ; } ; # echo INFO reseeding  ; sh -ex ./bootstrap.sh -p $VO_CMS_SW_DIR -a ${SCRAM_ARCH} reseed ; } ; \
+[ $? -eq 0 ] && { wget -q -O  $VO_CMS_SW_DIR/bootstrap.sh http://cmsrep.cern.ch/cmssw/repos/bootstrap.sh ; } ;
 
-echo INFO installing $CMSSW_RELEASE ${SCRAM_ARCH} in the proot env
+echo INFO installing $CMSSW_RELEASE ${SCRAM_ARCH} in the proot env "(Check $HOME/logs/proot.${exotic_arch}.log )"
 PROOT_ROOT=$(echo ${centos72_exotic_arch_bzip_file} | sed 's#\.tar\.bz2##g')
 
+if [ ] ; then
 ./proot -R $PWD/$PROOT_ROOT -b /cvmfs:/cvmfs -q "$PWD/qemu-${exotic_arch} -cpu ${THECHIP}" /bin/sh -c "\
 star='*' ; \
 init_sh=\`ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh -t | head -1\` ; \
@@ -134,9 +139,63 @@ second_plus= ; \
 echo $CMSSW_RELEASE | grep -q patch && second_plus=-patch ; \
 echo INFO executing cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+$CMSSW_RELEASE ; \
 cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+$CMSSW_RELEASE > $HOME/logs/cmspkg_install.log 2>&1 ; \
-[ \$? -eq 0 ] || { echo cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+$CMSSW_RELEASE failed ; cat $HOME/logs/cmspkg_install.log ; echo proot_status=1 ; exit 1 ; } ; \
+status=\$? ; \
+echo INFO check if reseeding necessary for next round of installation ; \
+grep -q ^'error: Failed dependencies'  $HOME/logs/cmspkg_install.log ; \
+[ \$? -eq 0 ] && { echo INFO reseeding  ; sh -ex $VO_CMS_SW_DIR/bootstrap.sh -p $VO_CMS_SW_DIR -a ${SCRAM_ARCH} reseed ; } ; \
+[ \$status -eq 0 ] || { echo cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+$CMSSW_RELEASE failed ; cat $HOME/logs/cmspkg_install.log ; echo proot_status=1 ; exit 1 ; } ; \
 cat $HOME/logs/cmspkg_install.log ; \
 echo proot_status=0" > $HOME/logs/proot.${exotic_arch}.log 2>&1 &
+else
+    echo INFO was using ./proot -R $PWD/$PROOT_ROOT -b /cvmfs:/cvmfs -q "$PWD/qemu-${exotic_arch} -cpu ${THECHIP}" /bin/sh -c ""
+    echo INFO now using ./proot -R $HOME/cc7_aarch64 -b /cvmfs:/cvmfs -q "$PWD/qemu-${exotic_arch} -cpu ${THECHIP}" /bin/sh -c ""
+    ./proot -R $HOME/cc7_aarch64 -b /cvmfs:/cvmfs -q "$PWD/qemu-${exotic_arch} -cpu ${THECHIP}" /bin/sh -c "\
+star='*' ; \
+init_sh=\`ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh -t | head -1\` ; \
+if [ -f \"\$init_sh\" ] ; then \
+   echo INFO sourcing \$init.sh ; \
+   source \$init_sh ; \
+else \
+   echo INFO bootstrapping ${SCRAM_ARCH} ; \
+   sh -x $VO_CMS_SW_DIR/bootstrap.sh -repository cms setup -path $VO_CMS_SW_DIR -a ${SCRAM_ARCH} ; \
+   [ \$? -eq 0 ] || { echo proot_status=1 ; exit 1 ; } ; \
+   init_sh=\`ls $VO_CMS_SW_DIR/${SCRAM_ARCH}/external/rpm/*/etc/profile.d/init.sh -t | head -1\` ; \
+   if [ -f \"\$init_sh\" ] ; then \
+      echo INFO sourcing \$init.sh ; \
+      source \$init_sh ; \
+   else \
+      echo ERROR init.sh not found for apt ; \
+   fi ; \
+fi ; \
+grep -q mutex_set_max $VO_CMS_SW_DIR/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG 2>/dev/null ; \
+if [ \$? -eq 0 ] ; then \
+   echo INFO mutex_set_max 100000 already there ; \
+else \
+   echo INFO adding mutex_set_max 100000 to $VO_CMS_SW_DIR/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG ; \
+   echo mutex_set_max 100000 >> $VO_CMS_SW_DIR/${SCRAM_ARCH}/var/lib/rpm/DB_CONFIG ; \
+fi ; \
+which cmspkg 2>/dev/null 1>/dev/null ; \
+[ \$? -eq 0 ] || { export PATH=\$PATH:/cvmfs/cms.cern.ch/common ; } ; \
+echo INFO executing cmspkg -a ${SCRAM_ARCH} update ; \
+cmspkg -a ${SCRAM_ARCH} -y upgrade ; \
+[ \$? -eq 0 ] || { echo cmspkg -a ${SCRAM_ARCH} -y upgrade failed ; echo proot_status=1 ; exit 1 ; } ; \
+cmspkg -a ${SCRAM_ARCH} update ; \
+[ \$? -eq 0 ] || { echo cmspkg -a ${SCRAM_ARCH} update failed ; echo proot_status=1 ; exit 1 ; } ; \
+second_plus= ; \
+echo $CMSSW_RELEASE | grep -q patch && second_plus=-patch ; \
+echo INFO executing cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+$CMSSW_RELEASE ; \
+cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+$CMSSW_RELEASE > $HOME/logs/cmspkg_install.log 2>&1 ; \
+status=\$? ; \
+echo INFO check if reseeding necessary for next round of installation ; \
+grep -q 'error: Failed dependencies'  $HOME/logs/cmspkg_install.log ; \
+[ \$? -eq 0 ] && { echo INFO reseeding  ; sh -ex $VO_CMS_SW_DIR/bootstrap.sh -p $VO_CMS_SW_DIR -a ${SCRAM_ARCH} reseed ; } ; \
+rpm -qa | grep perl-Encode 2>&1 ; \
+which nice ; \
+file \`which nice\` ; \
+[ \$status -eq 0 ] || { echo cmspkg -a ${SCRAM_ARCH} -y install cms+cmssw\${second_plus}+$CMSSW_RELEASE failed ; cat $HOME/logs/cmspkg_install.log ; echo proot_status=1 ; exit 1 ; } ; \
+cat $HOME/logs/cmspkg_install.log ; \
+echo proot_status=0" > $HOME/logs/proot.${exotic_arch}.log 2>&1 &
+fi
 job_pid=$!
 
 second_plus=

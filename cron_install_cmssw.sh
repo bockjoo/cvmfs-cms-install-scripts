@@ -123,6 +123,28 @@ fi
 # fi
 #fi
 #
+if [ ] ; then
+Maintenance_Ymd=20191211
+#Maintenance_Ymd=20191209
+message="CC7 Upgrade"
+Maintenance_d=$(echo $Maintenance_Ymd | cut -c7-8)
+Maintenance_H1=09
+Maintenance_H2=23
+if [ "X$(date +%Y%m%d)" == "X${Maintenance_Ymd}" ] ; then
+ echo it is one echo $(date +%d%H) -ge ${Maintenance_d}${Maintenance_H1} -a $(date +%d%H) -lt ${Maintenance_d}${Maintenance_H2}
+ if [ $(date +%d%H) -ge ${Maintenance_d}${Maintenance_H1} -a $(date +%d%H) -lt ${Maintenance_d}${Maintenance_H2} ] ; then #
+   message="CC7 Upgrade"
+   echo it is two
+
+   printf "$(basename $0) Exiting for $message\n$(cat $HOME/crontab | sed 's#%#%%#g')\n" | mail -s "Exiting for $message" $notifytowhom
+   exit 0
+ fi
+fi
+fi # if [ ] ; then
+#
+
+#printf "$(basename $0) Exiting for $message\n$(cat $HOME/crontab | sed 's#%#%%#g')\n" | mail -s "Exiting for $message" $notifytowhom 
+#exit 0
 
 # Hour and Minute Now
 date_H=$(date +%H)
@@ -196,9 +218,13 @@ date_ymdhs=$(date +%Y-%m-%d_%H:%M)
 export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
 export LANG="C"
 #DOCKER_TAG=bockjoo/slc7:test
-DOCKER_TAG=cmssw/slc7:current
-DOCKER_TAG=cmssw/slc7-installer:cvcms     # the one that Shahzad built and pulled from hub
-DOCKER_TAG=cmssw/slc7-installer:usercvcms # the one built from oo to have libaio
+#DOCKER_TAG=cmssw/slc7:current
+#DOCKER_TAG=cmssw/slc7-installer:cvcms     # the one that Shahzad built and pulled from hub
+DOCKER_TAG=cmssw/cc7:amd64
+#DOCKER_TAG_SLC6=cmssw/slc6:latest
+DOCKER_TAG_SLC6=cmssw/slc6:amd64
+DOCKER_TAG_SLC8=cmssw/cc8:amd64
+#DOCKER_TAG=cmssw/slc7-installer:usercvcms # the one built from oo to have libaio
 #DOCKER_TAG=cmssw/slc7-installer:latest    # hn-cms-sw-develtools@cern.ch Subject:Re: bootstrap fails due to missing libaio
 
 functions=$HOME/functions-cms-cvmfs-mgmt # $workdir/$(basename $0 | sed "s#\.sh##g")-functions # .$(date -u +%s)
@@ -367,6 +393,9 @@ done
 
 #if [ ] ; then
 # [] install cmssw
+
+# Additional archs
+archs="$archs cc8_amd64_gcc8"
 i=0
 j=$(expr $j + 1)
 echo INFO "[$j]" ARCHS Available: $archs
@@ -401,8 +430,20 @@ for arch in $archs ; do
               continue
            fi
         else
-           printf "$(basename $0) $(hostname -f) unable to bootstrap: bootstrap_arch $arch \n" | mail -s "ERROR $(basename $0) $(hostname -f) unable to bootstrap $arch" $notifytowhom
-           continue
+           echo INFO checking if it is an cc8_
+           echo $arch | grep -q cc8_
+           if [ $? -eq 0 ] ; then
+              #bootstrap_arch_tarball $arch > $HOME/bootstrap_${arch}.log 2>&1
+              bootstrap_arch_nn $arch > $workdir/logs/bootstrap_arch_nn_${arch}.log 2>&1
+              if [ $? -eq 0 ] ; then
+                 printf "$(basename $0) $(hostname -f) Success: bootstrap_arch_nn $arch \n$(cat $workdir/logs/bootstrap_arch_nn_${arch}.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) $(hostname -f) Success: bootstrap_arch_nn $arch " $notifytowhom #-a $workdir/logs/bootstrap_arch_nn_${arch}.log
+              else
+                 printf "$(basename $0) $(hostname -f) failed: bootstrap_arch_nn $arch  \n$(cat $workdir/logs/bootstrap_arch_nn_${arch}.log | sed 's#%#%%#g')\n" | mail -s "ERROR $(basename $0) $(hostname -f) bootstrap_arch_nn $arch failed " $notifytowhom #-a $workdir/logs/bootstrap_arch_nn_${arch}.log
+                 continue
+              fi
+              #printf "$(basename $0) $(hostname -f) unable to bootstrap: bootstrap_arch $arch \n" | mail -s "ERROR $(basename $0) $(hostname -f) unable to bootstrap $arch" $notifytowhom
+              #continue
+           fi # if [ $? -eq 0 ] ; then
         fi
      fi
 
@@ -431,6 +472,11 @@ for arch in $archs ; do
   if [ $? -ne 0 ] ; then
      printf "ERROR: list_announced_arch_cmssws $arch failed\n" | mail -s "ERROR: list_announced_arch_cmssws $arch failed" $notifytowhom
      continue
+  fi
+  if [ "x$arch" == "xcc8_amd64_gcc8" ] ; then
+     # Additional CMSSWS
+     #cmssws="CMSSW_11_1_0_pre1"
+     :
   fi
   k=0
   ncmssws=$(echo $cmssws | wc -w)
@@ -491,9 +537,18 @@ for arch in $archs ; do
      else
         echo "$arch" | grep -q ${which_slc}_
         if [ $? -ne 0 ] ; then
+          echo "$arch" | grep -q "slc6_"
+          if [ $(echo "$arch" | grep -q "slc6_" ; echo $?) -eq 0 ] ; then
+           install_cmssw_function=docker_install_nn_cmssw
+	  elif [ $(echo "$arch" | grep -q "slc8_" ; echo $?) -eq 0 ] ; then
+           install_cmssw_function=docker_install_nn_cmssw
+	  elif [ $(echo "$arch" | grep -q "cc8_" ; echo $?) -eq 0 ] ; then
+           install_cmssw_function=docker_install_nn_cmssw
+          else
            echo ERROR do not know how to install $cmssw $arch
            printf "$(basename $0) ERROR: do not know how to install $cmssw  $arch\n" | mail -s "$(basename $0) ERROR: FAILED do not know how to install $cmssw  $arc" $notifytowhom
            continue
+	  fi
         fi
      fi
      # echo INFO "[$j]" executing $install_cmssw_function $cmssw $arch
@@ -572,17 +627,29 @@ echo
 echo INFO Next CRAB3 EL6 gcc493 update will be checked and updated as needed
 echo
 echo INFO installing slc6 gcc493 crab3
-install_slc6_amd64_gcc493_crab3
+#install_slc6_amd64_gcc493_crab3 > $HOME/logs/install_slc6_amd64_gcc493_crab3.log 2>&1
+docker_install_crab3 slc6_amd64_gcc493 > $HOME/logs/install_slc6_amd64_gcc493_crab3.log 2>&1
 echo
 echo INFO Done CRAB3 EL6 gcc493 check and update part of the script
 echo
+#fi # if [ ] ; then
+
 # [] Rucio Client
-#echo INFO Next Rucio Client
-#echo
-#$HOME/install_rucio_client.sh 2>&1 | tee $HOME/logs/install_rucio_client.log
-#echo
-#echo INFO Done Next Rucio Client
-#echo
+Maintenance_Ymd=20200130
+Maintenance_d=$(echo $Maintenance_Ymd | cut -c7-8)
+Maintenance_H1=11
+Maintenance_H2=12
+if [ "X$(date +%Y%m%d)" == "X${Maintenance_Ymd}" ] ; then
+ echo it is one echo $(date +%d%H) -ge ${Maintenance_d}${Maintenance_H1} -a $(date +%d%H) -lt ${Maintenance_d}${Maintenance_H2}
+ if [ $(date +%d%H) -ge ${Maintenance_d}${Maintenance_H1} -a $(date +%d%H) -lt ${Maintenance_d}${Maintenance_H2} ] ; then
+    echo INFO Next Rucio Client
+    echo
+    $HOME/install_rucio_client.sh 2>&1 | tee $HOME/logs/install_rucio_client.log
+    echo
+    echo INFO Done Next Rucio Client
+    echo
+ fi
+fi
 
 if [ ] ; then
 # [] PHEDEX
@@ -641,10 +708,19 @@ echo
 echo INFO Done cron_rsync_generator_package_from_eos part of the script
 echo
 
+if [ ] ; then
+# disabled because
+# cvmfs_update_pilot_config.sh ERROR at /home/cvcms/tmp/kestrel/src kestrel_pilot_config --write -o /home/cvcms/tmp/config_generated.ini failed
+# Traceback (most recent call last):
+#   File "./kestrel_pilot_config", line 8, in <module>
+#     import classad
+# ImportError: libpython2.6.so.1.0: cannot open shared object file: No such file or directory
+#
 # [] pilot config
 echo INFO Next Pilot config udate will be checked and updated as needed
 $HOME/cvmfs_update_pilot_config.sh 2>&1 | tee $HOME/logs/cvmfs_update_pilot_config.log
 echo INFO Done Pilot config check and update part of the script
+fi # if [ ] ; then
 
 # [] python
 echo INFO Next COMP+python update will be checked and updated as needed

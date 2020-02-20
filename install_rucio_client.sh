@@ -20,9 +20,11 @@ git clone --depth -1 https://github.com/cms-sw/cms-bot
 cvmfs_server transaction
 #[ -d /cvmfs/cms.cern.ch/rucio ] || mkdir -p /cvmfs/cms.cern.ch/rucio
 #source PIP environment and install rucio-client. Make use of docker container if needed
+DOCKER_TAG=cmssw/slc7-installer:latest
+DOCKER_TAG=cmssw/cc7:amd64
 
 #DOCKER_CMD="docker run --net=host --rm -t -v /tmp:/tmp -v /cvmfs:/cvmfs -v /home:/home -u $(whoami) cmssw/slc7-installer:latest"
-DOCKER_CMD="docker run --net=host --rm -t -v /tmp:/tmp -v /cvmfs:/cvmfs -v /home:/home -u $(whoami) cmssw/slc7-installer:cvcms"
+DOCKER_CMD="docker run --net=host --rm -t -v /tmp:/tmp -v /cvmfs:/cvmfs -v /home:/home -u $(id -u):$(id -g) $DOCKER_TAG"
 echo INFO Running $DOCKER_CMD sh -c "source /cvmfs/${CVMFS_REPO}/${ARCHITECTURE}/external/py2-pip/${CMS_PIP_VERSION}/etc/profile.d/init.sh ; ${WORKSPACE}/cms-bot/rucio/install.sh -c -v '${RUCIO_VERSION}' -i '/cvmfs/${CVMFS_REPO}/rucio' -C 'file://${WORKSPACE}/cms-bot/rucio/rucio.cfg'"
 $DOCKER_CMD sh -c "source /cvmfs/${CVMFS_REPO}/${ARCHITECTURE}/external/py2-pip/${CMS_PIP_VERSION}/etc/profile.d/init.sh ; \
   ${WORKSPACE}/cms-bot/rucio/install.sh -c -v '${RUCIO_VERSION}' -i '/cvmfs/${CVMFS_REPO}/rucio' -C 'file://${WORKSPACE}/cms-bot/rucio/rucio.cfg'"
