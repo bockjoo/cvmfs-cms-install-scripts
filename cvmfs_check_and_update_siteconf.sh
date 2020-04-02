@@ -269,8 +269,16 @@ echo "[2] Fetching list of CMS sites..."
 SITES_URL="https://cmsweb.cern.ch/sitedb/data/prod/site-names"
 /bin/rm -f ${TMP_AREA}/sitedb.json 1>/dev/null 2>&1
 #/usr/bin/wget --certificate=${AUTH_CRT} --private-key=${AUTH_KEY} -O ${TMP_AREA}/sitedb.json ${SITES_URL} 1>${ERR_FILE} 2>&1
-/usr/bin/curl -s -S --cert ${AUTH_CRT} --key ${AUTH_CRT} --cacert ${AUTH_CRT} --capath /etc/grid-security/certificates -o ${TMP_AREA}/sitedb.json -X GET "${SITES_URL}" 1>${ERR_FILE} 2>&1
+#/usr/bin/curl -s -S --cert ${AUTH_CRT} --key ${AUTH_CRT} --cacert ${AUTH_CRT} --capath /etc/grid-security/certificates -o ${TMP_AREA}/sitedb.json -X GET "${SITES_URL}" 1>${ERR_FILE} 2>&1
+#/usr/bin/curl -L -k --key $AUTH_CRT --cert $AUTH_CRT -v "https://cms-cric.cern.ch/api/cms/site/query/?json&preset=site-names&rcsite_state=ANY" 1>${TMP_AREA}/sitedb.json 2>${ERR_FILE} # | grep \"T[0-9] | cut -d\" -f2 | sort -u
+/usr/bin/curl -L -k --key $AUTH_CRT --cert $AUTH_CRT -v "http://cms-cric.cern.ch/api/cms/site/query/?json&preset=site-names&rcsite_state=ANY" 1>${TMP_AREA}/sitedb.json 2>${ERR_FILE} # | grep \"T[0-9] | cut -d\" -f2 | sort -u
 RC=$?
+# for now use the static sitedb.json
+if [ $RC -ne 0  ] ; then
+   echo DEBUG doing /bin/cp $HOME/sitedb.json ${TMP_AREA}/sitedb.json
+   /bin/cp $HOME/sitedb.json ${TMP_AREA}/sitedb.json
+   RC=$?
+fi
 if [ ${RC} -ne 0 ]; then
    MSG="failed to query SiteDB to get site-names, curl=${RC}"
    /bin/cat ${ERR_FILE}
@@ -287,7 +295,11 @@ echo DEBUG content of sitedb.json
 echo cat ${TMP_AREA}/sitedb.json 
 echo DEBUG end of content of sitedb.json
 /bin/rm -f ${TMP_AREA}/sitedb.list
-/usr/bin/awk -f ${TMP_AREA}/sitedb.awk ${TMP_AREA}/sitedb.json 1>${TMP_AREA}/sitedb.list
+
+echo DEBUG ${TMP_AREA}/sitedb.list.old
+/usr/bin/awk -f ${TMP_AREA}/sitedb.awk ${TMP_AREA}/sitedb.json 1>${TMP_AREA}/sitedb.list.old
+grep \"T[0-9]  ${TMP_AREA}/sitedb.json | cut -d\" -f2 | sort -u > ${TMP_AREA}/sitedb.list
+
 /bin/rm ${TMP_AREA}/sitedb.json
 echo DEBUG ${TMP_AREA}/sitedb.list
 cat ${TMP_AREA}/sitedb.list

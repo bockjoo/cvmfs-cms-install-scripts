@@ -91,6 +91,7 @@ cvmfs_server_name=$(grep cvmfs_server_name= $HOME/cron_install_cmssw.config | gr
 rpmdb_local_dir=$(grep rpmdb_local_dir= $HOME/cron_install_cmssw.config | grep -v \# | cut -d= -f2)
 notifytowhom=$(grep notifytowhom= $HOME/cron_install_cmssw.config | grep -v \# | cut -d= -f2)
 theuser=$(/usr/bin/whoami)
+jenkins_cmssw=$(grep ^jenkins_cmssw= $HOME/cron_install_cmssw.config | grep -v \# | cut -d= -f2)
 cvmfs_server_name=$(eval echo $cvmfs_server_name)
 [ "$(/bin/hostname -f)" == "x$cvmfs_server_name" ] || cvmfs_server_yes=no
 
@@ -348,6 +349,7 @@ done
 i=0
 nslc=$(echo $VO_CMS_SW_DIR/slc* | wc -w)
 for thedir in $VO_CMS_SW_DIR/slc* ; do
+   [ "x$jenkins_cmssw" == "xon" ] && break
    [ "x$thedir" == "x$VO_CMS_SW_DIR/slc*" ] && break
    [ -d $thedir ] || continue
    i=$(expr $i + 1)
@@ -400,6 +402,7 @@ i=0
 j=$(expr $j + 1)
 echo INFO "[$j]" ARCHS Available: $archs
 for arch in $archs ; do
+  [ "x$jenkins_cmssw" == "xon" ] && break
   echo "$arch" | grep -q amd64_gcc
   [ $? -eq 0 ] || continue
   echo "$arch" | grep -q slc5_amd64_gcc
@@ -622,7 +625,7 @@ check_and_update_siteconf > $HOME/logs/check_and_update_siteconf.log 2>&1
 echo INFO Done check_and_update_siteconf using gitlab
 echo
 
-#if [ ] ; then
+if [ ] ; then
 # [] CRAB3
 echo INFO Next CRAB3 EL6 gcc493 update will be checked and updated as needed
 echo
@@ -632,7 +635,7 @@ docker_install_crab3 slc6_amd64_gcc493 > $HOME/logs/install_slc6_amd64_gcc493_cr
 echo
 echo INFO Done CRAB3 EL6 gcc493 check and update part of the script
 echo
-#fi # if [ ] ; then
+fi # if [ ] ; then
 
 # [] Rucio Client
 Maintenance_Ymd=20200130
@@ -808,12 +811,14 @@ cd
 time cvmfs_server publish 2>&1 | tee $HOME/logs/cvmfs_server+publish.log
 cd $currdir
 
+if [ ] ; then
 echo INFO Next CRAB3 EL7 gcc630 update will be checked and updated as needed
 echo
 echo INFO installing slc7 gcc630 crab3
 install_slc7_amd64_gcc630_crab3 > $HOME/logs/install_slc7_amd64_gcc630_crab3.log 2>&1
 echo
 echo INFO Done CRAB3 EL7 gcc630 check and update part of the script
+fi # if [ ] ; then
 
 #backup_installation 2>&1 | tee $HOME/logs/backup_installation.log
 #it takes longer than 8 hours: backup_installation_one slc6_amd64_gcc472 2>&1 | tee $HOME/logs/backup_installation_one_slc6_amd64_gcc472.log
