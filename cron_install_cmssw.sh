@@ -271,6 +271,12 @@ if [ $? -eq 0 ] ; then
    fi
 fi
 
+diff $updated_list $HOME/$(basename $updated_list) 1>/dev/null 2>/dev/null
+if [ $? -ne 0 ] ; then
+      printf "$(basename $0) Something updated $updated_list\n$(diff $updated_list $HOME/$(basename $updated_list))\n" | mail -s "$(basename $0) WARN $(basename $updated_list) updated" $notifytowhom      
+fi
+
+
 ps auxwww | grep -q grep | grep "$theuser"
 echo INFO need_to_fix_mount_issue=$need_to_fix_mount_issue
 
@@ -349,7 +355,7 @@ done
 i=0
 nslc=$(echo $VO_CMS_SW_DIR/slc* | wc -w)
 for thedir in $VO_CMS_SW_DIR/slc* ; do
-   [ "x$jenkins_cmssw" == "xon" ] && break
+   #[ "x$jenkins_cmssw" == "xon" ] && break
    [ "x$thedir" == "x$VO_CMS_SW_DIR/slc*" ] && break
    [ -d $thedir ] || continue
    i=$(expr $i + 1)
@@ -402,7 +408,7 @@ i=0
 j=$(expr $j + 1)
 echo INFO "[$j]" ARCHS Available: $archs
 for arch in $archs ; do
-  [ "x$jenkins_cmssw" == "xon" ] && break
+  #[ "x$jenkins_cmssw" == "xon" ] && break
   echo "$arch" | grep -q amd64_gcc
   [ $? -eq 0 ] || continue
   echo "$arch" | grep -q slc5_amd64_gcc
@@ -416,8 +422,12 @@ for arch in $archs ; do
   if [ $(ls -al $VO_CMS_SW_DIR/${arch}/external/rpm/*/etc/profile.d/init.sh 2>/dev/null 1>/dev/null ; echo $? ; ) -eq 0 ] ; then
      echo INFO "[$j]" arch $arch seems to be already bootstrapped
   else
-     echo INFO "[$j]" bootstrapping bootstrap_arch $arch
-     bootstrap_arch $arch
+     if [ "x$jenkins_cmssw" == "xon" ] ; then
+        printf "$(basename $0) $(hostname -f) Bootstrapping necessary for $arch\nBut Jenkins is on\n" | mail -s "$(basename $0) $(hostname -f) Bootstrapping necessary for $arch" $notifytowhom
+     else
+        echo INFO "[$j]" bootstrapping bootstrap_arch $arch
+        bootstrap_arch $arch
+     fi
      if [ $? -eq 0 ] ; then
         printf "$(basename $0) $(hostname -f) Success: bootstrap_arch $arch \n$(cat $VO_CMS_SW_DIR/bootstrap_${arch}.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) $(hostname -f) Success: bootstrap_arch $arch " $notifytowhom      
      else
@@ -555,6 +565,10 @@ for arch in $archs ; do
         fi
      fi
      # echo INFO "[$j]" executing $install_cmssw_function $cmssw $arch
+     if [ "x$jenkins_cmssw" == "xon" ] ; then
+        printf "$(basename $0) $(hostname -f) Supposedly $install_cmssw_function $cmssw $arch necessary\nBut Jenkins is on\n" | mail -s "$(basename $0) $(hostname -f) Install needed $cmssw $arch" $notifytowhom
+        continue
+     fi
      echo INFO "$install_cmssw_function $cmssw $arch > $HOME/logs/${install_cmssw_function}+${cmssw}+${arch}.log"
      $install_cmssw_function $cmssw $arch > $HOME/logs/${install_cmssw_function}+${cmssw}+${arch}.log 2>&1
      status=$?
@@ -822,6 +836,7 @@ fi # if [ ] ; then
 
 #backup_installation 2>&1 | tee $HOME/logs/backup_installation.log
 #it takes longer than 8 hours: backup_installation_one slc6_amd64_gcc472 2>&1 | tee $HOME/logs/backup_installation_one_slc6_amd64_gcc472.log
+cp $updated_list $HOME/
 echo script $(basename $0) Done
 echo
 date_ymdh=$(date +"["%H"] ["%Y-%m-%d"]")
