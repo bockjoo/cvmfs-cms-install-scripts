@@ -138,25 +138,25 @@ if [ ] ; then
 echo DEBUG checking /usr/bin/lcg-cp
 ldd /usr/bin/lcg-cp 2>&1
 
-/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
 if [ $? -eq 0 ] ; then
    cp $X509_USER_PROXY.copy $X509_USER_PROXY
       voms-proxy-info -all
 else
-      printf "$(basename $0) ERROR failed to download $X509_USER_PROXY\n$(/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://${X509_USER_PROXY}.copy 2>&1 | sed 's#%#%%#g')n" | mail -s "$(basename $0) ERROR proxy download failed" $notifytowhom
+      printf "$(basename $0) ERROR failed to download $X509_USER_PROXY\n$(/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/.cmsphedex.proxy  file://${X509_USER_PROXY}.copy 2>&1 | sed 's#%#%%#g')n" | mail -s "$(basename $0) ERROR proxy download failed" $notifytowhom
       source $HOME/osg/osg-wn-client/setup.sh
-      globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+      globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
       if [ $? -eq 0 ] ; then
          cp $X509_USER_PROXY.copy $X509_USER_PROXY
       fi
 fi
 fi # if [ ] ; then
 source $HOME/osg/osg-wn-client/setup.sh
-globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
 if [ $? -eq 0 ] ; then
    cp $X509_USER_PROXY.copy $X509_USER_PROXY
 else
-   printf "$(basename $0) ERROR failed to download $X509_USER_PROXY\n$(globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy 2>&1 | sed 's#%#%%#g')\n" | mail -s "$(basename $0) ERROR proxy download failed" $notifytowhom
+   printf "$(basename $0) ERROR failed to download $X509_USER_PROXY\n$(globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy 2>&1 | sed 's#%#%%#g')\n" | mail -s "$(basename $0) ERROR proxy download failed" $notifytowhom
 fi
 
 
@@ -164,13 +164,13 @@ timeleft=$(voms-proxy-info -timeleft 2>/dev/null)
 if [ ] ; then
 if [ $timeleft -lt 1900 ] ; then # 1800 + 100
    #/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY
-   /usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+   /usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
    status=$?
    echo DEBUG lcg-cp status=$status
    if [ $status -eq 0 ] ; then
       cp $X509_USER_PROXY.copy $X509_USER_PROXY
    else
-      globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+      globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
       if [ $? -eq 0 ] ; then
          cp $X509_USER_PROXY.copy $X509_USER_PROXY
       fi
@@ -663,8 +663,8 @@ grep "tar.xz\|tar.gz\|tgz" $HOME/logs/rsync+generator+package+from+eos.log | gre
 if [ -f $HOME/osg/osg-wn-client/setup.sh ] ; then
    source $HOME/osg/osg-wn-client/setup.sh
    export X509_USER_PROXY=/home/cvcms/.florida.t2.proxy
-   globus-url-copy -vb file://$HOME/logs/cms.cern.ch_space.txt gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/cvmfs_installations/cms.cern.ch_space.txt
-   globus-url-copy -vb file://$HOME/logs/gridpacks_schedule.txt gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/cvmfs_installations/gridpacks_schedule.txt
+   globus-url-copy -vb file://$HOME/logs/cms.cern.ch_space.txt gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/cvmfs_installations/cms.cern.ch_space.txt
+   globus-url-copy -vb file://$HOME/logs/gridpacks_schedule.txt gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/cvmfs_installations/gridpacks_schedule.txt
 fi
 
 
