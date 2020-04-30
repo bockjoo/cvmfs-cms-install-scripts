@@ -189,7 +189,7 @@ fi
 echo INFO creating $lock
 echo $(date -u) >> $lock
 
-# [1] gridpacks still active in cron
+# [1] gridpacks still active in cron: Documentation README.gridpacks
 echo INFO Execute only the first half of the even hours
 echo INFO Next cron_rsync_generator_package_from_eos as needed
 echo

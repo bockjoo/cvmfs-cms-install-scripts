@@ -34,6 +34,49 @@ DOCKER_TAG_SLC6=cmssw/slc6:amd64
 DOCKER_TAG_SLC8=cmssw/cc8:amd64
 
 # Functions
+function higher_priority_gridpacks () {
+printf "
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_s-channel-M400_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_s-channel-M500_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_s-channel-M800_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_s-channel-M1200_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_t-channel-M500_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_t-channel-M1200_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_t-channel-M1500_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M400_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M500_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M600_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M800_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M900_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M1200_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M1500_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_pair-M2000_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.3.3/ggh01_M125_Toa01a01_M50_Totautautautau/v1/ggh01_M125_Toa01a01_M50_Totautautautau_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.3.3/LLJJ_aTGC_EWK_SM_5f_LO/LLJJ_aTGC_EWK_SM_5f_LO_tarball-fixedMadspinCard_V1.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.3.3/ChargedHiggs_GMmodel_HToWZ/SinglyChargedHiggsGMmodel_HWZ_M500_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.3.3/ChargedHiggs_GMmodel_HToWZ/SinglyChargedHiggsGMmodel_HWZ_M500_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.3.3/ggh01_M125_Toa01a01_M25_Tomumubb/v2/ggh01_M125_Toa01a01_M25_Tomumubb_tarball.tar.xz
+/eos/cms/store/group/phys_generator/cvmfs/gridpacks/slc6_amd64_gcc481/13TeV/madgraph/V5_2.3.3/ggh01_M125_Toa01a01_M30_Tomumubb/v2/ggh01_M125_Toa01a01_M30_Tomumubb_tarball.tar.xz\n"
+
+}
+
+function eos () {
+  $EOSSYS/bin/eos.select
+  return $?
+}
+
+function eoscms () {
+  $EOSSYS/bin/eos.select
+  return $?
+}
+
+function eosforceumount () {
+  killall eosfsd 2>/dev/null
+  killall -9 eosfsd 2>/dev/null
+  fusermount -u $1
+  return $?
+}
+
 function cvmfs_create_lhapdf_621a1 () {
     newdir=/cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2.1a_1
     [ -d $newdir ] || mkdir -p $newdir # mkdir -p /cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2.1a_1
@@ -6568,9 +6611,7 @@ function check_and_update_siteconf () {
       [ -f /afs/cern.ch/cms/LCG/LCG-2/UI/cms_ui_env.sh ] && source /afs/cern.ch/cms/LCG/LCG-2/UI/cms_ui_env.sh
    fi
    export X509_USER_PROXY=$HOME/.florida.t2.proxy
-   #/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v srm://srm.ihepa.ufl.edu:8443/srm/v2/server?SFN=/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
    source /home/cvcms/osg/osg-wn-client/setup.sh
-   #/usr/bin/lcg-cp -b -n 1 --vo cms -D srmv2 -T srmv2 -v gsiftp://cmsio6.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
    globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cms/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
    if [ $? -eq 0 ] ; then
       cp $X509_USER_PROXY.copy $X509_USER_PROXY
@@ -6922,4 +6963,16 @@ function run_install_cmssw () {
     done
     return 0
 }
+
+
+function cic_sed_del_line () { # func description: It deletes a line                     
+  if [ $# -lt 2 ] ; then
+     echo ERROR cic_sed_del_line string file
+     return 1
+  fi
+  string=$1
+  infile=$2
+  sed -i "/$(echo $string | sed 's^/^\\\/^g')/ d" $infile
+}
+
 ####### ENDIN Functions 12345

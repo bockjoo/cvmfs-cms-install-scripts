@@ -55,5 +55,15 @@ for f in $files ; do
    ls -al $workdir/$f
 done
 
+files="README.gridpacks"
+i=0
+for f in $files ; do
+   i=$(expr $i + 1)
+   echo "[ $i ]" INFO dowloading $f to $workdir/$f
+   wget -q -O $workdir/$f $weborigin/$f
+   echo "[ $i ]" $f: Download Status: $?
+   echo "[ $i ]" Date Now: $(date)
+   ls -al $workdir/$f
+done
 
 exit 0
