@@ -5,6 +5,8 @@
 # 1.8.7
 #
 version=1.8.7
+
+# Configuration
 notifytowhom=bockjoo@phys.ufl.edu
 source $HOME/cron_install_cmssw.config # notifytowhom
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
@@ -24,6 +26,7 @@ export EOSSYS=/home/cvcms/eos_installation/${EOS_CLIENT_VERSION}
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/lib64 # for libreadline.so.5
 
 source $HOME/functions-cms-cvmfs-mgmt
+# Configuration
 
 :
 : ######### Main ###################################################
