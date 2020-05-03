@@ -39,6 +39,8 @@ fi
 touch $HOME/cron_install_cmssw.lock
 cvmfs_server transaction && ( cd /cvmfs/cms.cern.ch ; tar xzvf $HOME/SITECONF.tar.gz ; exit $? ; ) && cvmfs_server publish
 rm -f $HOME/cron_install_cmssw.lock
+If /cvmfs/cms.cern.ch/SITECONF/local is screwed up, 
+ln -s '$(CMS_LOCAL_SITE)' /cvmfs/cms.cern.ch/etc/SITECONF/local
 Finally, figure out what went wrong and fix the issue
 
 
