@@ -1,0 +1,20 @@
+
+README for gridpacks on cvmfs prepared by Bockjoo Kim on 29APRIL2020
+
+[1] What are gridpacks?
+They are the input files created by various HEP event generators and used to create the MC samples.
+They are compressed files with extensions .tar.xz, .tar.gz, or tgz.
+
+[2] Logistics of the gridpacks to cvmfs
+Various physics groups produce the compressed gridpack files generators and put them on the EOS space
+under /eos/cms/store/group/phys_generator/cvmfs/gridpacks
+Newly generated gridpacks need to be copied to the cvmfs so that jobs that use the gripacks can read
+the gridpack files from cvmfs.
+
+[3] How are gridpacks copied to cvmfs?
+/eos is not available on the machine of cvmfs management.
+It has to be user-mounted, which requires a X509 grid proxy and the EOS client tools.
+Once the EOS gripacks directory is mounted, one just has to rsync.
+cron_rsync_generator_package_from_eos_individual.sh is doing the job.
+To see details, read comments in the script.
+

@@ -199,10 +199,10 @@ echo INFO Done cron_rsync_generator_package_from_eos part of the script
 echo
 
 # [2] siteconf still active in cron
-echo INFO Next check_and_update_siteconf using gitlab
+echo INFO Next cvmfs_check_and_update_siteconf.sh using gitlab and cric
 echo
-check_and_update_siteconf > $HOME/logs/check_and_update_siteconf.log 2>&1
-echo INFO Done check_and_update_siteconf using gitlab
+$HOME/cvmfs_check_and_update_siteconf.sh > $HOME/logs/cvmfs_check_and_update_siteconf.log 2>&1
+echo INFO Done cvmfs_check_and_update_siteconf.sh using gitlab
 echo
 
 # [3] install cmssw: In Jenkins but it's here just in case

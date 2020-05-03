@@ -1,7 +1,10 @@
 #!/bin/sh
+host=melrose.ihepa.ufl.edu
+port=8080
+host=cms.rc.ufl.edu
+port=8443
 MINUTE=$(date +%M)
-weborigin=http://melrose.ihepa.ufl.edu:8080/cmssoft/cvmfs
-cicweb=http://melrose.ihepa.ufl.edu:8080/cmssoft/cic
+weborigin=http://${host}:${port}/cmssoft/cvmfs
 workdir=$HOME
 if [ $# -gt 0 ] ; then
    workdir=$1

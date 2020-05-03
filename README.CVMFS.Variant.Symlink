@@ -1,0 +1,194 @@
+[1] Test for Default varsymlink
+ln -s '$(CMS_K8_SITE:-/etc/cvmfs/SITECONF)' /cvmfs/cms.cern.ch/SITECONF/K8_local
+Reference
+ln -s '$(CMS_K8_SITE:-/etc/cvmfs/SITECONF)' /cvmfs/cms.cern.ch/SITECONF/K8_local
+
+[0]
+Hi Bockjoo,
+
+there is a possibility called variant symlinks available in cvmfs.  It
+allows you to use an environment variable as symlink destination, so you
+can change the real location per worker node.
+
+CMS repository uses this feature for
+/cvmfs/cms.cern.ch/etc/SITECONF/local, which points to $CMS_LOCAL_SITE.
+ This variable is set in /etc/cvmfs/config.d/cms.cern.ch.{conf.local}.
+This link as been created like
+ln -s '$(CMS_LOCAL_SITE)' /cvmfs/cms.cern.ch/etc/SITECONF/local
+
+I'm on vacation until next week but you can follow this up with Renéin
+'cc).
+
+Cheers,
+Jakob
+
+On 11/19/13 8:07 PM, Bockjoo Kim wrote:
+> Hi Alexey,
+> It's visible from CERN as it is soft-linked to the one in afs area.
+> Since icc is a license compiler, I think it's not supposed to be visible
+> at Purdue.
+>
+> I don't know how to do this. I am adding Jakob who is a cvmfs expert.
+> Jakob, is there a way to differently soft link some software to a local
+> environment?
+>
+> Otherwise, Alexey has to manipulate to point icc compiler to the one at
+> the Purdue machine
+> by adding some manual PATH or LD_LIBRARY_PATH, I would guess.
+> Thanks,
+> Bockjoo
+> On 11/19/13 1:07 PM, Alexey Svyatkovskiy wrote:
+>> Hi Shahzad, Bockjoo,
+>>
+>> We have installed cvmfs on the cluster with XeonPhis.
+>> I check the CC and CXX scram variables are set properly:
+>>
+>> conte-fe01> scram b echo_CXX
+>>>> Local Products Rules ..... started
+>>>> Local Products Rules ..... done
+>> CXX =
+>> /cvmfs/cms.cern.ch/slc6_mic_gcc481/cms/icc-scram/14.0.0/installation/bin/intel64/icpc
+>>
+>> conte-fe01> scram b echo_CC
+>>>> Local Products Rules ..... started
+>>>> Local Products Rules ..... done
+>> CC =
+>> /cvmfs/cms.cern.ch/slc6_mic_gcc481/cms/icc-scram/14.0.0/installation/bin/intel64/icc
+>>
+>>
+>> but when I try to compile, I get an error:
+>>
+>> conte-fe01> scram b
+>>>> Local Products Rules ..... started
+>>>> Local Products Rules ..... done
+>>>> Building CMSSW version CMSSW_7_0_0_pre7 ----
+>>>> Entering Package TrackPropagation/SteppingHelixPropagator
+>>>> Creating project symlinks
+>>>> Compiling edm plugin
+>>>> /home/asvyatko/XeonPhiTest/CMSSW_7_0_0_pre7/src/TrackPropagation/SteppingHelixPropagator/plugins/SteppingHelixPropagatorESProducer.cc
+>>>>
+>> /bin/sh:
+>> /cvmfs/cms.cern.ch/slc6_mic_gcc481/cms/icc-scram/14.0.0/installation/bin/intel64/icpc:
+>> No such file or directory
+>> /bin/sh:
+>> /cvmfs/cms.cern.ch/slc6_mic_gcc481/cms/icc-scram/14.0.0/installation/bin/intel64/icpc:
+>> No such file or directory
+>>
+>> Did we miss some step in the installation procedure?
+>>  
+>> Thanks,
+>> Alexey
+>>
+>> ----- Original Message -----
+>> From: "Alexey Svyatkovskiy" <asvyatko@purdue.edu>
+>> To: "Bockjoo Kim" <bockjoo@phys.ufl.edu>
+>> Cc: "Manoj Kumar Jha" <jha2@purdue.edu>, "Shahzad Malik MUZAFFAR"
+>> <Shahzad.Malik.Muzaffar@cern.ch>
+>> Sent: Thursday, November 14, 2013 4:35:19 PM
+>> Subject: Re: Patched version of CMSSW
+>>
+>> Yes, I have access to both icc and XeonPhi at conte cluster at Purdue.
+>> The only remaining problem is that we do not have cvmfs installed at
+>> conte yet - Manoj is working on it now..
+>>
+>> But I can see CMSSW_7_0_0_pre7 in the list of CMSSW releases available
+>> for slc6_mic_gcc481 arch on other machines already.
+>> I will report back later when we have it.
+>>
+>> Thanks,
+>> Alexey
+>>   ----- Original Message -----
+>> From: "Bockjoo Kim" <bockjoo@phys.ufl.edu>
+>> To: "Shahzad Malik MUZAFFAR" <Shahzad.Malik.Muzaffar@cern.ch>
+>> Cc: "Alexey Svyatkovskiy" <asvyatko@purdue.edu>, "Manoj Kumar Jha"
+>> <jha2@purdue.edu>
+>> Sent: Thursday, November 14, 2013 4:25:21 PM
+>> Subject: Re: Fwd: Patched version of CMSSW
+>>
+>> Yes, sorry, it is CMSSW_7_0_0_pre7.
+>> I am making it available on cvmfs for Alexey who I presume has both icc
+>> compiler and access to
+>> Xeon phi at Purdue.
+>> So, I guess the answer is yes and yes.
+>> Thanks,
+>> Bockjoo
+>> On 11/14/13 4:04 PM, Shahzad Malik MUZAFFAR wrote:
+>>> On 14/11/2013 19:33, Bockjoo Kim wrote:
+>>>> Hi Shahzad,
+>>>> I can install CMSSW_7_0_0_pre8 on cvmfs under slc6_mic_gcc481
+>>>> on an slc6 machine.
+>>>> Is this one of intended ways of installing it?
+>>> Is cvmfs installation area going to be visible from the machine where
+>>> you have icc compiler? Also is that area accessible from Xeon Phi? If
+>>> answer to both of these is yes then you you can install
+>>> slc6_mic_gcc481 releases.
+>>> By the way, we currently have CMSSW_7_0_0_pre7 available (pre8 is not
+>>> yet build for mic).
+>>>
+>>> Cheers,
+>>> --Shahzad
+>>>> Thanks,
+>>>> Bockjoo
+>>>> On 11/14/13 12:02 PM, Alexey Svyatkovskiy wrote:
+>>>>> Hi Bockjoo,
+>>>>>
+>>>>> Ok, this is the instructions I got from Peter/Shahzad.
+>>>>> If it is not working - I can reply and cc you in that email thread.
+>>>>>
+>>>>> Alexey
+>>>>>
+>>>>>
+>>>>> ----- Forwarded Message -----
+>>>>> From: "Shahzad Malik MUZAFFAR" <Shahzad.Malik.Muzaffar@cern.ch>
+>>>>> To: "Alexey Svyatkovskiy" <asvyatko@purdue.edu>, "Peter Elmer"
+>>>>> <Peter.Elmer@cern.ch>
+>>>>> Cc: "Norbert Neumeister" <nneumeis@purdue.edu>
+>>>>> Sent: Thursday, November 14, 2013 12:00:13 PM
+>>>>> Subject: Re: Patched version of CMSSW
+>>>>>
+>>>>> Hi,
+>>>>>      One should be able to use standard installation instruction
+>>>>> https://twiki.cern.ch/twiki/bin/view/CMSPublic/SDTCMSSW_aptinstaller
+>>>>>      one need to use arch slc6_amd64_gcc481. Basically it should be as
+>>>>> simple as
+>>>>>
+>>>>>
+>>>>>      slc6_mic_gcc472 releases are broken and contains older
+>>>>> compiler. I
+>>>>> would suggest to use CMSSW_7_0_0_pre7 from slc6_mic_gcc481 arch.
+>>>>>
+>>>>> Cheers,
+>>>>> --Shahzad
+>>>>>
+>>>>> [a]
+>>>>>
+>>>>> - Do only once
+>>>>> export VO_CMS_SW_DIR=/x/y/z
+>>>>> export SCRAM_ARCH=slc6_mic_gcc481
+>>>>> mkdir -p $VO_CMS_SW_DIR
+>>>>> wget -O $VO_CMS_SW_DIR/bootstrap.sh
+>>>>> http://cmsrep.cern.ch/cmssw/cms/bootstrap.sh
+>>>>> sh -x $VO_CMS_SW_DIR/bootstrap.sh setup -path $VO_CMS_SW_DIR -arch
+>>>>> $SCRAM_ARCH
+>>>>>
+>>>>> - For each update/new release installation
+>>>>> export VO_CMS_SW_DIR=/x/y/z
+>>>>> export SCRAM_ARCH=slc6_mic_gcc481
+>>>>> source $VO_CMS_SW_DIR/$SCRAM_ARCH/external/apt/*/etc/profile.d/init.sh
+>>>>> apt-get update
+>>>>> apt-get install cms+cmssw+CMSSW_7_0_0_pre7
+>>>>>
+>>>>> - Do not forget to update icc-scram symlink (see my talk)
+>>>>> https://indico.cern.ch/getFile.py/access?contribId=57&sessionId=4&resId=0&materialId=slides&confId=263735
+>>>>>
+>>>>>
+>>>>>
+>>>>>
+>>>>
+>>>
+>>
+>>
+>
+>
+
+

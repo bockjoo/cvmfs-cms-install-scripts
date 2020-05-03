@@ -6597,7 +6597,58 @@ EOF_gitlab.awk
    return 0
 }
 
-function check_and_update_siteconf () {
+function check_rsync_source_siteconf_sanity () {
+   if [ $# -lt 1 ] ; then
+      echo ERROR check_rsync_source_siteconf_sanity $rsync_source/SITECONF
+      return 1
+   fi
+   rsynce_source_siteconf=$1
+   # sanity check of SiteDB sites:
+   if [ $(ls $rsynce_source_siteconf 2>/dev/null | grep ^T[0-9]_ | wc -l) -lt 100 ]; then
+       MSG="sanity check of $rsynce_source_siteconf failed in T[0-9], exiting"
+       echo "   ${MSG}"
+       if [ ! -t 0 ]; then
+	   printf "$0 ${MSG}\n$(cat ${TMP_AREA}/sitedb.list)\n" | mail -s "$0 ${MSG}" $notifytowhom # echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
+       fi
+       return 1
+   fi
+   if [ $(ls $rsynce_source_siteconf 2>/dev/null | grep ^T0_ | wc -l) -lt 1 ]; then
+       MSG="sanity check of $rsynce_source_siteconf Tier-0 count failed, exiting"
+       echo "   ${MSG}"
+       if [ ! -t 0 ]; then
+	   printf "$0 ${MSG}\n$(cat ${TMP_AREA}/sitedb.list)\n" | mail -s "$0 ${MSG}" $notifytowhom # echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
+       fi
+       return 1
+   fi
+   if [ $(ls $rsynce_source_siteconf 2>/dev/null | grep ^T1_ | wc -l) -lt 5 ]; then
+       MSG="sanity check of $rsynce_source_siteconf Tier-1 count failed, exiting"
+       echo "   ${MSG}"
+       if [ ! -t 0 ]; then
+	   printf "$0 ${MSG}\n$(cat ${TMP_AREA}/sitedb.list)\n" | mail -s "$0 ${MSG}" $notifytowhom # echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
+       fi
+       return 1
+   fi
+   if [ $(ls $rsynce_source_siteconf 2>/dev/null | grep ^T2_ | wc -l) -lt 40 ]; then
+       MSG="sanity check of $rsynce_source_siteconf Tier-2 count failed, exiting"
+       echo "   ${MSG}"
+       if [ ! -t 0 ]; then
+	   printf "$0 ${MSG}\n$(cat ${TMP_AREA}/sitedb.list)\n" | mail -s "$0 ${MSG}" $notifytowhom # echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
+       fi
+       return 1
+   fi
+   if [ $(ls $rsynce_source_siteconf 2>/dev/null | grep ^T3_ | wc -l) -lt 50 ]; then
+       MSG="sanity check of $rsynce_source_siteconf Tier-3 count failed, exiting"
+       echo "   ${MSG}"
+       if [ ! -t 0 ]; then
+	   printf "$0 ${MSG}\n$(cat ${TMP_AREA}/sitedb.list)\n" | mail -s "$0 ${MSG}" $notifytowhom # echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
+       fi
+       return 1
+   fi
+   
+   return 0
+}
+
+function check_and_update_siteconf_bash () {
 
    what="check_and_update_siteconf ()"
    updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates

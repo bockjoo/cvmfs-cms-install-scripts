@@ -200,6 +200,39 @@ if [ $status -eq 0 ] ; then
            continue
       fi
       destfile=$(dirname $rsync_name)/$f
+
+      # Check if destination directory exists. If not, create. If creation fails for some strange reason, remove the created directory
+      if [ ! -d $(dirname $destfile) ] ; then
+         echo INFO creating $(dirname $destfile)
+         mkdir -p $(dirname $destfile) > $HOME/logs/eos_mkdir_log 2>&1
+         grep -q "File exists" $HOME/logs/eos_mkdir_log
+         if [ $? -eq 0 ] ; then
+            if [ -f $(dirname $destfile) ] ; then
+               rm -rf $(dirname $destfile)
+               printf "$(basename $0) ERROR failed: $(dirname $destfile) supposed to be a directory. Something went wrong\n" | mail -s "$(basename $0) ERROR failed: mkdir -p $(dirname $destfile) " $notifytowhom
+               #echo DRY rm -rf $(dirname $destfile)
+               time cvmfs_server publish > $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log 2>&1
+               [ $? -eq 0 ] || ( cd ; cvmfs_server abort -f ; ) ;
+               echo INFO eosumount $HOME/eos2
+               $EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
+               ps auxwww | grep -v grep | grep -q eosfsd
+               if [ $? -eq 0 ] ; then
+                  echo Warning eosforceumount $HOME/eos2
+                  eosforceumount $HOME/eos2
+               fi
+               echo INFO checking with ls $HOME/eos2
+               ls $HOME/eos2
+               echo script $0 Done
+               log=$HOME/logs/$(basename $0 | sed 's#\.sh#\.log#g')
+               eos_fuse_logs=
+               for f in /tmp/eos-fuse.*.log ; do
+                  [ -f "$f" ] && { eos_fuse_logs="$eos_fuse_logs $f" ; rm -f $f ; } ;
+               done
+               exit 1
+            fi
+         fi
+      fi
+
       # To upload new files only
       echo DEBUG  NEWGRIDPACKS_ONLY=$NEWGRIDPACKS_ONLY
       if [ $NEWGRIDPACKS_ONLY ] ; then

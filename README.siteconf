@@ -1,0 +1,39 @@
+
+README for the SITECONF update on cvmfs prepared by Bockjoo Kim on 02MAY2020
+
+[1] What is SITECONF?
+It is an XML description of the site file access protocols and mapping.
+Each site usually has different SITECONF.
+The most important two files in the SITECONF/T* directories:
+SITECONF/T*/JobConfig/site-local-config.xml
+SITECONF/T*/PhEDEx/storage.xml
+
+JobConfig/site-local-config.xml points to the so-called trivial catalog, PhEDEx/storage.xml, defines
+local stageout, fallback stageout, and the frontier squid.
+For more details, please refer to the CMS twiki {1}
+site-local-config.xml and storage.xml files are used by CMS jobs and are very important to keep them
+up-to-date to the gitlab {2}, which is updated by each site as needed
+
+[2] SITECONF Update
+The need for the SITECONF update and the execution of the SITECONF update are performed by the script
+cvmfs_check_and_update_siteconf.sh {3}
+  1. The script first fetches the site list from CRIC {4}.
+  2. It then deletes sites that are not in CRIC.
+  3. It gets siteid-site mapping from the gitlab {5}.
+  4. It compares the timestamp stored locally ($OLDT) with the timestamp stored in the gitlab and
+     as needed, it downloads the siteconf tarball using the siteid-site mapping from the step 3 above
+  5. It creates the updated SITECONF in the $HOME/SITECONF/SITECONF
+  6. It updates the timestamp in the $HOME/SITECONF/SITECONF/.timestamp
+  7. If all is successful, SITECONF is published
+One important aspect of the SITECONF is the variant symlink, /cvmfs/cms.cern.ch/SITECONF/local, which is
+symlinked to the cvmfs client variable $(CMS_LOCAL_SITE) which is then configured at each site based on the
+site need {6}
+
+
+References
+{1} https://twiki.cern.ch/twiki/bin/view/CMSPublic/SiteConfInGitlab
+{2} https://gitlab.cern.ch/SITECONF
+{3} https://github.com/bockjoo/cvmfs-cms-install-scripts/blob/master/cvmfs_check_and_update_siteconf.sh
+{4} http://cms-cric.cern.ch/api/cms/site/query/?json&preset=site-names&rcsite_state=ANY
+{5} https://gitlab.cern.ch/api/v4/groups/4099/projects
+{6} https://github.com/bockjoo/cvmfs-cms-install-scripts/blob/master/README.CVMFS.Variant.Symlink

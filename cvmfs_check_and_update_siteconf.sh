@@ -22,34 +22,59 @@
 # version=0.3
 # 
 # #############################################################################
+# Versions
+# 1.8.7
+
+# Configuration
+version=1.8.7
+notifytowhom=bockjoo@phys.ufl.edu
+updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
+what="$(basename $0)"
+rsync_name="/cvmfs/cms.cern.ch/SITECONF"   # /cvmfs/cms.cern.ch/SITECONF
 SKIP_SITES="T3_US_ANL"
 EXC_LOCK=""
 TMP_AREA="/tmp/cvmfs_tmp"
 ERR_FILE="/tmp/stcnf_$$.err"
 EVERY_X_HOUR=4
-# 17DEC2018
-siteconf_cat=https://gitlab.cern.ch/api/v4/groups/SITECONF
 siteconf_cat=https://gitlab.cern.ch/api/v4/groups/4099/projects # See https://cern.service-now.com/service-portal/view-request.do?n=RQF1526910 
-
-notifytowhom=bockjoo@phys.ufl.edu
-# 17DEC2018
-
-# 12FEB2020
 siteid_list=$HOME/siteid_list.txt
-# 12FEB2020
+SYNC_DIR="$HOME/SITECONF"         # /cvmfs/cms.cern.ch
+AUTH_TKN="$(cat $HOME/.AUTH_TKN)" # private token $HOME/.AUTH_TKN
+EMAIL_ADDR="$notifytowhom"        # your email
+export X509_USER_PROXY=$HOME/.florida.t2.proxy
+AUTH_CRT="$X509_USER_PROXY"
+AUTH_KEY="$X509_USER_PROXY"
+
+source $HOME/cron_install_cmssw.config # notifytowhom
+source $HOME/functions-cms-cvmfs-mgmt
+
+# update proxy
+source /home/cvcms/osg/osg-wn-client/setup.sh
+globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy
+if [ $? -eq 0 ] ; then
+   cp $X509_USER_PROXY.copy $X509_USER_PROXY
+   voms-proxy-info -all
+else
+   if [ $(voms-proxy-info -timelef 2>/dev/null) -lt 100 ] ; then
+      printf "$what ERROR failed to download $X509_USER_PROXY\n$(globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy 2>&1 | sed 's#%#%%#g')n" | mail -s "$what ERROR proxy download failed" $notifytowhom
+      exit 1
+   fi
+   echo INFO using previous one
+   voms-proxy-info -all
+fi
+
+# AUTH Token for gitlab siteconf api access 
+if [ ! -f $HOME/.AUTH_TKN ] ; then
+   printf "$what ERROR  $HOME/.AUTH_TKN does not exist \n" | mail -s "$what ERROR No Auth Token Found" $notifytowhom
+   exit 1
+fi
+
+
 echo DEBUG TMP_AREA=$TMP_AREA
 trap 'exit 1' 1 2 3 15
 trap '(/bin/rm -rf ${EXC_LOCK} ${TMP_AREA} ${ERR_FILE}) 1> /dev/null 2>&1' 0
 
-if [ $# -lt 3 ] ; then
-   echo ERROR $(basename $0) SYNC_DIR AUTH_TKN EMAIL
-   exit 1
-fi
-SYNC_DIR="$1"        # /cvmfs/cms.cern.ch
-AUTH_TKN="$(cat $2)" # private token $HOME/.AUTH_TKN
-EMAIL_ADDR="$3"      # your email
-AUTH_CRT="$X509_USER_PROXY"
-AUTH_KEY="$X509_USER_PROXY"
+
 echo "[0] SYNC_DIR=$SYNC_DIR"
 # #############################################################################
 
@@ -58,8 +83,8 @@ echo "[0] SYNC_DIR=$SYNC_DIR"
 # get cvmfs/stcnf_updt lock:
 # --------------------------
 echo "[1] Acquiring lock for cvmfs/stcnf_updt"
-if [ ! -d /var/tmp/cmssst ]; then
-   /bin/rm -f /var/tmp/cvmfs 1>/dev/null 2>&1
+if [ ! -d /var/tmp/cvmfs ]; then
+   /bin/rm -rf /var/tmp/cvmfs 1>/dev/null 2>&1
    /bin/mkdir /var/tmp/cvmfs 1>/dev/null 2>&1
 fi
 /bin/ln -s $$ /var/tmp/cvmfs/stcnf_updt.lock
@@ -86,7 +111,7 @@ if [ $? -ne 0 ]; then
       exit 1
    fi
 fi
-#
+
 # double check we have the lock
 LKPID=`(/bin/ls -l /var/tmp/cvmfs/stcnf_updt.lock | /usr/bin/awk '{if($(NF-1)=="->")print $NF;else print "";exit}') 2>/dev/null`
 if [ "${LKPID}" != "$$" ]; then
@@ -98,9 +123,8 @@ EXC_LOCK="/var/tmp/cvmfs/stcnf_updt.lock"
 # #############################################################################
 
 
-
+# Try to create a temporary directory
 /bin/rm -f ${ERR_FILE} 1>/dev/null 2>&1
-#
 /bin/rm -rf ${TMP_AREA} 1>/dev/null 2>&1
 /bin/mkdir ${TMP_AREA} 1>${ERR_FILE} 2>&1
 RC=$?
@@ -109,15 +133,15 @@ if [ ${RC} -ne 0 ]; then
    /bin/cat ${ERR_FILE}
    echo "   ${MSG}"
    if [ ! -t 0 ]; then
-      /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
+      printf "$0 ${MSG}\n$(cat ${ERR_FILE})\n" | mail -s "$0 ${MSG}" $notifytowhom # /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
    fi
    exit ${RC}
 fi
 /bin/rm -f ${ERR_FILE} 1>/dev/null 2>&1
-#
+
+# Create $SYNC_DIR if needed
 if [ ! -d ${SYNC_DIR} ]; then
-   #/bin/mkdir ${SYNC_DIR} 1>${ERR_FILE} 2>&1
-   echo DEBUG doing /bin/mkdir -p ${SYNC_DIR} at $(pwd)
+   echo INFO doing /bin/mkdir -p ${SYNC_DIR} at $(pwd)
    /bin/mkdir -p ${SYNC_DIR} 1>${ERR_FILE} 2>&1
    RC=$?
    if [ ${RC} -ne 0 ]; then
@@ -125,11 +149,13 @@ if [ ! -d ${SYNC_DIR} ]; then
       /bin/cat ${ERR_FILE}
       echo "   ${MSG}"
       if [ ! -t 0 ]; then
-         /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
+         printf "$0 ${MSG}\n$(cat ${ERR_FILE})\n" | mail -s "$0 ${MSG}" $notifytowhom # /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
       fi
       exit ${RC}
    fi
 fi
+
+# Create SITECONF if needed
 /bin/rm -f ${ERR_FILE} 1>/dev/null 2>&1
 if [ ! -d ${SYNC_DIR}/SITECONF ]; then
    /bin/mkdir ${SYNC_DIR}/SITECONF 1>${ERR_FILE} 2>&1
@@ -139,139 +165,19 @@ if [ ! -d ${SYNC_DIR}/SITECONF ]; then
       /bin/cat ${ERR_FILE}
       echo "   ${MSG}"
       if [ ! -t 0 ]; then
-         /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
+         printf "$0 ${MSG}\n$(cat ${ERR_FILE})\n" | mail -s "$0 ${MSG}" $notifytowhom # /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
       fi
       exit ${RC}
    fi
 fi
 /bin/rm -f ${ERR_FILE} 1>/dev/null 2>&1
-# #############################################################################
-
-
-
-# extract awk script:
-# ===================
-/bin/rm -f ${TMP_AREA}/sitedb.awk 1> /dev/null 2>&1
-/bin/cat 1>${TMP_AREA}/sitedb.awk 2>${ERR_FILE} << 'EOF_sitedb.awk'
-#!/bin/awk -f
-BEGIN{brck=0}
-{
-   todo=$0
-   while(length(todo)>=1){
-      ob=index(todo,"[")
-      cb=index(todo,"]")
-      if((ob!=0)&&((cb==0)||(ob<cb))){
-         brck+=1
-         if(brck==2)line=substr(todo,ob+1)
-         todo=substr(todo,ob+1)
-      }else{
-         if(cb!=0){
-            todo=substr(todo,cb+1);
-            if(brck==2){
-               len=length(line)-length(todo)-1
-               line=substr(line,0,len)
-               nk=split(line,a,",")
-               if(a[1]=="\"cms\""){
-                  gsub(" ","",a[3]);gsub("\"","",a[3])
-                  print a[3]
-               }
-            }
-            brck-=1
-         }else{
-            break
-         }
-      }
-   }
-}
-EOF_sitedb.awk
-RC=$?
-if [ ${RC} -ne 0 ]; then
-   MSG="failed to write sitedb.awk, cat=${RC}"
-   /bin/cat ${ERR_FILE}
-   echo "   ${MSG}"
-   if [ ! -t 0 ]; then
-      /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
-   fi
-   exit ${RC}
-fi
-/bin/rm ${ERR_FILE} 1>/dev/null 2>&1
-#
-/bin/rm -f ${TMP_AREA}/gitlab.awk 1> /dev/null 2>&1
-/bin/cat 1>${TMP_AREA}/gitlab.awk 2>${ERR_FILE} << 'EOF_gitlab.awk'
-#!/bin/awk -f
-BEGIN{now=systime();brcs=0}
-{
-   todo=$0
-   while(length(todo)>=1){
-      ob=index(todo,"{")
-      cb=index(todo,"}")
-      if((ob!=0)&&((cb==0)||(ob<cb))){
-         brcs+=1
-         if(brcs==1){site="";last=now;keys=substr(todo,ob+1);sobj=0}
-         if(brcs==2)sobj=ob
-         todo=substr(todo,ob+1)
-      }else{
-         if(cb!=0){
-            todo=substr(todo,cb+1);
-            if(brcs==1){
-               len=length(keys)-length(todo)-1
-               if(sobj==0){
-                  keys=substr(keys,0,len)
-               }else{
-                  key1=substr(keys,0,sobj)
-                  key2=substr(keys,eobj,len-eobj+1)
-                  keys=(key1 key2)
-               }
-               nk=split(keys,a,",")
-               for(i=nk;i>0;i-=1){
-                  if(index(a[i],"\"name\":")>0){
-                     site=substr(a[i],8)
-                     gsub("\"","",site)
-                  }
-                  if(index(a[i],"\"last_activity_at\":")>0){
-                     ts=substr(a[i],21,19)
-                     ts2=substr(a[i],21,19)
-                     gsub("-"," ",ts);gsub("T"," ",ts);gsub(":"," ",ts)
-                     gsub("-","",ts2);gsub("T"," ",ts2)
-                     tzn=substr(a[i],44,3)
-                     last=mktime(ts)-3600*tzn
-                  }
-               }
-               if(site!="")printf "%s:%s:%s\n",site,last,ts2
-            }
-            if(brcs==2)eobj=length(keys)-length(todo)
-            brcs-=1
-         }else{
-            break
-         }
-      }
-   }
-}
-EOF_gitlab.awk
-RC=$?
-if [ ${RC} -ne 0 ]; then
-   MSG="failed to write gitlab.awk, cat=${RC}"
-   /bin/cat ${ERR_FILE}
-   echo "   ${MSG}"
-   if [ ! -t 0 ]; then
-      /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
-   fi
-   exit ${RC}
-fi
-/bin/rm ${ERR_FILE} 1>/dev/null 2>&1
-# #############################################################################
-
-
 
 # get list of CMS sites:
 # ======================
 echo "[2] Fetching list of CMS sites..."
 SITES_URL="https://cmsweb.cern.ch/sitedb/data/prod/site-names"
 /bin/rm -f ${TMP_AREA}/sitedb.json 1>/dev/null 2>&1
-#/usr/bin/wget --certificate=${AUTH_CRT} --private-key=${AUTH_KEY} -O ${TMP_AREA}/sitedb.json ${SITES_URL} 1>${ERR_FILE} 2>&1
-#/usr/bin/curl -s -S --cert ${AUTH_CRT} --key ${AUTH_CRT} --cacert ${AUTH_CRT} --capath /etc/grid-security/certificates -o ${TMP_AREA}/sitedb.json -X GET "${SITES_URL}" 1>${ERR_FILE} 2>&1
-#/usr/bin/curl -L -k --key $AUTH_CRT --cert $AUTH_CRT -v "https://cms-cric.cern.ch/api/cms/site/query/?json&preset=site-names&rcsite_state=ANY" 1>${TMP_AREA}/sitedb.json 2>${ERR_FILE} # | grep \"T[0-9] | cut -d\" -f2 | sort -u
-/usr/bin/curl -L -k --key $AUTH_CRT --cert $AUTH_CRT -v "http://cms-cric.cern.ch/api/cms/site/query/?json&preset=site-names&rcsite_state=ANY" 1>${TMP_AREA}/sitedb.json 2>${ERR_FILE} # | grep \"T[0-9] | cut -d\" -f2 | sort -u
+/usr/bin/curl -L -k --key $AUTH_CRT --cert $AUTH_CRT -v "http://cms-cric.cern.ch/api/cms/site/query/?json&preset=site-names&rcsite_state=ANY" 1>${TMP_AREA}/sitedb.json 2>${ERR_FILE}
 RC=$?
 # for now use the static sitedb.json
 if [ $RC -ne 0  ] ; then
@@ -284,65 +190,56 @@ if [ ${RC} -ne 0 ]; then
    /bin/cat ${ERR_FILE}
    echo "   ${MSG}"
    if [ ! -t 0 ]; then
-      /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
+      printf "$0 ${MSG}\n$(cat ${ERR_FILE})\n" | mail -s "$0 ${MSG}" $notifytowhom # /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
    fi
    exit ${RC}
 fi
 /bin/rm ${ERR_FILE} 1>/dev/null 2>&1
-#
+
+
 # make list of CMS site names:
-echo DEBUG content of sitedb.json
-echo cat ${TMP_AREA}/sitedb.json 
-echo DEBUG end of content of sitedb.json
 /bin/rm -f ${TMP_AREA}/sitedb.list
-
-echo DEBUG ${TMP_AREA}/sitedb.list.old
-/usr/bin/awk -f ${TMP_AREA}/sitedb.awk ${TMP_AREA}/sitedb.json 1>${TMP_AREA}/sitedb.list.old
 grep \"T[0-9]  ${TMP_AREA}/sitedb.json | cut -d\" -f2 | sort -u > ${TMP_AREA}/sitedb.list
-
 /bin/rm ${TMP_AREA}/sitedb.json
-echo DEBUG ${TMP_AREA}/sitedb.list
-cat ${TMP_AREA}/sitedb.list
-echo DEBUG end of ${TMP_AREA}/sitedb.list
-#
+
 # sanity check of SiteDB sites:
-if [ `/usr/bin/awk 'BEGIN{nl=0}{nl+=1}END{print nl}' ${TMP_AREA}/sitedb.list 2>/dev/null` -lt 100 ]; then
+if [ $(/usr/bin/awk 'BEGIN{nl=0}{nl+=1}END{print nl}' ${TMP_AREA}/sitedb.list 2>/dev/null) -lt 100 ]; then
    MSG="sanity check of SiteDB sites failed, exiting"
    echo "   ${MSG}"
    if [ ! -t 0 ]; then
-      echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
+      printf "$0 ${MSG}\n$(cat ${TMP_AREA}/sitedb.list)\n" | mail -s "$0 ${MSG}" $notifytowhom # echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
    fi
    exit 1
 fi
-if [ `(/bin/grep '^T0_' ${TMP_AREA}/sitedb.list | /usr/bin/wc -l) 2>/dev/null` -lt 1 ]; then
+if [ $(/bin/grep '^T0_' ${TMP_AREA}/sitedb.list 2>/dev/null | /usr/bin/wc -l) -lt 1 ]; then
    MSG="sanity check of SiteDB Tier-0 count failed, exiting"
    echo "   ${MSG}"
    if [ ! -t 0 ]; then
-      echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
+      printf "$0 ${MSG}\n$(cat ${TMP_AREA}/sitedb.list)\n" | mail -s "$0 ${MSG}" $notifytowhom # echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
    fi
    exit 1
 fi
-if [ `(/bin/grep '^T1_' ${TMP_AREA}/sitedb.list | /usr/bin/wc -l) 2>/dev/null` -lt 5 ]; then
+if [ $(/bin/grep '^T1_' ${TMP_AREA}/sitedb.list 2>/dev/null | /usr/bin/wc -l) -lt 5 ]; then
    MSG="sanity check of SiteDB Tier-1 count failed, exiting"
    echo "   ${MSG}"
    if [ ! -t 0 ]; then
-      echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
+      printf "$0 ${MSG}\n$(cat ${TMP_AREA}/sitedb.list)\n" | mail -s "$0 ${MSG}" $notifytowhom # echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
    fi
    exit 1
 fi
-if [ `(/bin/grep '^T2_' ${TMP_AREA}/sitedb.list | /usr/bin/wc -l) 2>/dev/null` -lt 40 ]; then
+if [ $(/bin/grep '^T2_' ${TMP_AREA}/sitedb.list 2>/dev/null | /usr/bin/wc -l) -lt 40 ]; then
    MSG="sanity check of SiteDB Tier-2 count failed, exiting"
    echo "   ${MSG}"
    if [ ! -t 0 ]; then
-      echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
+      printf "$0 ${MSG}\n$(cat ${TMP_AREA}/sitedb.list)\n" | mail -s "$0 ${MSG}" $notifytowhom # echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
    fi
    exit 1
 fi
-if [ `(/bin/grep '^T3_' ${TMP_AREA}/sitedb.list | /usr/bin/wc -l) 2>/dev/null` -lt 50 ]; then
+if [ $(/bin/grep '^T3_' ${TMP_AREA}/sitedb.list 2>/dev/null | /usr/bin/wc -l) -lt 50 ]; then
    MSG="sanity check of SiteDB Tier-3 count failed, exiting"
    echo "   ${MSG}"
    if [ ! -t 0 ]; then
-      echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
+      printf "$0 ${MSG}\n$(cat ${TMP_AREA}/sitedb.list)\n" | mail -s "$0 ${MSG}" $notifytowhom # echo "${SDB_LIST}" | /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR}
    fi
    exit 1
 fi
@@ -360,7 +257,6 @@ for PAGE in 1 2 3 4 5 6 7 8 9; do
    /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=90 -O ${TMP_AREA}/gitlab_${PAGE}.json 'https://gitlab.cern.ch/api/v4/groups/SITECONF/projects?per_page=100&page='${PAGE} 1>>${ERR_FILE} 2>&1
    RC=$?
    echo DEBUG gitlab page:
-   #cat ${TMP_AREA}/gitlab_${PAGE}.json
    if [ ${RC} -eq 0 ]; then
       SUCC=1
       /bin/grep name ${TMP_AREA}/gitlab_${PAGE}.json 1>/dev/null 2>&1
@@ -385,106 +281,45 @@ if [ ${FAIL} -ne 0 ]; then
    /bin/cat ${ERR_FILE}
    echo "   ${MSG}"
    if [ ! -t 0 ]; then
-      /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
-      # 17DEC2018
       printf "$(/bin/hostname) $0: ${MSG}\n$(cat ${ERR_FILE})" | mail -s "ERROR: $MSG" $notifytowhom
-      # 17DEC2018
    fi
 fi
 if [ ${SUCC} -eq 0 ]; then
    exit 1
 fi
 /bin/rm ${ERR_FILE} 1>/dev/null 2>&1
-#
-echo DEBUG ${TMP_AREA}/.timestamp
-cat ${TMP_AREA}/.timestamp
+# ###################################################################################################
 
-echo DEBUG /bin/rm -f ${TMP_AREA}/.timestamp
 /bin/rm -f ${TMP_AREA}/.timestamp
-#echo DEBUG ${TMP_AREA}/gitlab_\*.json
-#for f in ${TMP_AREA}/gitlab_\*.json ; do
-#   echo DEBUG $f
-#done
-for f in ${TMP_AREA}/gitlab_[0-9]*.json ; do
-   echo DEBUG cat $f
-   cat $f
-done
-#echo DEBUG /usr/bin/awk -f ${TMP_AREA}/gitlab.awk ${TMP_AREA}/gitlab_\*.json
-#/usr/bin/awk -f ${TMP_AREA}/gitlab.awk ${TMP_AREA}/gitlab_*.json 1>${TMP_AREA}/.timestamp
-#echo DEBUG checking ${TMP_AREA}/gitlab.awk
-#cat  ${TMP_AREA}/gitlab.awk
-if [ ] ; then
-   /usr/bin/awk -f ${TMP_AREA}/gitlab.awk ${TMP_AREA}/gitlab_*.json 1>${TMP_AREA}/.timestamp1
-else
-   #for f in ${TMP_AREA}/gitlab_*.json ; do
-   #   /bin/cp $f $HOME/$(basename $f).$(date +%Y%m%d)
-   #done
-   #sed "s#SITECONF/T#\nSITECONF/T#g" ${TMP_AREA}/gitlab_[0-9]*.json | grep last_activity_at | \
-   #while read line ; do 
-   #   site_last_activity=$(echo $line | sed 's#,#\n#g' | grep "SITECONF/T\|last_activity_at")
-   #   site=$(echo $site_last_activity | cut -d/ -f2 | cut -d\" -f1)
-   #   timestamp=$(echo $site_last_activity | cut -d: -f2- | cut -d. -f1)\"
-   #   timestamp=$(date -d "$(echo $timestamp | sed 's#\"##g')" +%s)
-   #   echo $site:$timestamp | sed 's#"##g'
-   #done > ${TMP_AREA}/.timestamp # | grep "T3_US_UMiss\|UMISS\|Florida\|T3_US_TAMU\|T0_CH_CERN\|T2_CH_CERN\|T3_KR_KISTI\|T3_US_Colorado\|T2_FR_GRIF_LLR\|T3_BY_NCPHEP\|T3_IT_Trieste\|T3_KR_UOS\|T3_US_UCR\|T3_CH_Volunteer\|T3_US_NotreDame\|T2_KR_KISTI\|T3_US_UMD\|T3_US_Rutgers\|T2_BE_UCL\|T3_FR_IPNL\|T3_CH_PSI\|T3_US_OSG\|T3_US_TACC\|T2_US_MIT\|T2_IT_Pisa\|T2_FI_HIP" > ${TMP_AREA}/.timestamp
-   sed 's#"name":"T#\n"name":"T#g' ${TMP_AREA}/gitlab_[0-9]*.json | grep last_activity_at | \
-   while read line ; do 
+sed 's#"name":"T#\n"name":"T#g' ${TMP_AREA}/gitlab_[0-9]*.json | grep last_activity_at | \
+while read line ; do 
       site_last_activity=$(echo $line | sed 's#,#^\n#g' | grep "\"name\":\"T\|last_activity_at")
       site=$(echo $site_last_activity | cut -d\^ -f1 | cut -d: -f2 | sed 's#"##g')
       timestamp=$(echo $site_last_activity | cut -d\^ -f2 | cut -d: -f2- | cut -d. -f1 | sed 's#"##g')
       timestamp=$(date -d "$timestamp" +%s)
       echo $site:$timestamp
-   done > ${TMP_AREA}/.timestamp
+done > ${TMP_AREA}/.timestamp
+
+# ${TMP_AREA}/.timestamp should not be empty
+if [ $(cat ${TMP_AREA}/.timestamp | wc -l) -lt 100 ] ; then
+   echo ERROR ${TMP_AREA}/.timestamp has less than 100 entries
+   printf "$(/bin/hostname) $0: ${TMP_AREA}/.timestamp has less than 100 entries\n$(cat ${TMP_AREA}/.timestamp)\n" | mail -s "ERROR: Content of ${TMP_AREA}/.timestamp" $notifytowhom
+   # release thelock:
+   echo "Releasing lock for cvmfs/stcnf_updt"
+   /bin/rm ${EXC_LOCK}
+   EXC_LOCK=""
+   exit 0
 fi
 
-if [ ] ; then
-echo DEBUG checking ${TMP_AREA}/.timestamp1
-cat ${TMP_AREA}/.timestamp1
-echo DEBUG checking ${TMP_AREA}/.timestamp2
-cat ${TMP_AREA}/.timestamp2
-while read line ; do
-   site=$(echo $line | cut -d: -f1)
-   t1=$(echo $line | cut -d: -f2)
-   t2=$(echo $line | cut -d: -f3-)
-   #[ "x$site" == "xT2_CH_CERN_HLT" ] && { t2cern=$(expr $(date --date "$t2" +%s) + 3600) ; echo ${site}:$t2cern ; continue ; }
-   echo DEBUG t1=$t1 t2=$t2 t2 should be in time format
-   echo ${site}:$(date --date "$t2" +%s)
-done < ${TMP_AREA}/.timestamp1
-
-while read line ; do
-   site=$(echo $line | cut -d: -f1)
-   t1=$(echo $line | cut -d: -f2)
-   t2=$(echo $line | cut -d: -f3-)
-   #[ "x$site" == "xT2_CH_CERN_HLT" ] && { t2cern=$(expr $(date --date "$t2" +%s) + 3600) ; echo ${site}:$t2cern ; continue ; }
-   echo ${site}:$(date --date "$t2" +%s)
-done < ${TMP_AREA}/.timestamp1 > ${TMP_AREA}/.timestamp
-fi
-
-#cp ${TMP_AREA}/.timestamp2 ${TMP_AREA}/.timestamp
-echo DEBUG timestamp "(should not be empty)"
-cat ${TMP_AREA}/.timestamp
-#echo DEBUG timestamp
-#cat ${TMP_AREA}/.timestamp
-
-#echo DEBUG content of timestamp at $(date)
-#ls -al ${TMP_AREA}/.timestamp
-
-#cat ${TMP_AREA}/.timestamp
-#cp ${TMP_AREA}/gitlab_*.json $HOME/
-#cp ${TMP_AREA}/gitlab.awk $HOME/
-
-#echo DEBUG /bin/rm ${TMP_AREA}/gitlab_\*.json
 /bin/rm ${TMP_AREA}/gitlab_*.json
 # #############################################################################
-
-
 
 echo "[4] loop over SYNC_DIR ${SYNC_DIR} CMS sites and remove sites no longer in SiteDB..."
 # loop over SYNC_DIR CMS sites and remove sites no longer in SiteDB:
 # ==================================================================
 /bin/cp /dev/null ${ERR_FILE} 1>/dev/null 2>&1
 FAIL=0
-SYNC_LIST=`(cd ${SYNC_DIR}/SITECONF; /bin/ls -d1 T?_??_*) 2>/dev/null`
+SYNC_LIST=$(cd ${SYNC_DIR}/SITECONF ; /bin/ls -d1 T?_??_* 2>/dev/null)
 for SITE in ${SYNC_LIST}; do
    echo DEBUG site=$SITE checking /bin/grep "^${SITE}\$" ${TMP_AREA}/sitedb.list
    /bin/grep "^${SITE}\$" ${TMP_AREA}/sitedb.list 1>/dev/null 2>&1
@@ -513,8 +348,9 @@ if [ ${FAIL} -ne 0 ]; then
    /bin/cat ${ERR_FILE}
    echo "   ${MSG}"
    if [ ! -t 0 ]; then
-      /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
+      printf "$0 ${MSG}\n$(cat ${ERR_FILE})\n" | mail -s "$0 ${MSG}" $notifytowhom # /usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
    fi
+   /bin/rm ${EXC_LOCK}
    exit 1
 fi
 /bin/rm ${ERR_FILE} 1>/dev/null 2>&1
@@ -522,7 +358,7 @@ fi
 
 
 
-echo "[5] loop over SiteDB sites and update SYNC_DIR as needed"
+echo "[5] loop over CRIC sites and update SYNC_DIR as needed"
 # loop over SiteDB sites and update SYNC_DIR as needed:
 # =====================================================
 /bin/cp /dev/null ${ERR_FILE} 1>/dev/null 2>&1
@@ -530,16 +366,7 @@ list_sites_updated=""
 FAIL=0
 isite=0
 
-# 17DEC2018 We have to use api see email from Lammel and need to fetch SITECONF siteid
-if [ ] ; then
-/usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat 2>&1
-if [ $? -ne 0 ] ; then
-   printf "$(/bin/hostname) $0 failed to download $siteconf_cat\nUsing /usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat " | mail -s "ERROR: wget $siteconf_cat AUTH failed " $notifytowhom
-   exit 1
-fi
-fi # if [ ] ; then
 
-# if [ ] ; then
 ipages=0
 status=0
 while [ $ipages -lt 100 ] ; do
@@ -547,14 +374,18 @@ while [ $ipages -lt 100 ] ; do
    /usr/bin/wget -q --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat.${ipages} "$siteconf_cat?page=${ipages}&per_page=100" 2>&1
   status=$(expr $status + $?)
   [ $status -eq 0 ] || break
-  grep -q \\.git ${TMP_AREA}/siteconf_cat.${i}
-  [ $? -eq 0 ] || { rm -f ${TMP_AREA}/siteconf_cat.${i} ; break ; } ;
-  echo INFO check ${TMP_AREA}/siteconf_cat.${i}
+  # If we can not find .git in the page, the page is empty or something
+  grep -q \\.git ${TMP_AREA}/siteconf_cat.${ipages}
+  [ $? -eq 0 ] || { rm -f ${TMP_AREA}/siteconf_cat.${ipages} ; break ; } ;
+  echo INFO check ${TMP_AREA}/siteconf_cat.${ipages}
 done
 if [ $status -ne 0 ] ; then
    printf "$(/bin/hostname) $0 failed to download one of the pages in $siteconf_cat\nUsing /usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat " | mail -s "ERROR: wget $siteconf_cat AUTH failed " $notifytowhom
+   /bin/rm ${EXC_LOCK}
    exit 1
 fi
+
+# Just in case, create a cache for siteid_list
 printf "$(cat ${TMP_AREA}/siteconf_cat*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/.*.git | sed 's#,#\n#g' | grep "^{\"id" | cut -d: -f2 | \
 while read id ; do
   siteconf_sitename=$(printf "$(cat ${TMP_AREA}/siteconf_cat*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/.*.git | sed 's#,#\n#g' | grep -A 2 "^{\"id\":$id" | grep \"name\": | cut -d\" -f4)
@@ -564,17 +395,16 @@ while read id ; do
   [ $? -eq 0 ] || { echo INFO adding  "$siteconf_sitename $id" to $siteid_list ; echo "$siteconf_sitename $id" >> $siteid_list ; } ;
 done
 
-# fi
-
 # Sanity check for the downloaded output
 grep -q '"name":"siteconf"' ${TMP_AREA}/siteconf_cat*
 if [ $? -ne 0 ] ; then
    printf "$(/bin/hostname) $0 failed to download $siteconf_cat\nUsing /usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat \n${TMP_AREA}/siteconf_cat wrong" | mail -s "ERROR: wget $siteconf_cat ${TMP_AREA}/siteconf_cat wrong " $notifytowhom
+   /bin/rm ${EXC_LOCK}
    exit 1
 fi
-# 17DEC2018
 
-for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
+# Compare the new timestamp ($NEWT) with the old ($OLDT). If they are different, download the siteconf for the site (given the siteid)
+for SITE in $(/bin/cat ${TMP_AREA}/sitedb.list) ; do
    isite=$(expr $isite + 1)
    echo "[5]" DEBUG doing SITE=$SITE
    NEWT=`/usr/bin/awk -F: '{if($1=="'${SITE}'"){print $2}}' ${TMP_AREA}/.timestamp 2>/dev/null`
@@ -595,7 +425,6 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
          # so I am ignoring timestamp-based update every four hour.
          # every four hour all sites that changed are updated
          #
-         # continue
          if [ $(expr $(date +%H) % $EVERY_X_HOUR) -eq 0 ] ; then
             echo DEBUG "[ $isite ]" SITE=$SITE HOUR=$(date +%H) so ignore timestamp for once and update the siteconf
          else
@@ -605,48 +434,27 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
       fi
    fi
 
-   #for site in $SKIP_SITES ; do echo $site ; done | grep -q ^${SITE}$
-   #
-   # [ $? -eq 0 ] && { echo Warning $SITE in SKIP_SITES list. Will ignore $SITE ; continue ; } ;
-   #
-
    #
    # need to update SITECONF:
    # ------------------------
    echo "[5-1] Updating area of site \"${SITE}\":"
    UPPER=`echo ${SITE} | /usr/bin/tr '[:lower:]' '[:upper:]'`
-   # 17DEC2018
-   # Need to use api instead /usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz 'https://gitlab.cern.ch/SITECONF/'${UPPER}'/repository/archive.tar.gz?ref=master' 1>>${ERR_FILE} 2>&1
-   if [ ] ; then
-   thesiteid=$(printf "$(cat ${TMP_AREA}/siteconf_cat)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/${UPPER}.git | sed 's#,#\n#g' | grep "^{\"id" | cut -d: -f2)
-   if [ "x$thesiteid" == "x" ] ; then
-      thesiteid=$(grep "${SITE} " $siteid_list 2>/dev/null | awk '{print $2}')
-   fi
-   fi # if [ ] ; then
-   # if [ ] ; then
    thesiteid=$(printf "$(cat ${TMP_AREA}/siteconf_cat.*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/${UPPER}.git | sed 's#,#\n#g' | grep "^{\"id" | cut -d: -f2)
    # The pagination for siteconf_cat does not work from time to time, use the siteid from the cache
    if [ "x$thesiteid" == "x" ] ; then
       thesiteid=$(grep "${SITE} " $siteid_list 2>/dev/null | awk '{print $2}')
    fi
-   # fi
 
    echo "[5-2] Site id for \"${SITE}\":${thesiteid}:"
    if [ "x$thesiteid" == "x" ] ; then
          /bin/cp ${TMP_AREA}/siteconf_cat.* $HOME/
-         #printf "$(cat ${TMP_AREA}/siteconf_cat.*)\n"
-         #printf "$(cat ${TMP_AREA}/siteconf_cat.*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/${UPPER}.git | sed 's#%#%%#g' | mail -s "ERROR:  the site id empty with $SITE" $notifytowhom
          printf "$(/bin/hostname) $0  ERROR: the site id is empty for $SITE. This should not have happened\n" | mail -s "ERROR:  the site id empty with $SITE" $notifytowhom
          continue
    fi
    /usr/bin/wget --header="PRIVATE-TOKEN: $(cat .AUTH_TKN)" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz https://gitlab.cern.ch/api/v4/projects/${thesiteid}/repository/archive.tar.gz?ref=master
-   # 17DEC2018
    RC=$?
    if [ ${RC} -ne 0 ]; then
-      # 17DEC2018
-      #/usr/bin/wget --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz 'https://gitlab.cern.ch/SITECONF/'${UPPER}'/repository/archive.tar.gz?ref=master' 2>&1 | grep -q "Authorization failed"
       /usr/bin/wget --header="PRIVATE-TOKEN: $(cat .AUTH_TKN)" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz https://gitlab.cern.ch/api/v4/projects/${thesiteid}/repository/archive.tar.gz?ref=master 2>&1 | grep -q "Authorization failed"
-      # 17DEC2018
       if [ $? -eq 0 ] ; then
          echo ERROR: wget Authorization failed with $SITE. This should not have happened
          printf "$(/bin/hostname) $0  ERROR: wget Authorization failed with $SITE. This should not have happened\n" | mail -s "ERROR:  wget Authorization failed with $SITE" $notifytowhom
@@ -659,12 +467,10 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
          echo "${MSG}" >> ${ERR_FILE}
          echo "" >> ${ERR_FILE}
       fi
-      # 17DEC2018
       printf "$(/bin/hostname) $0  Warning: failed to fetch GitLab archive of ${SITE} SiteId=$thesiteid , wget=${RC}\n/usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz https://gitlab.cern.ch/api/v4/projects/${thesiteid}/repository/archive.tar.gz?ref=master\n" | mail -s "Warning:  wget FAIL with $SITE" $notifytowhom
-      # 17DEC2018
       continue
    fi
-   # 17DEC2018
+   
    tar tzvf ${TMP_AREA}/archive_${SITE}.tgz | grep -q -i ${SITE}-
    if [ $? -ne 0 ] ; then
       FAIL=1
@@ -674,11 +480,10 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
       printf "$(/bin/hostname) $0  Warning: failed to pass tar tzvf ${TMP_AREA}/archive_${SITE}.tgz | grep -q -i $SITE\n$(tar tzvf ${TMP_AREA}/archive_${SITE}.tgz)\n" | mail -s "Warning:  wget FAIL with $SITE Wrong download" $notifytowhom
       continue
    fi
-   # 17DEC2018
-   #
+   
    TAR_DIR=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{print $1;exit}') 2>/dev/null`
    TAR_LST=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{if((($2=="JobConfig")&&(match($3,".*site-local-config.*\\.xml$")!=0))||(($2=="JobConfig")&&(match($3,"^cmsset_.*\\.c?sh$")!=0))||(($2=="PhEDEx")&&(match($3,".*storage.*\\.xml$")!=0))||(($2=="Tier0")&&($3=="override_catalog.xml"))||(($2=="GlideinConfig")&&($3=="")))print $0}') 2>/dev/null`
-   #
+   
    # 17JUL2018 forget about sites that do not have xml files in the gitlab
    if [ -s ${TMP_AREA}/archive_${SITE}.tgz ] ; then
       tar tzvf ${TMP_AREA}/archive_${SITE}.tgz 2>&1 | grep -q xml
@@ -691,8 +496,10 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
       echo "   extracting tar archive"
       (cd ${SYNC_DIR}/SITECONF; /bin/tar -xzf ${TMP_AREA}/archive_${SITE}.tgz ${TAR_LST}) 1>>${ERR_FILE} 2>&1
    else
-      /bin/mkdir ${SYNC_DIR}/SITECONF/${TAR_DIR}
-      /bin/mkdir ${SYNC_DIR}/SITECONF/${TAR_DIR}/JobConfig
+      if [ "x$(echo ${TAR_DIR})" != "x" ] ; then
+         /bin/mkdir ${SYNC_DIR}/SITECONF/${TAR_DIR}
+         /bin/mkdir ${SYNC_DIR}/SITECONF/${TAR_DIR}/JobConfig
+      fi
    fi
    RC=$?
    if [ ${RC} -ne 0 ]; then
@@ -706,9 +513,8 @@ for SITE in `/bin/cat ${TMP_AREA}/sitedb.list`; do
       fi
       continue
    fi
-   #[ "$SITE" == "T2_CH_CERN_HLT" ] && cp ${TMP_AREA}/archive_${SITE}.tgz $HOME/
    /bin/rm ${TMP_AREA}/archive_${SITE}.tgz
-   #
+   
    # avoid directory file update in case extracted files did not change
    /usr/bin/diff -r ${SYNC_DIR}/SITECONF/${SITE} ${SYNC_DIR}/SITECONF/${TAR_DIR} 1>/dev/null 2>&1
    status=$?
@@ -790,11 +596,9 @@ if [ ${FAIL} -ne 0 ]; then
    /bin/cat ${ERR_FILE}
    echo "   ${MSG}"
    if [ ! -t 0 ]; then
-      # 17DEC2018
-      #/usr/bin/Mail -s "$0 ${MSG}" ${EMAIL_ADDR} < ${ERR_FILE}
       printf "$(/bin/hostname) $0: ${MSG}\n$(cat ${ERR_FILE})" | mail -s "ERROR: $MSG" $notifytowhom
-      # 17DEC2018
    fi
+   /bin/rm ${EXC_LOCK}
    exit 1
 fi
 
@@ -803,15 +607,14 @@ fi
 # we need to make sure those sites are deleted from /cvmfs/cms.cern.ch/SITECONF and those
 # sites should be added to the UPDATED_SITES list
 #
-#if [ "x$UPDATED_SITES" == "x" ] ; then
-#echo DEBUG updated_sites are empty
-#
 # Ensure the $HOME/SITECONF/SITECONF has some content
 if [ $(ls $SYNC_DIR/SITECONF 2>/dev/null | wc -l) -le 1 ] ; then
       echo ERROR $SYNC_DIR/SITECONF empty
-      printf "functions-cms-cvmfs-mgmt: check_and_update_siteconf () ERROR $SYNC_DIR/SITECONF empty\nls $SYNC_DIR/SITECONF\necho INFO probably execute this command: rsync -arzuvp --exclude=.cvmfscatalog --delete ${rsync_name} $rsync_source/" | mail -s "ERROR: check_and_update_siteconf() $SYNC_DIR/SITECONF empty" $notifytowhom      
+      printf "functions-cms-cvmfs-mgmt: check_and_update_siteconf () ERROR $SYNC_DIR/SITECONF empty\nls $SYNC_DIR/SITECONF\necho INFO probably execute this command: rsync -arzuvp --exclude=.cvmfscatalog --delete ${rsync_name} $SYNC_DIR/" | mail -s "ERROR: check_and_update_siteconf() $SYNC_DIR/SITECONF empty" $notifytowhom      
       exit 1
 fi
+
+# Check if there was any siteconf that is updated
 sites_cvmfs=$(ls /cvmfs/cms.cern.ch/SITECONF | sort -u | grep T[0-9])
 sites_sync_dir=$(ls $SYNC_DIR/SITECONF | sort -u | grep T[0-9])
    
@@ -823,25 +626,132 @@ for s in $sites_cvmfs ; do
        [ $? -eq 0 ] || list_sites_updated="$list_sites_updated $s"
     fi
 done
-#fi
-echo UPDATED_SITES=\"$(echo $list_sites_updated)\"
-#[ $(expr $(date +%H) % $EVERY_X_HOUR) -eq 0 ] && { HOUR=$(date +%H) ; printf "$(basename $0) $(date) \nHOUR=$HOUR so ignore timestamp for once \nUPDATED_SITES=$UPDATED_SITES\n" | mail -s "HOUR=$HOUR so ignore timestamp for once" $EMAIL_ADDR ; } ;
 
-#echo UPDATED_SITES=
-#cp -pR /cvmfs/cms.cern.ch/SITECONF/local ${SYNC_DIR}/SITECONF/
-[ -L ${SYNC_DIR}/SITECONF/local ] || ln  -s '$(CMS_LOCAL_SITE)' ${SYNC_DIR}/SITECONF/local
+
+export UPDATED_SITES="$(echo $list_sites_updated)"
+publish_needed=0
+
+[ -L ${SYNC_DIR}/SITECONF/local ] || { publish_needed=1 ; ln  -s '$(CMS_LOCAL_SITE)' ${SYNC_DIR}/SITECONF/local ; }
 /bin/rm ${ERR_FILE} 1>/dev/null 2>&1
+
+if [ "x$UPDATED_SITES" == "x" ] ; then
+   echo INFO nothing to do. UPDATED_SITES is empty
+else
+   publish_needed=1
+fi
+
+if [ $publish_needed -eq 0 ] ; then
+   echo INFO publish not needed
+   # release thelock:
+   # -----------------------
+   echo "Releasing lock for cvmfs/stcnf_updt"
+   /bin/rm ${EXC_LOCK}
+   EXC_LOCK=""
+   exit 0
+fi
+
+# Publish needed
+cvmfs_server transaction
+status=$?
+cvmfs_server_transaction_check $status $what
+if [ $? -eq 0 ] ; then
+   echo INFO transaction OK for $what
+else
+   printf "$0 cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom
+   cd
+   exit 1
+fi
+
+# Check if ${rsync_source}/SITECONF is sane
+check_rsync_source_siteconf_sanity ${rsync_source}/SITECONF
+if [ $? -eq 0 ] ; then
+   echo INFO ${rsync_source}/SITECONF is sane
+else
+   printf "ERROR $0 ${rsync_source}/SITECONF is insane\n$(ls -al ${rsync_source}/SITECONF)\n" | mail -s "ERROR: ${rsync_source}/SITECONF insane" $notifytowhom
+   ( cd ; cvmfs_server abort -f ; ) ;
+   exit 1
+fi
+
+( cd /cvmfs/cms.cern.ch ; tar czvf $HOME/SITECONF.tar.gz.copy SITECONF && { /bin/cp $HOME/SITECONF.tar.gz $HOME/SITECONF.tar.gz.1 ; /bin/cp $HOME/SITECONF.tar.gz.copy $HOME/SITECONF.tar.gz ; } ; ) ;
+
+echo rsync -arzuvp --exclude=.cvmfscatalog --delete ${rsync_source}/SITECONF/ $rsync_name
+thelog=$HOME/logs/cvmfs_check_and_update_siteconf_rsync.log 
+rsync -arzuvp --exclude=.cvmfscatalog --delete ${rsync_source}/SITECONF/ $rsync_name > $thelog 2>&1 # option --delete deletes extraneous files from dest dirs
+if [ $? -eq 0 ] ; then
+      publish_needed=0
+      i=0
+      for f in $(grep ^T[0-9] $thelog | grep -v .git/ 2>/dev/null) ; do
+         i=$(expr $i + 1)
+         [ -f "$rsync_name/$f" ] || { echo "[ $i ] " $rsync_name/$f is not a file $publish_needed ; continue ; } ;
+         publish_needed=1
+         echo "[ $i ] " $rsync_name/$f is a file $publish_needed
+      done
+      grep -q "deleting T[0-9]_" $thelog
+      [ $? -eq 0 ] && publish_needed=1
+      echo INFO check point publish_needed $publish_needed
+      if [ $publish_needed -eq 0 ] ; then
+         echo INFO publish was not needed, So ending the transaction
+         printf "$what publish was not needed, though there are $UPDATED_SITES\nCheck $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/logs/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "ERROR $what publish was not needed but with updated sites" $notifytowhom
+         ( cd ; cvmfs_server abort -f ; ) ;
+         /bin/rm ${EXC_LOCK}
+         exit 1
+      else
+         if [ -L /cvmfs/cms.cern.ch/SITECONF/local ] ; then
+            printf "$what /cvmfs/cms.cern.ch/SITECONF/local exists\n$(ls -al /cvmfs/cms.cern.ch/SITECONF/local | sed 's#%#%%#g')\n" | mail -s "INFO /cvmfs/cms.cern.ch/SITECONF/local" $notifytowhom
+         else
+            ln -s '$(CMS_LOCAL_SITE)' /cvmfs/cms.cern.ch/SITECONF/local
+            if [ $? -eq 0 ] ; then
+               printf "$what local symlink went OK\nln -s '$\(CMS_LOCAL_SITE\)' /cvmfs/cms.cern.ch/SITECONF/local\n" | mail -s "INFO $what" $notifytowhom
+               publish_needed=1
+            else
+               printf "$what local symlink went failed\nln -s '$\(CMS_LOCAL_SITE\)' /cvmfs/cms.cern.ch/SITECONF/local\n" | mail -s "ERROR $what local symlink" $notifytowhom
+               ( cd ; cvmfs_server abort -f ; ) ;
+               /bin/rm ${EXC_LOCK}
+               exit 1
+            fi
+         fi
+         echo INFO publish necessary
+         printf "$what publish is needed UPDATED_SITES=$UPDATED_SITES\nCheck $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/logs/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "DEBUG $what publish is necessary" $notifytowhom
+         YMDM=$(date -u +%Y%m%d%H)
+         grep "$YMDM " $updated_list | grep -q "$UPDATED_SITES"
+         if [ $? -ne 0 ] ; then
+            echo $YMDM $(/bin/date +%s) $(/bin/date -u) "$UPDATED_SITES" to $updated_list
+            [ $(/bin/hostname -f) == $cvmfs_server_name ] && echo $YMDM $(/bin/date +%s) $(/bin/date -u) "$UPDATED_SITES" >> $updated_list
+         fi
+
+         echo INFO publishing $rsync_name
+         currdir=$(pwd)
+         cd
+         time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
+         status=$?
+         cd $currdir
+         if [ $status -eq 0 ] ; then
+            echo "$what cvmfs_server_publish OK"
+         else
+            echo ERROR failed cvmfs_server publish
+            printf "$what cvmfs_server_publish failed UPDATED_SITES=$UPDATED_SITES\nCheck $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/logs/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "ERROR $what cvmfs_server_publish failed" $notifytowhom
+            ( cd ; cvmfs_server abort -f ; ) ;
+            /bin/rm ${EXC_LOCK}
+            exit 1
+         fi
+      fi
+else
+      echo ERROR failed : rsync -arzuvp $rsync_source $(dirname $rsync_name)
+      printf "$what FAILED: rsync -arzuvp $rsync_source $(dirname $rsync_name)\n" | mail -s "$what ERROR FAILED rsync" $notifytowhom
+      ( cd ; cvmfs_server abort -f ; ) ;
+      /bin/rm ${EXC_LOCK}
+      exit 1
+fi
+
 # #############################################################################
 
 
 
-# release space_mon lock:
+# release thelock:
 # -----------------------
 echo "Releasing lock for cvmfs/stcnf_updt"
 /bin/rm ${EXC_LOCK}
 EXC_LOCK=""
 # #############################################################################
-
-
 
 exit 0
