@@ -249,32 +249,6 @@ if [ "X$(date +%Y%m%d)" == "X${Maintenance_Ymd}" ] ; then
  fi
 fi
 
-if [ ] ; then
-# [] PHEDEX
-echo INFO Next PhEDEXAgents EL6 gcc493 update will be checked and updated as needed
-echo
-echo INFO installing slc6 gcc493 phedexagents
-install_slc6_amd64_gcc493_phedexagents
-echo
-echo INFO Done PhEDExAgents EL6 gcc493 check and update part of the script
-echo
-# [] spacemon-client
-echo INFO Next spacemon-client EL6 gcc493 update will be checked and updated as needed
-echo
-echo INFO installing slc6 gcc493 spacemonclient
-install_slc6_amd64_gcc493_spacemonclient
-echo
-echo INFO Done spacemon-client EL6 gcc493 check and update part of the script
-echo
-# [] spacemon-client
-echo INFO Next xrootd_client EL6 gcc493 update will be checked and updated as needed
-echo
-echo INFO installing slc6 gcc493 xrootd_client
-install_slc6_amd64_gcc493_xrootd_client
-echo
-echo INFO Done xrootd_client EL6 gcc493 check and update part of the script
-echo
-fi # if [ ] ; then
 
 
 echo INFO Next LHAPDF update will be checked and updated as needed
@@ -292,20 +266,6 @@ fi
 echo
 echo INFO Done LHAPDF check and update part of the script
 
-
-if [ ] ; then
-# disabled because
-# cvmfs_update_pilot_config.sh ERROR at /home/cvcms/tmp/kestrel/src kestrel_pilot_config --write -o /home/cvcms/tmp/config_generated.ini failed
-# Traceback (most recent call last):
-#   File "./kestrel_pilot_config", line 8, in <module>
-#     import classad
-# ImportError: libpython2.6.so.1.0: cannot open shared object file: No such file or directory
-#
-# [] pilot config
-echo INFO Next Pilot config udate will be checked and updated as needed
-$HOME/cvmfs_update_pilot_config.sh 2>&1 | tee $HOME/logs/cvmfs_update_pilot_config.log
-echo INFO Done Pilot config check and update part of the script
-fi # if [ ] ; then
 
 # [] python
 echo INFO Next COMP+python update will be checked and updated as needed
@@ -393,17 +353,6 @@ cd
 time cvmfs_server publish 2>&1 | tee $HOME/logs/cvmfs_server+publish.log
 cd $currdir
 
-if [ ] ; then
-echo INFO Next CRAB3 EL7 gcc630 update will be checked and updated as needed
-echo
-echo INFO installing slc7 gcc630 crab3
-install_slc7_amd64_gcc630_crab3 > $HOME/logs/install_slc7_amd64_gcc630_crab3.log 2>&1
-echo
-echo INFO Done CRAB3 EL7 gcc630 check and update part of the script
-fi # if [ ] ; then
-
-#backup_installation 2>&1 | tee $HOME/logs/backup_installation.log
-#it takes longer than 8 hours: backup_installation_one slc6_amd64_gcc472 2>&1 | tee $HOME/logs/backup_installation_one_slc6_amd64_gcc472.log
 cp $updated_list $HOME/
 echo script $(basename $0) Done
 echo

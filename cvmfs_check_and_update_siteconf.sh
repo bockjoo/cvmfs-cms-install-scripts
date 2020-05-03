@@ -672,7 +672,7 @@ else
    exit 1
 fi
 
-( cd /cvmfs/cms.cern.ch ; tar czvf $HOME/SITECONF.tar.gz.copy SITECONF && { /bin/cp $HOME/SITECONF.tar.gz $HOME/SITECONF.tar.gz.1 ; /bin/cp $HOME/SITECONF.tar.gz.copy $HOME/SITECONF.tar.gz ; } ; ) ;
+( cd /cvmfs/cms.cern.ch ; tar czvf $HOME/SITECONF.tar.gz.copy $(echo $(for d in SITECONF/* ; do echo $d ; done | grep ^SITECONF/T[0-9]_)) && { /bin/cp $HOME/SITECONF.tar.gz $HOME/SITECONF.tar.gz.1 ; /bin/cp $HOME/SITECONF.tar.gz.copy $HOME/SITECONF.tar.gz ; } ; ) ;
 
 echo rsync -arzuvp --exclude=.cvmfscatalog --delete ${rsync_source}/SITECONF/ $rsync_name
 thelog=$HOME/logs/cvmfs_check_and_update_siteconf_rsync.log 

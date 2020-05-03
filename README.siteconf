@@ -29,6 +29,18 @@ One important aspect of the SITECONF is the variant symlink, /cvmfs/cms.cern.ch/
 symlinked to the cvmfs client variable $(CMS_LOCAL_SITE) which is then configured at each site based on the
 site need {6}
 
+[3] What you should do if /cvmfs/cms.cern.ch/SITECONF is screwed up
+First, recover it from the backup SITECONF like so:
+if [ -f $HOME/cron_install_cmssw.lock ] ; then
+   # Get the ps that uses the lock
+   theps=$(for ps in $(ps auxwww | grep cvcms | grep -v grep | awk '{print $2}') ; do /usr/sbin/lsof -p $ps 2>/dev/null | grep -q cron_install_cmssw.log && { echo $ps ; break ; } ; done)
+   tail --pid=$theps -f /dev/null
+fi
+touch $HOME/cron_install_cmssw.lock
+cvmfs_server transaction && ( cd /cvmfs/cms.cern.ch ; tar xzvf $HOME/SITECONF.tar.gz ; exit $? ; ) && cvmfs_server publish
+rm -f $HOME/cron_install_cmssw.lock
+Finally, figure out what went wrong and fix the issue
+
 
 References
 {1} https://twiki.cern.ch/twiki/bin/view/CMSPublic/SiteConfInGitlab
