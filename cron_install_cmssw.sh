@@ -189,72 +189,46 @@ fi
 echo INFO creating $lock
 echo $(date -u) >> $lock
 
-# [1] gridpacks still active in cron: Documentation README.gridpacks
-echo INFO Execute only the first half of the even hours
-echo INFO Next cron_rsync_generator_package_from_eos as needed
 echo
-$HOME/cron_rsync_generator_package_from_eos_individual.sh > $HOME/logs/cron_rsync_generator_package_from_eos_individual.log 2>&1
-echo
-echo INFO Done cron_rsync_generator_package_from_eos part of the script
-echo
-
-# [2] siteconf still active in cron
-echo INFO Next cvmfs_check_and_update_siteconf.sh using gitlab and cric
-echo
-$HOME/cvmfs_check_and_update_siteconf.sh > $HOME/logs/cvmfs_check_and_update_siteconf.log 2>&1
-echo INFO Done cvmfs_check_and_update_siteconf.sh using gitlab
-echo
-
+j=$(expr $j + 1)
 # [3] install cmssw: In Jenkins but it's here just in case
-echo INFO "executing run_install_cmssw > $HOME/logs/run_install_cmssw.log 2>&1"
-run_install_cmssw > $HOME/logs/run_install_cmssw.log 2>&1
+echo INFO "[$j]" "executing run_install_cmssw > $HOME/logs/run_install_cmssw.log 2>&1"
+$HOME/run_install_cmssw.sh > $HOME/logs/run_install_cmssw.log 2>&1
 
-# [] install power arch
-echo INFO "executing install_cmssw_power_archs 2>&1 | tee  $HOME/logs/install_cmssw_power_archs.log"
+echo
+j=$(expr $j + 1)
+# [4] install power arch
+echo INFO "[$j]" "executing install_cmssw_power_archs 2>&1 | tee  $HOME/logs/install_cmssw_power_archs.log"
 install_cmssw_power_archs 2>&1 | tee  $HOME/logs/install_cmssw_power_archs.log
 
-# [] install slc aarch
-echo INFO executing "install_cmssw_centos72_exotic_archs 2>&1 | tee $HOME/logs/install_cmssw_centos72_exotic_archs.log"
-install_cmssw_centos72_exotic_archs 2>&1 | tee $HOME/logs/cvmfs_install_cmssw_centos72_exotic_archs.log
 echo
+j=$(expr $j + 1)
+# [5] install slc aarch
+echo INFO "[$j]" executing "install_cmssw_centos72_exotic_archs 2>&1 | tee $HOME/logs/install_cmssw_centos72_exotic_archs.log"
+install_cmssw_centos72_exotic_archs 2>&1 | tee $HOME/logs/cvmfs_install_cmssw_centos72_exotic_archs.log
 echo INFO Done CMSSW installation part of the script
 
-
-if [ ] ; then
-# [] CRAB3
-echo INFO Next CRAB3 EL6 gcc493 update will be checked and updated as needed
 echo
-echo INFO installing slc6 gcc493 crab3
-#install_slc6_amd64_gcc493_crab3 > $HOME/logs/install_slc6_amd64_gcc493_crab3.log 2>&1
-docker_install_crab3 slc6_amd64_gcc493 > $HOME/logs/install_slc6_amd64_gcc493_crab3.log 2>&1
+j=$(expr $j + 1)
+# [6] gridpacks still active in cron: Documentation README.gridpacks
+echo INFO "[$j]" cron_rsync_generator_package_from_eos as needed
+$HOME/cron_rsync_generator_package_from_eos_individual.sh > $HOME/logs/cron_rsync_generator_package_from_eos_individual.log 2>&1
+echo INFO Done cron_rsync_generator_package_from_eos part of the script
+
 echo
-echo INFO Done CRAB3 EL6 gcc493 check and update part of the script
-echo
-fi # if [ ] ; then
-
-# [] Rucio Client on Jenkins
-Maintenance_Ymd=20200130
-Maintenance_d=$(echo $Maintenance_Ymd | cut -c7-8)
-Maintenance_H1=11
-Maintenance_H2=12
-if [ "X$(date +%Y%m%d)" == "X${Maintenance_Ymd}" ] ; then
- echo it is one echo $(date +%d%H) -ge ${Maintenance_d}${Maintenance_H1} -a $(date +%d%H) -lt ${Maintenance_d}${Maintenance_H2}
- if [ $(date +%d%H) -ge ${Maintenance_d}${Maintenance_H1} -a $(date +%d%H) -lt ${Maintenance_d}${Maintenance_H2} ] ; then
-    echo INFO Next Rucio Client
-    echo
-    $HOME/install_rucio_client.sh 2>&1 | tee $HOME/logs/install_rucio_client.log
-    echo
-    echo INFO Done Next Rucio Client
-    echo
- fi
-fi
-
-
+j=$(expr $j + 1)
+# [7] siteconf still active in cron
+echo INFO "[$j]" cvmfs_check_and_update_siteconf.sh using gitlab and cric
+$HOME/cvmfs_check_and_update_siteconf.sh > $HOME/logs/cvmfs_check_and_update_siteconf.log 2>&1
+echo INFO Done cvmfs_check_and_update_siteconf.sh using gitlab
 
 echo INFO Next LHAPDF update will be checked and updated as needed
 echo
 
-# [] lhapdf still active in cron
+echo
+j=$(expr $j + 1)
+# [8] lhapdf still active in cron
+echo INFO "[$j]" executing $HOME/cron_download_lhapdf.sh
 $HOME/cron_download_lhapdf.sh 2>&1 | tee $HOME/logs/cron_download_lhapdf.log
 lha_pdfsets_version=$(grep ^lhapdfweb_updates= $HOME/cron_download_lhapdf.sh | awk '{print $NF}' | cut -d\" -f1)
 grep -q "INFO publishing" $HOME/logs/cron_download_lhapdf.log
@@ -307,10 +281,6 @@ if [ "x$THEHOUR" == "x$RUN_WHEN" ] ; then
       echo INFO status of cvmfs_update_cmssw_git_mirror_v3.sh execution : $?
 fi
 echo INFO Done git mirror check
-# Check Point 5
-#rm -f $lock
-#exit 0
-#fi # if [ ] ; then
 
 # [] The host's CA/CRL update for grid operations still active in cron
 echo INFO Next CA/CRL update
