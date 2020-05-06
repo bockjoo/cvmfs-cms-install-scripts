@@ -5,8 +5,8 @@ WORKDIR=/cvmfs/cms.cern.ch
 export VO_CMS_SW_DIR=$WORKDIR
 workdir=$HOME
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
-rsync_source="$HOME/eos2/cms/store/group/phys_generator/cvmfs/gridpacks"
-rsync_name="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
+#rsync_source="$HOME/eos2/cms/store/group/phys_generator/cvmfs/gridpacks"
+#rsync_name="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
 rsync_destination="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
 bootstrap_script=http://cmsrep.cern.ch/cmssw/repos/bootstrap.sh     # 01FEB2017
 # Release Map

@@ -1,0 +1,15 @@
+
+Going back to the previous tag prepared by Bockjoo Kim 06MAY2020
+
+
+[1] Introduction
+[2] Commands
+    Step 1 find the list of tags
+           cvmfs_server tag -xl cms.cern.ch # to see the list of tags
+    Step 2 rollback
+           cvmfs_server rollback -t <tagname> cms.cern.ch. # Here <tagname> is the tag from the Step 1 above
+
+
+
+References
+{1} https://cvmfs.readthedocs.io/en/stable/cpt-repo.html#rollbacks

@@ -30,7 +30,7 @@ version=1.8.7
 notifytowhom=bockjoo@phys.ufl.edu
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
 what="$(basename $0)"
-rsync_name="/cvmfs/cms.cern.ch/SITECONF"   # /cvmfs/cms.cern.ch/SITECONF
+RSYNC_SITES="/cvmfs/cms.cern.ch/SITECONF"   # /cvmfs/cms.cern.ch/SITECONF
 SKIP_SITES="T3_US_ANL"
 EXC_LOCK=""
 TMP_AREA="/tmp/cvmfs_tmp"
@@ -610,7 +610,7 @@ fi
 # Ensure the $HOME/SITECONF/SITECONF has some content
 if [ $(ls $SYNC_DIR/SITECONF 2>/dev/null | wc -l) -le 1 ] ; then
       echo ERROR $SYNC_DIR/SITECONF empty
-      printf "functions-cms-cvmfs-mgmt: check_and_update_siteconf () ERROR $SYNC_DIR/SITECONF empty\nls $SYNC_DIR/SITECONF\necho INFO probably execute this command: rsync -arzuvp --exclude=.cvmfscatalog --delete ${rsync_name} $SYNC_DIR/" | mail -s "ERROR: check_and_update_siteconf() $SYNC_DIR/SITECONF empty" $notifytowhom      
+      printf "ERROR $what $SYNC_DIR/SITECONF empty\nls $SYNC_DIR/SITECONF\necho INFO probably execute this command: rsync -arzuvp --exclude=.cvmfscatalog --delete ${RSYNC_SITES} $SYNC_DIR/" | mail -s "ERROR: $what $SYNC_DIR/SITECONF empty" $notifytowhom      
       exit 1
 fi
 
@@ -637,6 +637,7 @@ publish_needed=0
 if [ "x$UPDATED_SITES" == "x" ] ; then
    echo INFO nothing to do. UPDATED_SITES is empty
 else
+   echo INFO publication needed
    publish_needed=1
 fi
 
@@ -662,29 +663,37 @@ else
    exit 1
 fi
 
-# Check if ${rsync_source}/SITECONF is sane
-check_rsync_source_siteconf_sanity ${rsync_source}/SITECONF
+# Check if ${SYNC_DIR}/SITECONF is sane
+check_rsync_source_siteconf_sanity ${SYNC_DIR}/SITECONF
 if [ $? -eq 0 ] ; then
-   echo INFO ${rsync_source}/SITECONF is sane
+   echo INFO ${SYNC_DIR}/SITECONF is sane
 else
-   printf "ERROR $0 ${rsync_source}/SITECONF is insane\n$(ls -al ${rsync_source}/SITECONF)\n" | mail -s "ERROR: ${rsync_source}/SITECONF insane" $notifytowhom
+   printf "ERROR $0 ${SYNC_DIR}/SITECONF is insane\n$(ls -al ${SYNC_DIR}/SITECONF)\n" | mail -s "ERROR: ${SYNC_DIR}/SITECONF insane" $notifytowhom
    ( cd ; cvmfs_server abort -f ; ) ;
+   /bin/rm ${EXC_LOCK}
    exit 1
 fi
 
 ( cd /cvmfs/cms.cern.ch ; tar czvf $HOME/SITECONF.tar.gz.copy $(echo $(for d in SITECONF/* ; do echo $d ; done | grep ^SITECONF/T[0-9]_)) && { /bin/cp $HOME/SITECONF.tar.gz $HOME/SITECONF.tar.gz.1 ; /bin/cp $HOME/SITECONF.tar.gz.copy $HOME/SITECONF.tar.gz ; } ; ) ;
 
-echo rsync -arzuvp --exclude=.cvmfscatalog --delete ${rsync_source}/SITECONF/ $rsync_name
+echo $RSYNC_SITES | grep -q /SITECONF
+if [ $? -ne 0 ] ; then
+   printf "ERROR $0 $RSYNC_SITES does not have /SITECONF\n$(ls -al $RSYNC_SITES)\n" | mail -s "ERROR: $RSYNC_SITES insane" $notifytowhom
+   ( cd ; cvmfs_server abort -f ; ) ;
+   /bin/rm ${EXC_LOCK}
+   exit 1
+fi 
+echo rsync -arzuvp --exclude=.cvmfscatalog --delete ${SYNC_DIR}/SITECONF/ $RSYNC_SITES
 thelog=$HOME/logs/cvmfs_check_and_update_siteconf_rsync.log 
-rsync -arzuvp --exclude=.cvmfscatalog --delete ${rsync_source}/SITECONF/ $rsync_name > $thelog 2>&1 # option --delete deletes extraneous files from dest dirs
+rsync -arzuvp --exclude=.cvmfscatalog --delete ${SYNC_DIR}/SITECONF/ $RSYNC_SITES > $thelog 2>&1 # option --delete deletes extraneous files from dest dirs
 if [ $? -eq 0 ] ; then
       publish_needed=0
       i=0
       for f in $(grep ^T[0-9] $thelog | grep -v .git/ 2>/dev/null) ; do
          i=$(expr $i + 1)
-         [ -f "$rsync_name/$f" ] || { echo "[ $i ] " $rsync_name/$f is not a file $publish_needed ; continue ; } ;
+         [ -f "$RSYNC_SITES/$f" ] || { echo "[ $i ] " $RSYNC_SITES/$f is not a file $publish_needed ; continue ; } ;
          publish_needed=1
-         echo "[ $i ] " $rsync_name/$f is a file $publish_needed
+         echo "[ $i ] " $RSYNC_SITES/$f is a file $publish_needed
       done
       grep -q "deleting T[0-9]_" $thelog
       [ $? -eq 0 ] && publish_needed=1
@@ -719,7 +728,7 @@ if [ $? -eq 0 ] ; then
             [ $(/bin/hostname -f) == $cvmfs_server_name ] && echo $YMDM $(/bin/date +%s) $(/bin/date -u) "$UPDATED_SITES" >> $updated_list
          fi
 
-         echo INFO publishing $rsync_name
+         echo INFO publishing $RSYNC_SITES
          currdir=$(pwd)
          cd
          time cvmfs_server publish > $HOME/logs/cvmfs_server+publish.log 2>&1
@@ -736,8 +745,8 @@ if [ $? -eq 0 ] ; then
          fi
       fi
 else
-      echo ERROR failed : rsync -arzuvp $rsync_source $(dirname $rsync_name)
-      printf "$what FAILED: rsync -arzuvp $rsync_source $(dirname $rsync_name)\n" | mail -s "$what ERROR FAILED rsync" $notifytowhom
+      echo ERROR failed : rsync -arzuvp $SYNC_DIR $(dirname $RSYNC_SITES)
+      printf "$what FAILED: rsync -arzuvp $SYNC_DIR $(dirname $RSYNC_SITES)\n" | mail -s "$what ERROR FAILED rsync" $notifytowhom
       ( cd ; cvmfs_server abort -f ; ) ;
       /bin/rm ${EXC_LOCK}
       exit 1
