@@ -191,22 +191,24 @@ echo $(date -u) >> $lock
 
 echo
 j=$(expr $j + 1)
-# [3] install cmssw: In Jenkins but it's here just in case
+# [3] install cmssw: In Jenkins but it's here just in case: Documentation README.cmssw and README.cmssw.jenkins
 echo INFO "[$j]" "executing run_install_cmssw > $HOME/logs/run_install_cmssw.log 2>&1"
 $HOME/run_install_cmssw.sh > $HOME/logs/run_install_cmssw.log 2>&1
 
-echo
-j=$(expr $j + 1)
-# [4] install power arch
-echo INFO "[$j]" "executing install_cmssw_power_archs 2>&1 | tee  $HOME/logs/install_cmssw_power_archs.log"
-install_cmssw_power_archs 2>&1 | tee  $HOME/logs/install_cmssw_power_archs.log
+if [ "x$jenkins_cmssw" != "xon" ] ; then
+    echo
+    j=$(expr $j + 1)
+    # [4] install power arch
+    echo INFO "[$j]" "executing install_cmssw_power_archs 2>&1 | tee  $HOME/logs/install_cmssw_power_archs.log"
+    install_cmssw_power_archs 2>&1 | tee  $HOME/logs/install_cmssw_power_archs.log
 
-echo
-j=$(expr $j + 1)
-# [5] install slc aarch
-echo INFO "[$j]" executing "install_cmssw_centos72_exotic_archs 2>&1 | tee $HOME/logs/install_cmssw_centos72_exotic_archs.log"
-install_cmssw_centos72_exotic_archs 2>&1 | tee $HOME/logs/cvmfs_install_cmssw_centos72_exotic_archs.log
-echo INFO Done CMSSW installation part of the script
+    echo
+    j=$(expr $j + 1)
+    # [5] install slc aarch
+    echo INFO "[$j]" executing "install_cmssw_centos72_exotic_archs 2>&1 | tee $HOME/logs/install_cmssw_centos72_exotic_archs.log"
+    install_cmssw_centos72_exotic_archs 2>&1 | tee $HOME/logs/cvmfs_install_cmssw_centos72_exotic_archs.log
+    echo INFO Done CMSSW installation part of the script
+fi
 
 echo
 j=$(expr $j + 1)
@@ -217,7 +219,7 @@ echo INFO Done cron_rsync_generator_package_from_eos part of the script
 
 echo
 j=$(expr $j + 1)
-# [7] siteconf still active in cron
+# [7] siteconf still active in cron: Documentation README.siteconf
 echo INFO "[$j]" cvmfs_check_and_update_siteconf.sh using gitlab and cric
 $HOME/cvmfs_check_and_update_siteconf.sh > $HOME/logs/cvmfs_check_and_update_siteconf.log 2>&1
 echo INFO Done cvmfs_check_and_update_siteconf.sh using gitlab

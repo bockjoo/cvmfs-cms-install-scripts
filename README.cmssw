@@ -1,0 +1,25 @@
+
+README for the CMSSW installation on cvmfs prepared by Bockjoo Kim on 02MAY2020
+
+[1] What is CMSSW?
+It is the CMS software that are used by the entire CMS collaboration for production, processing, and analysis.
+CMSSW is developed and built. The release is announced and published in the release map {1}.
+
+[2] Installation of CMSSW
+Based on the release map, all announced new CMSSW releases are installed.
+We use the script $HOME/run_install_cmssw.sh
+However, as of April 2, 2020, the installation is handled by Jenkins {2}.
+
+
+References
+{1} https://cmssdt.cern.ch/SDT/releases.map
+{2} https://github.com/bockjoo/cvmfs-cms-install-scripts/blob/master/README.cmssw.jenkins
+
+
+
+https://twiki.cern.ch/twiki/bin/view/CMSPublic/SiteConfInGitlab
+{2} https://gitlab.cern.ch/SITECONF
+{3} https://github.com/bockjoo/cvmfs-cms-install-scripts/blob/master/cvmfs_check_and_update_siteconf.sh
+{4} http://cms-cric.cern.ch/api/cms/site/query/?json&preset=site-names&rcsite_state=ANY
+{5} https://gitlab.cern.ch/api/v4/groups/4099/projects
+{6} https://github.com/bockjoo/cvmfs-cms-install-scripts/blob/master/README.CVMFS.Variant.Symlink

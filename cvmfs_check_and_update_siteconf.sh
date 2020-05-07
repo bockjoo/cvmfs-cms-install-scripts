@@ -321,7 +321,7 @@ echo "[4] loop over SYNC_DIR ${SYNC_DIR} CMS sites and remove sites no longer in
 FAIL=0
 SYNC_LIST=$(cd ${SYNC_DIR}/SITECONF ; /bin/ls -d1 T?_??_* 2>/dev/null)
 for SITE in ${SYNC_LIST}; do
-   echo DEBUG site=$SITE checking /bin/grep "^${SITE}\$" ${TMP_AREA}/sitedb.list
+   #echo DEBUG site=$SITE checking /bin/grep "^${SITE}\$" ${TMP_AREA}/sitedb.list
    /bin/grep "^${SITE}\$" ${TMP_AREA}/sitedb.list 1>/dev/null 2>&1
    if [ $? -ne 0 ]; then
       echo "Site \"${SITE}\" no longer in SiteDB, removing site area"
@@ -406,7 +406,7 @@ fi
 # Compare the new timestamp ($NEWT) with the old ($OLDT). If they are different, download the siteconf for the site (given the siteid)
 for SITE in $(/bin/cat ${TMP_AREA}/sitedb.list) ; do
    isite=$(expr $isite + 1)
-   echo "[5]" DEBUG doing SITE=$SITE
+   #echo "[5]" DEBUG doing SITE=$SITE
    NEWT=`/usr/bin/awk -F: '{if($1=="'${SITE}'"){print $2}}' ${TMP_AREA}/.timestamp 2>/dev/null`
    if [ -z "${NEWT}" ]; then
       # no repository for this SiteDB site
@@ -674,7 +674,7 @@ else
    exit 1
 fi
 
-( cd /cvmfs/cms.cern.ch ; tar czvf $HOME/SITECONF.tar.gz.copy $(echo $(for d in SITECONF/* ; do echo $d ; done | grep ^SITECONF/T[0-9]_)) && { /bin/cp $HOME/SITECONF.tar.gz $HOME/SITECONF.tar.gz.1 ; /bin/cp $HOME/SITECONF.tar.gz.copy $HOME/SITECONF.tar.gz ; } ; ) ;
+( cd /cvmfs/cms.cern.ch ; tar czf $HOME/SITECONF.tar.gz.copy $(echo $(for d in SITECONF/* ; do echo $d ; done | grep ^SITECONF/T[0-9]_)) && { /bin/cp $HOME/SITECONF.tar.gz $HOME/SITECONF.tar.gz.1 ; /bin/cp $HOME/SITECONF.tar.gz.copy $HOME/SITECONF.tar.gz ; } ; ) ;
 
 echo $RSYNC_SITES | grep -q /SITECONF
 if [ $? -ne 0 ] ; then
@@ -691,7 +691,8 @@ if [ $? -eq 0 ] ; then
       i=0
       for f in $(grep ^T[0-9] $thelog | grep -v .git/ 2>/dev/null) ; do
          i=$(expr $i + 1)
-         [ -f "$RSYNC_SITES/$f" ] || { echo "[ $i ] " $RSYNC_SITES/$f is not a file $publish_needed ; continue ; } ;
+         #[ -f "$RSYNC_SITES/$f" ] || { echo "[ $i ] " $RSYNC_SITES/$f is not a file $publish_needed ; continue ; } ;
+         [ -f "$RSYNC_SITES/$f" ] || { continue ; } ;
          publish_needed=1
          echo "[ $i ] " $RSYNC_SITES/$f is a file $publish_needed
       done
@@ -720,7 +721,6 @@ if [ $? -eq 0 ] ; then
             fi
          fi
          echo INFO publish necessary
-         printf "$what publish is needed UPDATED_SITES=$UPDATED_SITES\nCheck $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/logs/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "DEBUG $what publish is necessary" $notifytowhom
          YMDM=$(date -u +%Y%m%d%H)
          grep "$YMDM " $updated_list | grep -q "$UPDATED_SITES"
          if [ $? -ne 0 ] ; then
@@ -743,6 +743,7 @@ if [ $? -eq 0 ] ; then
             /bin/rm ${EXC_LOCK}
             exit 1
          fi
+         printf "$what publish is needed UPDATED_SITES=$UPDATED_SITES\nCheck $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf_rsync.log | sed 's#%#%%#g')\nCheck $HOME/logs/cvmfs_check_and_update_siteconf.log\n$(cat $HOME/logs/cvmfs_check_and_update_siteconf.log | sed 's#%#%%#g')\n" | mail -s "DEBUG $what publish is necessary" $notifytowhom
       fi
 else
       echo ERROR failed : rsync -arzuvp $SYNC_DIR $(dirname $RSYNC_SITES)

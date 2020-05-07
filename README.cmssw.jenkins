@@ -1,0 +1,42 @@
+
+README for the CMSSW Jenkins installation on cvmfs prepared by Bockjoo Kim on 02MAY2020
+
+[1] What is Jenkins?
+It is a continuous integration system used for the CMSSW development.
+
+[2] How does it work for the CMSSW deployment
+The jenkins job{1} to auto install the release after upload.
+Jenkins jobs assume that if ~/cron_install_cmssw.lock exists then there is already a transaction going on
+and we will wait till the file is removed. For every installed packages, Jenkins is going to put an entry 
+in /cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates {2}
+
+
+[3] How to disable Jenkins CMSSW deployment jobs
+The job https://cmssdt.cern.ch/jenkins/view/CVMFS-CMS/job/cmsrep-webhook/ 
+is responsible for triggering the CMSSW/COMP package installation and currently jot only triggers the installation for cms packages.
+You (Bockjoo) have full rights to enable/disable/modify it {3}. In case, you want to install cmssw releases 
+using cron job then just disable this jenkins job.
+cvmfs-cms-install-package is general purpose job which is triggered via other cvmfs-cms-install-* jobs. 
+So now if you want to enable only CMSSW installation then just enable cvmfs-cms-install-cms job
+
+[4] How to run cvmfs-cms-install-cms for one of already installed releases
+Just go to https://cmssdt.cern.ch/jenkins/view/CVMFS-CMS/job/cvmfs-cms-install-cms/ and Click on “Build with Parameters” link.
+In the Parameters sections provide
+
+PACKAGE : cms+cmssw-patch+CMSSW_10_6_11_patch
+ARCHITECTURE: slc7_amd64_gcc820
+
+and click on build. After this, cvmfs-cms-install-cms job will finish and will start cvmfs-cms-install-package job 
+which should do the actual installation. 
+
+The result should be a link something similar to https://cmssdt.cern.ch/jenkins/job/cvmfs-cms-install-package/162/
+
+[5] Other installations
+See https://github.com/cms-sw/cms-bot/pull/1291
+
+
+References
+{1} https://cmssdt.cern.ch/jenkins/view/CVMFS-CMS/job/cvmfs-cms-install-package
+{2} https://github.com/cms-sw/cms-bot/blob/master/cvmfs_deployment/cvmfs-cms-install-package.sh
+{3} https://cmssdt.cern.ch/jenkins/view/CVMFS-CMS/job/cmsrep-webhook/
+
