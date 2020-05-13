@@ -160,10 +160,6 @@ if [ $? -eq 0 ] ; then
    fi
 fi
 
-diff $updated_list $HOME/$(basename $updated_list) 1>/dev/null 2>/dev/null
-if [ $? -ne 0 ] ; then
-      printf "$(basename $0) Something updated $updated_list\n$(diff $updated_list $HOME/$(basename $updated_list))\n" | mail -s "$(basename $0) WARN $(basename $updated_list) updated" $notifytowhom      
-fi
 
 
 ps auxwww | grep -q grep | grep "$theuser"
@@ -188,6 +184,16 @@ fi
 
 echo INFO creating $lock
 echo $(date -u) >> $lock
+diff $updated_list $HOME/$(basename $updated_list) 1>/dev/null 2>/dev/null
+if [ $? -ne 0 ] ; then
+      printf "$(basename $0) Something updated $updated_list\n$(diff $updated_list $HOME/$(basename $updated_list))\n" | mail -s "$(basename $0) WARN $(basename $updated_list) updated" $notifytowhom      
+fi
+
+filled_percent=$(df -h | grep /srv/cvmfs/cms.cern.ch$ | awk '{print $(NF-1)}' | sed 's#%##')
+filled_percent_limit=88
+if [ $filled_percent -gt $filled_percent_limit ] ; then
+      printf "$(basename $0) Filled percent is bigger than $filled_percent_limit\nTime to migrate to S3\n$(df -h | sed 's#%#%%#g')\n" | mail -s "$(basename $0) WARN $(basename $0) Filled ${filled_percent}%%" $notifytowhom
+fi
 
 echo
 j=$(expr $j + 1)

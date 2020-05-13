@@ -410,14 +410,14 @@ for SITE in $(/bin/cat ${TMP_AREA}/sitedb.list) ; do
    NEWT=`/usr/bin/awk -F: '{if($1=="'${SITE}'"){print $2}}' ${TMP_AREA}/.timestamp 2>/dev/null`
    if [ -z "${NEWT}" ]; then
       # no repository for this SiteDB site
-      echo DEBUG SITE=$SITE no repository for this SiteDB site. Continuing...      
+      #echo DEBUG SITE=$SITE no repository for this SiteDB site. Continuing...      
       continue
    fi
    if [ -f ${SYNC_DIR}/SITECONF/.timestamp ]; then
       OLDT=`/usr/bin/awk -F: '{if($1=="'${SITE}'"){print $2}}' ${SYNC_DIR}/SITECONF/.timestamp 2>/dev/null`
       if [ "${NEWT}" == "${OLDT}" ]; then
          # SYNC_DIR up-to-date
-         echo DEBUG SITE=$SITE SYNC_DIR up-to-date. Continuing... OLDT=$OLDT NEWT=$NEWT
+         #echo DEBUG SITE=$SITE SYNC_DIR up-to-date. Continuing... OLDT=$OLDT NEWT=$NEWT
          #
          # 02APR2018
          # timestamp in https://gitlab.cern.ch/api/v3/groups/SITECONF/projects?per_page=100&page=1
@@ -426,9 +426,9 @@ for SITE in $(/bin/cat ${TMP_AREA}/sitedb.list) ; do
          # every four hour all sites that changed are updated
          #
          if [ $(expr $(date +%H) % $EVERY_X_HOUR) -eq 0 ] ; then
-            echo DEBUG "[ $isite ]" SITE=$SITE HOUR=$(date +%H) so ignore timestamp for once and update the siteconf
+            echo INFO "[ $isite ]" SITE=$SITE HOUR=$(date +%H) so ignore timestamp for once and update the siteconf 2>/dev/null 1>/dev/null
          else
-            echo INFO "[ $isite ]" SITE=$SITE timestamp is same. Skipping this site
+            echo INFO "[ $isite ]" SITE=$SITE timestamp is same. Skipping this site 2>/dev/null 1>/dev/null
             continue
          fi
       fi
