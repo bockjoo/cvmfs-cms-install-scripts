@@ -1,34 +1,120 @@
 #!/bin/sh
 #
 # Bockjoo Kim, U of Florida
-# It downloads any new lhapdf and updates the lhapdf db.
+# Purpose:
+# It downloads any new lhapdf for CMS and creates a new CMS lhapdf version at the time of the download.
 #
 # 0.2.2: downloads pdfsets.index as well
-# versiono 0.3.2
-version=1.0.6.2.1.c
-export VO_CMS_SW_DIR=/cvmfs/cms.cern.ch
-workdir=/tmp/lhapdf
-thehome=$HOME # /home/shared # /scratch/shared/cms
-notifytowhom=bockjoo@phys.ufl.edu
+# 1.8.7: lhapdfweb_download
+#
 
-lhapdf_top=$VO_CMS_SW_DIR/lhapdf # CVMFS
-#lhapdf_top=$HOME/lhapdf # test machine
+version=1.8.7
+starttime=$(date)
+# Source the function first so that variables used in this script can overwrite the ones in the function
+source $HOME/functions-cms-cvmfs-mgmt
+
+lhapdf_web=https://lhapdf.hepforge.org/
+rsync_source="/cvmfs/sft.cern.ch/lcg/external/lhapdfsets/current"
+rsync_destination="/cvmfs/cms.cern.ch/lhapdf"
+LHAPDFSET_VERSION_INITIAL=6.2.3a
+lhapdfset_versions=$HOME/lhapdfset_versions
+
+check_if_cvmfs_server_in_transaction $(basename $0) || exit 1
+
+cvmfs_server_transaction_and_check_status $(basename $0) || exit 1
+
+
+[ -d $rsync_destination ] || mkdir -p $rsync_destination
+
+# Check if the destination is different from the source
+echo INFO executing rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}
+thelog=$HOME/logs/cron_download_lhapdf_rsync.log
+rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --include=current/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz --dry-run ${rsync_source} ${rsync_destination} > $thelog 2>&1
+status=$?
+( cd ; cvmfs_server abort -f ; ) ;
+
+if [ $status -ne 0 ] ; then
+   printf "$(basename $0) FAILED: rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) FAILED rsync dry-run" $notifytowhom
+   exit 1
+fi
+
+# If there is no change, there is no new version to create
+grep -q ^/current $thelog || exit 0
+
+# Create a new version if $thelog has any changes : start with 6.2.3a
+LHAPDFSET_VERSION_NEW=$(create_lhapdf_version_number $(basename $0) $lhapdfset_versions $lhapdf_web)
+[ $? -eq 0 ] || exit 1
+echo INFO LHAPDFSET_VERSION_NEW=$LHAPDFSET_VERSION_NEW
+
+# Make sure there is no ${LHAPDFSET_VERSION_NEW}
+if [ -d ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} ] ; then
+   printf "$(basename $0) FAILED: ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} exists\n" | mail -s "$(basename $0) FAILED ${LHAPDFSET_VERSION_NEW} exists" $notifytowhom
+   exit 1
+fi
+
+cvmfs_server_transaction_and_check_status $(basename $0) || exit 1
+
+# Notify the start of the new version
+printf "$(basename $0) Warn: will create ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} \n" | mail -s "$(basename $0) Warn creating LHAPDF ${LHAPDFSET_VERSION_NEW}" $notifytowhom
+
+# Really create the new version at the official area of the new version
+echo INFO executing rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
+rsync -rLptgoDzuv --delete --exclude=*/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} > $thelog 2>&1
+if [ $? -ne 0 ] ; then
+   echo ERROR rsync -rLptgoDzuv --delete --exclude=*/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
+   printf "$(basename $0) FAILED: rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) FAILED rsync for LHAPDFSET_VERSION_NEW" $notifytowhom
+   ( cd ; cvmfs_server abort -f ; ) ;
+   exit 1
+fi
+
+# Update ${rsync_destination}
+echo INFO executing rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*/@\* --exclude=\*/\*.tar.gz ${rsync_source} ${rsync_destination}
+rsync -rLptgoDzuv --delete --exclude=*/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz ${rsync_source} ${rsync_destination} > $thelog.update 2>&1
+if [ $? -ne 0 ] ; then
+   echo ERROR rsync -rLptgoDzuv --delete --exclude=*/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz ${rsync_source} ${rsync_destination}
+   printf "$(basename $0) FAILED: rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}\n$(cat $thelog.update | sed 's#%#%%#g')\n" | mail -s "$(basename $0) FAILED rsync update for ${rsync_destination}/current" $notifytowhom
+   ( cd ; cvmfs_server abort -f ; ) ;
+   exit 1
+fi
+
+( cd ; cvmfs_server abort -f ; ) ;
+endtime=$(date)
+printf "$(basename $0) DEBUG start=$starttime end=$endtime \n$(cat $thelog | sed 's#%#%%#g') \nUpdate log\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) DEBUG Check Debug Run" $notifytowhom
+exit 0
+
+cvmfs_server publish 2>&1
+status=$?
+if [ $status -eq 0 ] ; then
+   echo INFO updating the $updated_list with ${LHAPDFSET_VERSION_NEW}
+   grep -q "LHAPDF ${LHAPDFSET_VERSION_NEW}" $updated_list || echo "LHAPDF ${LHAPDFSET_VERSION_NEW} $(date +%s) $(date)" >> $updated_list
+else
+   printf "$(basename $0) ERROR: Status=$status failed to publish ${LHAPDFSET_VERSION_NEW}\n$(cat $thelog | sed 's#%#%%#g') \nUpdate log\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) ERROR publication failure: LHAPDF ${LHAPDFSET_VERSION_NEW}" $notifytowhom
+   exit 1
+fi
+printf "$(basename $0) INFO: Status=$status We created ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}\n$(cat $thelog | sed 's#%#%%#g') \nUpdate log\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) INFO LHAPDF ${LHAPDFSET_VERSION_NEW} created" $notifytowhom
+
+echo script $(basename $0) $status Done
+
+
+exit $status
+
+# Variables used in this script
+workdir=/tmp/lhapdf
+thehome=$HOME
+lhapdf_top=$VO_CMS_SW_DIR/lhapdf
+reference_list=$HOME/lhapdf_list.txt
+ntry=5
+THELOG=$HOME/logs/cron_download_lhapdf.log
 
 min_relnum=5009001 # minim release number is 5.9.1
+min_relnum=600100000 # minim release number is 6.1.000
 min_relnum=6001000 # minim release number is 6.1.0
-#min_relnum=600100000 # minim release number is 6.1.000
-lhapdfweb=http://www.hepforge.org/archive/lhapdf
-#http://www.hepforge.org/archive/lhapdf/pdfsets/6.2.1 # upto 6.2.1.a|6.2.1b
-#https://lhapdf.hepforge.org/downloads?f=pdfsets/6.2.1 # from 6.2.1.b|6.2.1c
-lhapdfweb=http://www.hepforge.org/archive/lhapdf
+
 lhapdfweb_download="http://www.hepforge.org/archive/lhapdf/"
 lhapdfweb_download="https://lhapdf.hepforge.org/downloads?f="
 lhapdfweb_download="http://oo.ihepa.ufl.edu:8080/lhapdf/"
-#CERN CVMFS
-db=$HOME/$(basename $0 | sed "s#\.sh##g").db.txt
-updated_list=$VO_CMS_SW_DIR/cvmfs-cms.cern.ch-updates
-#reference_list=http://oo.ihepa.ufl.edu:8080/cmssoft/lhapdf_list.txt
-reference_list=$HOME/lhapdf_list.txt
+
+lhapdfweb=http://www.hepforge.org/archive/lhapdf
 
 # Format: dest This should be a real release + .a or .b or .c or .d etc # /cvmfs/cms.cern.ch/lhapdf/pdfsets/<lhapdfweb_update>
 lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c 6.1.d 6.1.e 6.1.f 6.1.g 6.1.h 6.2 6.2.1 6.2.1.a 6.2.1.b 6.2.1.c"
@@ -37,132 +123,37 @@ lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c 6.1.d 6.1.e 6.1.f 6.1.g 6.1.h
 needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b 6.1.d|6.1.5d 6.1.e|6.1.5e 6.1.f|6.1.5f 6.1.g|6.1.6 6.1.h|6.1.6a 6.2|6.2.0a 6.2.1|6.2.1a 6.2.1.a|6.2.1b 6.2.1.b|6.2.1c 6.2.1.c|6.2.1d" # 6.1.6 -> 6.1.g
 previous_release=$(echo $lhapdfweb_updates | awk '{print $(NF-1)}')
 
-#lhapdfweb_updates="6.1.4b 6.1.4c 6.1.a 6.1.b 6.1.c"
-#needs_softlinks="6.1.b|6.1.5a 6.1.c|6.1.5b"
-
+:
+: Main
+:
 
 for v in $lhapdfweb_updates ; do
    grep -q ^${v}$ $reference_list
    [ $? -eq 0 ] || echo ${v} >> $reference_list
 done
 
-ntry=5
 
 [ -d $workdir ] || mkdir -p $workdir
 
+echo INFO Starting $(basename $0) LOG=$THELOG
 
-function cvmfs_server_transaction_check () {
-   status=$1
-   what="$2"
-   itry=0
-   while [ $itry -lt 10 ] ; do
-     if [ $status -eq 0 ] ; then
-      return 0
-     else
-      printf "$what cvmfs_server transaction Failing\n" | mail -s "ERROR cvmfs_server transaction Failed" $notifytowhom
-      echo INFO retrying $itry
-      cvmfs_server abort -f
-      cvmfs_server transaction
-      status=$?
-      [ $status -eq 0 ] && return 0
-     fi
-     itry=$(expr $itry + 1)
-   done
-   return 1
-}
-
-function create_lhapdf_softlink () {
-   installed=$1
-   what=$2
-   # Check 0
-   if [ $# -lt 2 ] ; then
-      echo ERROR create_lhapdf_softlink what+s+installed softlink4what
-      return 1
-   fi
-   grep "$installed" $HOME/lhapdf_list.txt
-   if [ $? -ne 0 ] ; then
-      echo ERROR $HOME/lhapdf_list.txt needs to be updated for $installed
-      return 1
-   fi
-   # Check 2
-   #lhapdfweb_updates=$(grep ^lhapdfweb_updates= $HOME/cron_download_lhapdf.sh | cut -d= -f2)
-   #for v in $lhapdfweb_updates ; do echo $v ; done | grep ${installed}$
-   #if [ $? -ne 0 ] ; then
-   #   echo ERROR $HOME/cron_download_lhapdf.sh needs to be updated for $installed
-   #   return 1
-   #fi
-   # Check 3
-   #ps auxwww | grep -v grep | grep shared | awk '{print $NF}' | grep cron_install_cmssw.sh | grep -v grep
-   #if [ $? -eq 0 ] ; then
-   #   echo ERROR cron_install_cmssw.sh is running
-   #   ps auxwww | grep shared | grep -v grep
-   #   exit 1
-   #fi
-   #echo INFO backing up crontab and removing
-   #cd $HOME
-   #crontab=crontab.$(date +%s)
-   #crontab -l > $crontab
-   #if [ $? -eq 0 ] ; then
-      #crontab -r
-   #else
-   #rm -f $crontab
-   #crontab=crontab
-   #fi
-
-   #echo INFO softlinking
-   #./download_cron_script.sh
-   #cvmfs_server transaction
-   cd /cvmfs/cms.cern.ch/lhapdf/pdfsets
-   #rm -f 6.1.5
-   ln -s $installed $what
-   cd -
-   #ln -s $what current
-   #ln -s 6.1a 6.1.5
-   #cd
-   #echo INFO publishing the change
-   #cvmfs_server publish
-
-   #echo INFO restoring the crontab
-   #crontab $crontab
-   #crontab -l
-   echo INFO copying the checksum from ${lhapdf_top}/checksum_pdfsets_${installed}.txt to ${lhapdf_top}/checksum_pdfsets_${what}.txt
-   cp ${lhapdf_top}/checksum_pdfsets_${installed}.txt ${lhapdf_top}/checksum_pdfsets_${what}.txt
-   return 0
-}
-THELOG=$HOME/logs/cron_download_lhapdf.log
-echo INFO LOG $THELOG
-echo INFO db $db
-echo INFO updated_list $VO_CMS_SW_DIR/cvmfs-cms.cern.ch-updates
-#$(wget --no-check-certificate -q -O- ${lhapdfweb}/pdfsets/ | grep folder.gif | grep -v current | sed 's#href="#|#g' | cut -d\| -f2 | cut -d/ -f1)
-
-#printf "$(basename $0) Starting cvmfs_server transaction for cron_download_lhapdf.sh\n" | mail -s "cvmfs_server transaction started" $notifytowhom
 cvmfs_server list  | grep stratum0 | grep -q transaction
 if [ $? -eq 0 ] ; then
-   #if [ ! -f $lock ] ; then
-   #   echo INFO $lock does not exist
-      #printf "$(basename $0) cvmfs mount issue\n$lock does not exist\ncvmfs_server list\n$(cvmfs_server list)\n" | mail -s "$(basename $0) needs to fix the mount issue" $notifytowhom
    echo ERROR cvfsm server already in transaction
    exit 1
-   #fi
 fi
 cvmfs_server transaction 2>&1
 [ $? -eq 0 ] || { printf "$(basename $0) ERROR cvmfs_server transaction failed\n$(cat $THELOG | sed 's#%#%%#g')\nChecking ps\n$(ps auxwww | sed 's#%#%%#g' | grep $(/usr/bin/whoami) | grep -v grep)\n" | mail -s "$(basename $0) cvmfs_server transaction lock failed" $notifytowhom ; exit 1 ; } ;
 
 begin_transaction=1
-#releases=$(wget -q -O- ${lhapdfweb}/ | grep lhapdf | grep tar.gz | cut -d\> -f7 | cut -d\< -f1 | grep -v nopdf | sed 's#lhapdf-##g' | sed 's#.tar.gz##g')
-#releases=$(wget -q -O- ${lhapdfweb}/ | grep lhapdf | grep tar.gz | cut -d\> -f7 | cut -d\< -f1 | grep -v nopdf) #| sed 's#lhapdf-##g' | sed 's#.tar.gz##g')
 releases=$(wget --no-check-certificate -q -O- ${lhapdfweb}/pdfsets/ | grep folder.gif | grep -v current | sed 's#href="#|#g' | cut -d\| -f2 | cut -d/ -f1)
 for v in $releases $lhapdfweb_updates ; do
    if [ $begin_transaction -eq 0 ] ; then
-     #printf "$(basename $0) Starting cvmfs_server transaction for cron_download_lhapdf.sh $v\n" | mail -s "cvmfs_server transaction started" $notifytowhom
      cvmfs_server transaction 2>&1
      [ $? -eq 0 ] || { printf "$(basename $0) ERROR cvmfs_server transaction failed while doing lhapdf v=$v\n$(cat $THELOG | sed 's#%#%%#g')\nChecking ps\n$(ps auxwww | sed 's#%#%%#g' | grep $(/usr/bin/whoami) | grep -v grep)\n" | mail -s "$(basename $0) cvmfs_server transaction lock failed" $notifytowhom ; exit 1 ; } ;
      begin_transaction=1
    fi
-   #wget -q -O /dev/null $reference_list
-   #if [ $? -eq 0 ] ; then
    if [ -f "$reference_list" ] ; then
-      #wget -q -O- $reference_list | grep -q "$v"
       grep -q "^${v}$" $reference_list
       [ $? -eq 0 ] || { echo INFO $v not in $reference_list ; continue ; } ;
    else
@@ -615,6 +606,9 @@ else
    printf "$(basename $0) begin_transaction is 0\n" | mail -s "$(basename $0) begin_transaction 0" $notifytowhom
 fi
 exit 0
+
+
+
 function unit_test () {
   lhapdfweb=http://www.hepforge.org/archive/lhapdf
   dest=pdfsets/6.1

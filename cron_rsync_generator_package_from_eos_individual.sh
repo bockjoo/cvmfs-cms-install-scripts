@@ -4,79 +4,28 @@
 # 0.1.7
 # 1.8.7
 #
-version=1.8.7
+version=1.8.7 # tag=generic-2020-05-13T17:40:17Z
 
 # Configuration
 notifytowhom=bockjoo@phys.ufl.edu
 source $HOME/cron_install_cmssw.config # notifytowhom
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
 
-rsync_source="$HOME/eos2/cms/store/group/phys_generator/cvmfs/gridpacks"
+#rsync_source="$HOME/eos2/cms/store/group/phys_generator/cvmfs/gridpacks"
+rsync_source="/eos/cms/store/group/phys_generator/cvmfs/gridpacks"
 rsync_name="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
 rsync_destination="/cvmfs/cms.cern.ch/phys_generator/gridpacks"
 
-# To mount EOS
-export X509_USER_PROXY=$HOME/.florida.t2.proxy
-
-# EOS
-export EOS_MGM_URL="root://eoscms.cern.ch"
-INDIVIDUAL_RSYNC_SIZE_LIMIT=5 # in Gigabytes
-export EOS_CLIENT_VERSION=${EOS_CLIENT_VERSION:-0.3.15}
-export EOSSYS=/home/cvcms/eos_installation/${EOS_CLIENT_VERSION}
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/lib64 # for libreadline.so.5
-
-source $HOME/functions-cms-cvmfs-mgmt
+what="$(basename $0)"
 # Configuration
 
 :
 : ######### Main ###################################################
 :
-
-# On DEC 16, 2014, I realized I need the grid proxy to mount eos personally
-# Update the X509 grid proxy by downloading the newer proxy using the valid grid proxy
-source $HOME/osg/osg-wn-client/setup.sh
-globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy 2>/dev/null 1>/dev/null
-if [ $? -eq 0 ] ; then
-   cp $X509_USER_PROXY.copy $X509_USER_PROXY
-else
-   printf "$(basename $0) ERROR failed to download $X509_USER_PROXY\n$(globus-url-copy -vb gsiftp://cmsio.rc.ufl.edu/cmsuf/t2/operations/.cmsphedex.proxy  file://$X509_USER_PROXY.copy 2>&1 | sed 's#%#%%#g')\n" | mail -s "$(basename $0) ERROR proxy download failed" $notifytowhom
-fi
-
-# Check if downloaded proxy is 31min 40 seconds or longer left.
-timeleft=$(voms-proxy-info -timeleft 2>/dev/null)
-if [ $timeleft -lt 1900 ] ; then # 1800 + 100
-    echo INFO proxy timeleft $timeleft
-    printf "$(basename $0) proxy valid only for $timeleft seconds\n" | mail -s "$(basename $0) Warning proxy time left < 1900" $notifytowhom
-fi
-
-# Checking if eos is already mounted, but not properly mounted. If so, forcemount it
-ls $HOME/eos2 | grep "Bad address" | grep -q "cannot access"
-if [ $? -eq 0 ] ; then
-   echo Warning $HOME/eos2 is not properly mounted
-   ls $HOME/eos2
-   echo Warning eosforceumount $HOME/eos2
-   eosforceumount $HOME/eos2
-fi
-
-# If EOS is not mounted, mount it.
-df -h | grep -q $(echo $EOS_MGM_URL | cut -d/ -f3 | cut -d: -f1)
-if [ $? -eq 0 ] ; then
-   echo INFO $HOME/eos2 is already mounted
-else
-   $EOSSYS/bin/eos.select -b fuse mount $HOME/eos2
-fi
-
 # After all the try to mount the EOS, if it is not mounted, try to forceunmount it and exit with error status
 if [ ! -d $rsync_source ] ; then
-   echo ERROR rsync_source not found eosmount error
-   printf "$(basename $0) $rsync_source not found \n Issue with: $EOSSYS/bin/eos.select -b fuse mount $HOME/eos2 did not work\nls $HOME/eos2/cms follows\n$(ls $HOME/eos2/cms)\ntail -10 eos log\n$(tail -10 /tmp/eos*)" | mail -s "$(basename $0) ERROR $EOSSYS/bin/eos.select -b fuse mount $HOME/eos2 failed " $notifytowhom
-   $EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
-   ps auxwww | grep -v grep | grep -q eosfsd
-   if [ $? -eq 0 ] ; then
-      echo Warning eosforceumount $HOME/eos2
-      eosforceumount $HOME/eos2
-   fi
-   ls $HOME/eos2
+   echo ERROR rsync_source not found eos error
+   printf "$(basename $0) $rsync_source not found \n" | mail -s "$(basename $0) ERROR rsync source not found" $notifytowhom
    exit 1
 fi
 
@@ -91,24 +40,16 @@ if [ $? -eq 0 ] ; then
 fi
 
 
-# Start cvmfs transaction
+# Start cvmfs transaction for the dry-run
 echo INFO Doing cvmfs_server transaction
 cvmfs_server transaction
 status=$?
-what="$(basename $0)"
-cvmfs_server_transaction_check $status $what
 if [ $? -eq 0 ] ; then
    echo INFO transaction OK for $what
 else
    echo ERROR transaction check FAILED
+   #( cd ; cvmfs_server abort -f ; ) ;
    printf "$(basename $0): 1 cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
-   $EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
-   ps auxwww | grep -v grep | grep -q eosfsd
-   if [ $? -eq 0 ] ; then
-      echo Warning eosforceumount $HOME/eos2
-      eosforceumount $HOME/eos2
-   fi
-   ls $HOME/eos2
    exit 1
 fi
 
@@ -123,30 +64,20 @@ status=$?
 echo INFO for now aborting the rsync to rsync only those files that are new
 ( cd ; cvmfs_server abort -f ; ) ;
 
-
 # Limit number of gridpacks to be rsynced per cron cycle and Show how many gridpacks need to be rsynced
 NGRIDPACKS=120
 NEWGRIDPACKS_ONLY= # NEWGRIDPACKS_ONLY=1
 echo INFO gridpakcs to be rsynced: $(grep "tar.xz\|tar.gz\|tgz" $thelog | grep "^gridpacks/" | grep -v "_noiter" | wc -l)
 
-# Start the transaction
+# Start the transaction for real
 cvmfs_server transaction
 status=$?
-what="$(basename $0)"
-cvmfs_server_transaction_check $status $what
 if [ $? -eq 0 ] ; then
    echo INFO transaction OK for $what
 else
    echo ERROR transaction check FAILED
-   ( cd ; cvmfs_server abort -f ; ) ;
+   #( cd ; cvmfs_server abort -f ; ) ;
    printf "$(basename $0): 2 cvmfs_server_transaction_check Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_check Failed" $notifytowhom      
-   $EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
-   ps auxwww | grep -v grep | grep -q eosfsd
-   if [ $? -eq 0 ] ; then
-      echo Warning eosforceumount $HOME/eos2
-      eosforceumount $HOME/eos2
-   fi
-   ls $HOME/eos2
    exit 1
 fi
 
@@ -213,21 +144,8 @@ if [ $status -eq 0 ] ; then
                #echo DRY rm -rf $(dirname $destfile)
                time cvmfs_server publish > $HOME/logs/cvmfs_server+publish+rsync+generator+package+from+eos.log 2>&1
                [ $? -eq 0 ] || ( cd ; cvmfs_server abort -f ; ) ;
-               echo INFO eosumount $HOME/eos2
-               $EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
-               ps auxwww | grep -v grep | grep -q eosfsd
-               if [ $? -eq 0 ] ; then
-                  echo Warning eosforceumount $HOME/eos2
-                  eosforceumount $HOME/eos2
-               fi
-               echo INFO checking with ls $HOME/eos2
-               ls $HOME/eos2
                echo script $0 Done
-               log=$HOME/logs/$(basename $0 | sed 's#\.sh#\.log#g')
-               eos_fuse_logs=
-               for f in /tmp/eos-fuse.*.log ; do
-                  [ -f "$f" ] && { eos_fuse_logs="$eos_fuse_logs $f" ; rm -f $f ; } ;
-               done
+               #log=$HOME/logs/$(basename $0 | sed 's#\.sh#\.log#g')
                exit 1
             fi
          fi
@@ -391,23 +309,14 @@ else
    printf "$(basename $0) ERROR FAILED: rsync -arzuvp $rsync_source $(dirname $rsync_name)\n" | mail -s "$(basename $0) ERROR FAILED rsync" $notifytowhom
    ( cd ; cvmfs_server abort -f ; ) ; # cvmfs_server abort -f
 fi
-
-# Unmount EOS
-echo INFO eosumount $HOME/eos2
-$EOSSYS/bin/eos.select -b fuse umount $HOME/eos2
-ps auxwww | grep -v grep | grep -q eosfsd
-if [ $? -eq 0 ] ; then
-   echo Warning eosforceumount $HOME/eos2
-   eosforceumount $HOME/eos2
+# Sanity check
+if [ $(ls $rsync_source | wc -l) -eq $(ls $rsync_name | wc -l) ] ; then
+   echo INFO basic sanity check passes : $rsync_source vs $rsync_name
+else
+   echo Warning basic sanity check fails
+   printf "$(basename $0) Checking ls $rsync_source\n$(ls $rsync_source)\nChecking ls $rsync_name \n$(ls $rsync_name) \n" | mail -s "$(basename $0) Warning rsync source and rsync_dir have different content" $notifytowhom
 fi
-echo INFO checking with ls $HOME/eos2
-ls $HOME/eos2
 
 echo script $0 Done
-log=$HOME/logs/$(basename $0 | sed 's#\.sh#\.log#g')
-eos_fuse_logs=
-for f in /tmp/eos-fuse.*.log ; do
-   [ -f "$f" ] && { eos_fuse_logs="$eos_fuse_logs $f" ; rm -f $f ; } ;
-done
-printf "$(basename $0) Done\nEOS Client Version=$EOS_CLIENT_VERSION\nRemoved $eos_fuse_logs\n$(ls -al /tmp)\n$(cat $log 2>&1 | sed 's#%#%%#g')\n"
+#log=$HOME/logs/$(basename $0 | sed 's#\.sh#\.log#g')
 exit 0

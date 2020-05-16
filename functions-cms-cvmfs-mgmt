@@ -34,6 +34,140 @@ DOCKER_TAG_SLC6=cmssw/slc6:amd64
 DOCKER_TAG_SLC8=cmssw/cc8:amd64
 
 # Functions
+function check_if_cvmfs_server_in_transaction () {
+    what=$1
+    cvmfs_server list  | grep stratum0 | grep -q transaction
+    if [ $? -eq 0 ] ; then
+	printf "$what stratum0 in transaction. See \n$(cvmfs_server list)\nThis is strange\n" | mail -s "$what stratum0 in transaction" $notifytowhom
+	echo ERROR cvmfs server already in transaction
+	return 1
+    fi
+    return 0
+}
+
+function cvmfs_server_transaction_and_check_status () {
+    what=$1
+    cvmfs_server transaction
+    status=$?
+    if [ $? -eq 0 ] ; then
+	echo INFO transaction OK for $what
+        return 0
+    else
+	echo ERROR transaction check FAILED
+	printf "$what: cvmfs_server_transaction_and_check_status Failed for $what\n" | mail -s "ERROR: cvmfs_server_transaction_and_check_status Failed" $notifytowhom      
+	return 1
+    fi
+}
+
+function generate_reasonable_lhapdf_version_number () {
+    what=$1
+    lhapdfset_versions=$2
+    lhapdf_web=$3
+    LHAPDFSET_VERSION_NEW=
+    if [ -f $lhapdfset_versions ] ; then
+	projectnumber=$(echo $(wget -q -O- $lhapdf_web |grep "<span id=\"projectnumber\">" | cut -d\< -f2 | cut -d\> -f2))
+	if [ "x$projectnumber" == "x" ] ; then
+	    printf "ERROR create_lhapdf_version_number projectnumber is empty\nCheck if $lhapdf_web has the projectnumber for $what\n" | mail -s "ERROR: create_lhapdf_version_number projectnumber is empty" $notifytowhom
+            return 1
+        fi
+        if [ "x$(echo $projectnumber | sed 's#\.##g' | sed 's#[0-9]##g')" != "x" ] ; then
+           printf "ERROR create_lhapdf_version_number projectnumber=$projectnumber has non-number\nCheck the projectnumber from $lhapdf_web has for $what\n" | mail -s "ERROR: create_lhapdf_version_number projectnumber has non-number" $notifytowhom
+           return 1
+        fi
+	grep -q $projectnumber $lhapdfset_versions
+        if [ $? -eq 0 ] ; then
+	    LHAPDFSET_VERSION_LAST=$(grep $projectnumber $lhapdfset_versions | tail -1)
+	    LAST_CHAR=$(echo $LHAPDFSET_VERSION_LAST | sed "s#$projectnumber##")
+	    LAST_CHAR=${LAST_CHAR: -1}
+            if [ "x$LAST_CHAR" == "xz" ] ; then
+               LHAPDFSET_VERSION_NEW=${LHAPDFSET_VERSION_LAST}a
+            else
+               alphavar=( {a..z} )
+               NEW_LAST_CHAR=$(for ((x=0; x<26; x++)); do echo ${alphavar[x]} ; done | grep -A 1 ${LAST_CHAR} | tail -1)
+               LHAPDFSET_VERSION_NEW=${LHAPDFSET_VERSION_LAST:0:$((${#LHAPDFSET_VERSION_LAST}-1))}${NEW_LAST_CHAR}
+            fi
+        else
+            majora=$(echo $projectnumber | cut -d. -f1) ; [ "X$majora" == "X" ] && majora=0
+            minora=$(echo $projectnumber | cut -d. -f2) ; [ "X$minora" == "X" ] && minora=0
+            subva=$(echo $projectnumber | cut -d. -f3) ; [ "X$subva" == "X" ] && subva=0
+            majorb=$(echo $(tail -1 $lhapdfset_versions | sed 's#[a-z]##g') | cut -d. -f1) ; [ "X$majorb" == "X" ] && majorb=0
+            minorb=$(echo $(tail -1 $lhapdfset_versions | sed 's#[a-z]##g') | cut -d. -f2) ; [ "X$minorb" == "X" ] && minorb=0
+            subvb=$(echo $(tail -1 $lhapdfset_versions | sed 's#[a-z]##g') | cut -d. -f3) ; [ "X$subvb" == "X" ] && subvb=0
+            
+            if [ ${majora}${minora}${subva} -le ${majorb}${minorb}${subvb} ] ; then
+               printf "ERROR create_lhapdf_version_number ${majora}${minora}${subva} -le ${majorb}${minorb}${subvb}\nCheck the projectnumber from $lhapdf_web has for $what\nAnd $(tail -1 $lhapdfset_versions)\n" | mail -s "ERROR: create_lhapdf_version_number new projectnumber smaller" $notifytowhom
+               return 1
+            fi
+            LHAPDFSET_VERSION_NEW=${projectnumber}a
+        fi
+    else
+	echo $LHAPDFSET_VERSION_INITIAL > $lhapdfset_versions
+	LHAPDFSET_VERSION_NEW=$LHAPDFSET_VERSION_INITIAL
+    fi
+    echo $LHAPDFSET_VERSION_NEW
+    grep -q "$LHAPDFSET_VERSION_NEW" $lhapdfset_versions || echo "$LHAPDFSET_VERSION_NEW" >> $lhapdfset_versions
+    return 0
+}
+
+function create_lhapdf_softlink () {
+   installed=$1
+   what=$2
+   # Check 0
+   if [ $# -lt 2 ] ; then
+      echo ERROR create_lhapdf_softlink what+s+installed softlink4what
+      return 1
+   fi
+   grep "$installed" $HOME/lhapdf_list.txt
+   if [ $? -ne 0 ] ; then
+      echo ERROR $HOME/lhapdf_list.txt needs to be updated for $installed
+      return 1
+   fi
+   # Check 2
+   #lhapdfweb_updates=$(grep ^lhapdfweb_updates= $HOME/cron_download_lhapdf.sh | cut -d= -f2)
+   #for v in $lhapdfweb_updates ; do echo $v ; done | grep ${installed}$
+   #if [ $? -ne 0 ] ; then
+   #   echo ERROR $HOME/cron_download_lhapdf.sh needs to be updated for $installed
+   #   return 1
+   #fi
+   # Check 3
+   #ps auxwww | grep -v grep | grep shared | awk '{print $NF}' | grep cron_install_cmssw.sh | grep -v grep
+   #if [ $? -eq 0 ] ; then
+   #   echo ERROR cron_install_cmssw.sh is running
+   #   ps auxwww | grep shared | grep -v grep
+   #   exit 1
+   #fi
+   #echo INFO backing up crontab and removing
+   #cd $HOME
+   #crontab=crontab.$(date +%s)
+   #crontab -l > $crontab
+   #if [ $? -eq 0 ] ; then
+      #crontab -r
+   #else
+   #rm -f $crontab
+   #crontab=crontab
+   #fi
+
+   #echo INFO softlinking
+   #./download_cron_script.sh
+   #cvmfs_server transaction
+   cd /cvmfs/cms.cern.ch/lhapdf/pdfsets
+   #rm -f 6.1.5
+   ln -s $installed $what
+   cd -
+   #ln -s $what current
+   #ln -s 6.1a 6.1.5
+   #cd
+   #echo INFO publishing the change
+   #cvmfs_server publish
+
+   #echo INFO restoring the crontab
+   #crontab $crontab
+   #crontab -l
+   echo INFO copying the checksum from ${lhapdf_top}/checksum_pdfsets_${installed}.txt to ${lhapdf_top}/checksum_pdfsets_${what}.txt
+   cp ${lhapdf_top}/checksum_pdfsets_${installed}.txt ${lhapdf_top}/checksum_pdfsets_${what}.txt
+   return 0
+}
+
 function higher_priority_gridpacks () {
 printf "
 /eos/cms/store/group/phys_generator/cvmfs/gridpacks/2017/13TeV/madgraph/V5_2.6.0/SingleLQ3ToTauB_5f/SingleLQ3ToTauB_5f_madgraph_LO_s-channel-M400_slc6_amd64_gcc481_CMSSW_7_1_30_tarball.tar.xz

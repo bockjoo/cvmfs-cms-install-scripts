@@ -58,7 +58,7 @@ for f in $files ; do
    ls -al $workdir/$f
 done
 
-files="README.gridpacks README.siteconf README.CVMFS.Variant.Symlink README.goback.publication README.cmssw README.cmssw.jenkins"
+files="README.gridpacks README.siteconf README.CVMFS.Variant.Symlink README.goback.publication README.cmssw README.cmssw.jenkins README.cvmfs.manager README.lhapdf"
 i=0
 for f in $files ; do
    i=$(expr $i + 1)
