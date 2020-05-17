@@ -67,11 +67,11 @@ function generate_reasonable_lhapdf_version_number () {
     if [ -f $lhapdfset_versions ] ; then
 	projectnumber=$(echo $(wget -q -O- $lhapdf_web |grep "<span id=\"projectnumber\">" | cut -d\< -f2 | cut -d\> -f2))
 	if [ "x$projectnumber" == "x" ] ; then
-	    printf "ERROR create_lhapdf_version_number projectnumber is empty\nCheck if $lhapdf_web has the projectnumber for $what\n" | mail -s "ERROR: create_lhapdf_version_number projectnumber is empty" $notifytowhom
+	    printf "ERROR generate_lhapdf_version_number projectnumber is empty\nCheck if $lhapdf_web has the projectnumber for $what\n" | mail -s "ERROR: generate_lhapdf_version_number projectnumber is empty" $notifytowhom
             return 1
         fi
         if [ "x$(echo $projectnumber | sed 's#\.##g' | sed 's#[0-9]##g')" != "x" ] ; then
-           printf "ERROR create_lhapdf_version_number projectnumber=$projectnumber has non-number\nCheck the projectnumber from $lhapdf_web has for $what\n" | mail -s "ERROR: create_lhapdf_version_number projectnumber has non-number" $notifytowhom
+           printf "ERROR generate_lhapdf_version_number projectnumber=$projectnumber has non-number\nCheck the projectnumber from $lhapdf_web has for $what\n" | mail -s "ERROR: generate_lhapdf_version_number projectnumber has non-number" $notifytowhom
            return 1
         fi
 	grep -q $projectnumber $lhapdfset_versions
@@ -95,17 +95,15 @@ function generate_reasonable_lhapdf_version_number () {
             subvb=$(echo $(tail -1 $lhapdfset_versions | sed 's#[a-z]##g') | cut -d. -f3) ; [ "X$subvb" == "X" ] && subvb=0
             
             if [ ${majora}${minora}${subva} -le ${majorb}${minorb}${subvb} ] ; then
-               printf "ERROR create_lhapdf_version_number ${majora}${minora}${subva} -le ${majorb}${minorb}${subvb}\nCheck the projectnumber from $lhapdf_web has for $what\nAnd $(tail -1 $lhapdfset_versions)\n" | mail -s "ERROR: create_lhapdf_version_number new projectnumber smaller" $notifytowhom
+               printf "ERROR generate_lhapdf_version_number ${majora}${minora}${subva} -le ${majorb}${minorb}${subvb}\nCheck the projectnumber from $lhapdf_web has for $what\nAnd $(tail -1 $lhapdfset_versions)\n" | mail -s "ERROR: generate_lhapdf_version_number new projectnumber smaller" $notifytowhom
                return 1
             fi
             LHAPDFSET_VERSION_NEW=${projectnumber}a
         fi
     else
-	echo $LHAPDFSET_VERSION_INITIAL > $lhapdfset_versions
 	LHAPDFSET_VERSION_NEW=$LHAPDFSET_VERSION_INITIAL
     fi
     echo $LHAPDFSET_VERSION_NEW
-    grep -q "$LHAPDFSET_VERSION_NEW" $lhapdfset_versions || echo "$LHAPDFSET_VERSION_NEW" >> $lhapdfset_versions
     return 0
 }
 

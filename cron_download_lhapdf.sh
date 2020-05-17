@@ -19,32 +19,14 @@ rsync_destination="/cvmfs/cms.cern.ch/lhapdf"
 LHAPDFSET_VERSION_INITIAL=6.2.3a
 lhapdfset_versions=$HOME/lhapdfset_versions
 
-check_if_cvmfs_server_in_transaction $(basename $0) || exit 1
-
-cvmfs_server_transaction_and_check_status $(basename $0) || exit 1
-
-
-[ -d $rsync_destination ] || mkdir -p $rsync_destination
-
-# Check if the destination is different from the source
-echo INFO executing rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}
-thelog=$HOME/logs/cron_download_lhapdf_rsync.log
-rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --include=current/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz --dry-run ${rsync_source} ${rsync_destination} > $thelog 2>&1
-status=$?
-( cd ; cvmfs_server abort -f ; ) ;
-
-if [ $status -ne 0 ] ; then
-   printf "$(basename $0) FAILED: rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) FAILED rsync dry-run" $notifytowhom
-   exit 1
-fi
-
-# If there is no change, there is no new version to create
-grep -q ^/current $thelog || exit 0
-
-# Create a new version if $thelog has any changes : start with 6.2.3a
-LHAPDFSET_VERSION_NEW=$(create_lhapdf_version_number $(basename $0) $lhapdfset_versions $lhapdf_web)
+# First generate the new lhapdf version to use
+LHAPDFSET_VERSION_NEW=$(generate_reasonable_lhapdf_version_number $(basename $0) $lhapdfset_versions $lhapdf_web)
 [ $? -eq 0 ] || exit 1
-echo INFO LHAPDFSET_VERSION_NEW=$LHAPDFSET_VERSION_NEW
+
+grep -q "LHAPDF ${LHAPDFSET_VERSION_NEW}" $updated_list && printf "$(basename $0) ERROR LHAPDF ${LHAPDFSET_VERSION_NEW}" in $updated_list\n" | mail -s "$(basename $0) ERROR LHAPDF ${LHAPDFSET_VERSION_NEW}" in $updated_list" $notifytowhom
+grep -q "LHAPDF ${LHAPDFSET_VERSION_NEW}" $updated_list && exit 1
+grep -q "$LHAPDFSET_VERSION_NEW" $lhapdfset_versions && printf "$(basename $0) ERROR ${LHAPDFSET_VERSION_NEW}" in $lhapdfset_versions\n" | mail -s "$(basename $0) ERROR ${LHAPDFSET_VERSION_NEW}" in $lhapdfset_versions" $notifytowhom
+grep -q "$LHAPDFSET_VERSION_NEW" $lhapdfset_versions && exit 1
 
 # Make sure there is no ${LHAPDFSET_VERSION_NEW}
 if [ -d ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} ] ; then
@@ -52,17 +34,50 @@ if [ -d ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} ] ; then
    exit 1
 fi
 
+# Check if cvmfs is already in transaction, shouldn't happen though.
+check_if_cvmfs_server_in_transaction $(basename $0) || exit 1
+
+# Put cvmfs in transaction for an rsync dryrun
 cvmfs_server_transaction_and_check_status $(basename $0) || exit 1
+
+[ -d $rsync_destination ] || mkdir -p $rsync_destination
+
+# Check if the destination is different from the source
+if [ ] ; then
+    echo INFO executing rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}
+    thelog=$HOME/logs/cron_download_lhapdf_rsync.log
+    rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --include=current/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz --dry-run ${rsync_source} ${rsync_destination} > $thelog 2>&1
+fi
+echo INFO executing rsync -rLptgoDzuv --delete --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}
+thelog=$HOME/logs/cron_download_lhapdf_rsync.log
+rsync -rLptgoDzuv --delete --include=current/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz --dry-run ${rsync_source} ${rsync_destination} > ${thelog}.DRY 2>&1
+status=$?
+( cd ; cvmfs_server abort -f ; ) ;
+
+if [ $status -ne 0 ] ; then
+   printf "$(basename $0) FAILED: rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}\n$(cat ${thelog}.DRY | sed 's#%#%%#g')\n" | mail -s "$(basename $0) FAILED rsync dry-run" $notifytowhom
+   exit 1
+fi
+
+# If there is no change, there is no new version to create
+grep -v ^current/$ ${thelog}.DRY | grep -q ^current/ || printf "$(basename $0) DEBUG no change in the PDF set content\n" | mail -s "$(basename $0) DEBUG LHAPDF no change" $notifytowhom
+grep -v ^current/$ ${thelog}.DRY | grep -q ^current/ || exit 0
+
+
+# OK, there was a change. Put cvmfs in transaction
+cvmfs_server_transaction_and_check_status $(basename $0) || exit 1
+
+echo INFO LHAPDFSET_VERSION_NEW=$LHAPDFSET_VERSION_NEW
 
 # Notify the start of the new version
 printf "$(basename $0) Warn: will create ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} \n" | mail -s "$(basename $0) Warn creating LHAPDF ${LHAPDFSET_VERSION_NEW}" $notifytowhom
 
-# Really create the new version at the official area of the new version
-echo INFO executing rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
-rsync -rLptgoDzuv --delete --exclude=*/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} > $thelog 2>&1
+# Create the new version at the official area of the new version
+echo INFO executing rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@\* --exclude=\*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
+rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@* --exclude=*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} > $thelog 2>&1
 if [ $? -ne 0 ] ; then
-   echo ERROR rsync -rLptgoDzuv --delete --exclude=*/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
-   printf "$(basename $0) FAILED: rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) FAILED rsync for LHAPDFSET_VERSION_NEW" $notifytowhom
+   echo ERROR rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@* --exclude=*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
+   printf "$(basename $0) FAILED: rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@\* --exclude=\*.tar.gz --dry-run ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) FAILED rsync for $LHAPDFSET_VERSION_NEW" $notifytowhom
    ( cd ; cvmfs_server abort -f ; ) ;
    exit 1
 fi
@@ -71,27 +86,32 @@ fi
 echo INFO executing rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*/@\* --exclude=\*/\*.tar.gz ${rsync_source} ${rsync_destination}
 rsync -rLptgoDzuv --delete --exclude=*/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz ${rsync_source} ${rsync_destination} > $thelog.update 2>&1
 if [ $? -ne 0 ] ; then
+   echo UNDO  rsync for ${LHAPDFSET_VERSION_NEW} 
+   ( cd ${rsync_destination}/pdfsets ; rm -rf ${LHAPDFSET_VERSION_NEW} ; ) ;   
    echo ERROR rsync -rLptgoDzuv --delete --exclude=*/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz ${rsync_source} ${rsync_destination}
    printf "$(basename $0) FAILED: rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}\n$(cat $thelog.update | sed 's#%#%%#g')\n" | mail -s "$(basename $0) FAILED rsync update for ${rsync_destination}/current" $notifytowhom
    ( cd ; cvmfs_server abort -f ; ) ;
    exit 1
 fi
 
-( cd ; cvmfs_server abort -f ; ) ;
 endtime=$(date)
-printf "$(basename $0) DEBUG start=$starttime end=$endtime \n$(cat $thelog | sed 's#%#%%#g') \nUpdate log\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) DEBUG Check Debug Run" $notifytowhom
-exit 0
+## Test
+#( cd ; cvmfs_server abort -f ; ) ;
+#printf "$(basename $0) DEBUG start=$starttime end=$endtime \n$(cat $lhapdfset_versions)\n$(cat $thelog | sed 's#%#%%#g') \nUpdate log\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) DEBUG Check Debug Run" $notifytowhom
+## Test
+#exit 0
 
 cvmfs_server publish 2>&1
 status=$?
 if [ $status -eq 0 ] ; then
    echo INFO updating the $updated_list with ${LHAPDFSET_VERSION_NEW}
    grep -q "LHAPDF ${LHAPDFSET_VERSION_NEW}" $updated_list || echo "LHAPDF ${LHAPDFSET_VERSION_NEW} $(date +%s) $(date)" >> $updated_list
+   grep -q "$LHAPDFSET_VERSION_NEW" $lhapdfset_versions || echo "$LHAPDFSET_VERSION_NEW" >> $lhapdfset_versions
 else
    printf "$(basename $0) ERROR: Status=$status failed to publish ${LHAPDFSET_VERSION_NEW}\n$(cat $thelog | sed 's#%#%%#g') \nUpdate log\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) ERROR publication failure: LHAPDF ${LHAPDFSET_VERSION_NEW}" $notifytowhom
    exit 1
 fi
-printf "$(basename $0) INFO: Status=$status We created ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}\n$(cat $thelog | sed 's#%#%%#g') \nUpdate log\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) INFO LHAPDF ${LHAPDFSET_VERSION_NEW} created" $notifytowhom
+printf "$(basename $0) INFO: Status=$status start=$starttime end=$endtime. We created ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}\n$(cat $thelog | sed 's#%#%%#g') \nUpdate log\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) INFO LHAPDF ${LHAPDFSET_VERSION_NEW} created" $notifytowhom
 
 echo script $(basename $0) $status Done
 
