@@ -18,6 +18,8 @@ rsync_source="/cvmfs/sft.cern.ch/lcg/external/lhapdfsets/current"
 rsync_destination="/cvmfs/cms.cern.ch/lhapdf"
 LHAPDFSET_VERSION_INITIAL=6.2.3a
 lhapdfset_versions=$HOME/lhapdfset_versions
+# Check if lhapdf_update is yes
+[ "$lhapdf_update" == "yes" ] || { echo INFO lhapdf_update=$lhapdf_update ; echo INFO update cron_install_cmssw.config as needed ; exit 0 ; } ;
 
 # First generate the new lhapdf version to use
 LHAPDFSET_VERSION_NEW=$(generate_reasonable_lhapdf_version_number $(basename $0) $lhapdfset_versions $lhapdf_web)
@@ -44,13 +46,13 @@ cvmfs_server_transaction_and_check_status $(basename $0) || exit 1
 
 # Check if the destination is different from the source
 if [ ] ; then
-    echo INFO executing rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}
+    echo INFO executing rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --include=current/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}
     thelog=$HOME/logs/cron_download_lhapdf_rsync.log
     rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --include=current/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz --dry-run ${rsync_source} ${rsync_destination} > $thelog 2>&1
 fi
-echo INFO executing rsync -rLptgoDzuv --delete --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}
+echo INFO executing rsync -rLptgoDzuv --delete --exclude=*/.cvmfscatalog --exclude=\*@\* --exclude=\*/\*.tar.gz --dry-run ${rsync_source} ${rsync_destination}
 thelog=$HOME/logs/cron_download_lhapdf_rsync.log
-rsync -rLptgoDzuv --delete --include=current/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz --dry-run ${rsync_source} ${rsync_destination} > ${thelog}.DRY 2>&1
+rsync -rLptgoDzuv --delete --exclude=*/.cvmfscatalog --exclude=*/@* --exclude=*/*.tar.gz --dry-run ${rsync_source} ${rsync_destination} > ${thelog}.DRY 2>&1
 status=$?
 ( cd ; cvmfs_server abort -f ; ) ;
 
@@ -60,7 +62,7 @@ if [ $status -ne 0 ] ; then
 fi
 
 # If there is no change, there is no new version to create
-grep -v ^current/$ ${thelog}.DRY | grep -q ^current/ || printf "$(basename $0) DEBUG no change in the PDF set content\n" | mail -s "$(basename $0) DEBUG LHAPDF no change" $notifytowhom
+#grep -v ^current/$ ${thelog}.DRY | grep -q ^current/ || printf "$(basename $0) DEBUG no change in the PDF set content\n" | mail -s "$(basename $0) DEBUG LHAPDF no change" $notifytowhom
 grep -v ^current/$ ${thelog}.DRY | grep -q ^current/ || exit 0
 
 
@@ -101,13 +103,12 @@ endtime=$(date)
 ## Test
 #exit 0
 
+echo INFO updating the $updated_list with ${LHAPDFSET_VERSION_NEW}
+grep -q "LHAPDF ${LHAPDFSET_VERSION_NEW}" $updated_list || echo "LHAPDF ${LHAPDFSET_VERSION_NEW} $(date +%s) $(date)" >> $updated_list
+grep -q "$LHAPDFSET_VERSION_NEW" $lhapdfset_versions || echo "$LHAPDFSET_VERSION_NEW" >> $lhapdfset_versions
+
 cvmfs_server publish 2>&1
-status=$?
-if [ $status -eq 0 ] ; then
-   echo INFO updating the $updated_list with ${LHAPDFSET_VERSION_NEW}
-   grep -q "LHAPDF ${LHAPDFSET_VERSION_NEW}" $updated_list || echo "LHAPDF ${LHAPDFSET_VERSION_NEW} $(date +%s) $(date)" >> $updated_list
-   grep -q "$LHAPDFSET_VERSION_NEW" $lhapdfset_versions || echo "$LHAPDFSET_VERSION_NEW" >> $lhapdfset_versions
-else
+if [ $? -ne 0 ] ; then
    printf "$(basename $0) ERROR: Status=$status failed to publish ${LHAPDFSET_VERSION_NEW}\n$(cat $thelog | sed 's#%#%%#g') \nUpdate log\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) ERROR publication failure: LHAPDF ${LHAPDFSET_VERSION_NEW}" $notifytowhom
    exit 1
 fi

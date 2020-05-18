@@ -24,6 +24,8 @@ rpmdb_local_dir=$(grep rpmdb_local_dir= $HOME/cron_install_cmssw.config | grep -
 notifytowhom=$(grep notifytowhom= $HOME/cron_install_cmssw.config | grep -v \# | cut -d= -f2)
 theuser=$(/usr/bin/whoami)
 jenkins_cmssw=$(grep ^jenkins_cmssw= $HOME/cron_install_cmssw.config | grep -v \# | cut -d= -f2)
+lhapdf_update=$(grep ^lhapdf_update= $HOME/cron_install_cmssw.config | grep -v \# | cut -d= -f2)
+
 cvmfs_server_name=$(eval echo $cvmfs_server_name)
 [ "$(/bin/hostname -f)" == "x$cvmfs_server_name" ] || cvmfs_server_yes=no
 # This machine

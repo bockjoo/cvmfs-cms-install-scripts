@@ -6,9 +6,40 @@ For this documentation on the lhapdf on cvmfs, it means the PDF sets that came o
 
 [2] Updating the lhapdf on cvmfs
 Until the version 6.2.1, the generator group requested the upload of the lhapdf on the cvmfs {2} based on the
-lhapdf releases that were used to be found in {3}. Officially, the PDF sets are moved to {4}.
-cron_download_lhapdf.sh is the script that were used until 6.2.1d ( /cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2.1d ).
+lhapdf releases that were used to be found in {3}.
+Namely, the LHAPDF dataset used by CMS was updated manually under /cvmfs/cms.cern.ch/lhapdf.
+When the LHAPDF CMS experts (Mikhail and CMS generator group) notice changes in the dataset, 
+additions to the dataset, or just a need for new MC production, I was told to create a new set of lhapdf and 
+assign a new version number.
+I guess this is needed because we need to give an identifier to the particular LHAPDF dataset used by generators
+at a given MC production period.
+For example, in the hepforge page, the version number is always some fixed version, e.g., 6.2.1, which is 
+the LHAPDF library code version but sometimes within 6.2.1, there had been changes in the LHAPDF dataset itself, 
+so I created a new directory for the dataset and assigned a version number, 6.2.1a, 6.2.1b, etc, CMS-internally
+to the new directory that contains the LHAPDF dataset.
+cron_download_lhapdf.sh is the script that has been used until 6.2.1d ( /cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2.1d ) to
+upload the LHAPDF to cvmfs manually. This has been a hassle due to the infrequent manual intervention to create
+a reasonable new version for the LHAPDF at a given time.
 
+[3] Automation of the LHAPDF upload
+To minimize the time and the upload error, it would be ideal for us to be able to automate the upload process somehow.
+This is what I have came up with:
+Whenever there is any change in the LHAPDF dataset listed in {4}, we would create a new version of the LHAPDF dataset,
+come up with a new version number, and copy the new dataset to /cvmfs/cms.cern.ch/lhapdf area so that CMS generator 
+can use it for a specific MC production.
+This version number that I mention has slightly different version number from the latest version of the library code,
+but we can derived it from the library code version with the convention of the alphabetic addition at the end of
+the library code version. In this way, the LHAPDF dataset will be consistent with the version of the LHAPDF library
+and with the CMS production period.
+
+For example, let's say the code version stayed at 6.2.3 (current), the derived CMS version of the LHAPDF dataset would be
+6.2.3a, .., 6.2.3z, 6.2.3za, ...., so on until the code version changed to a different version.
+Of course, any update will be initiated only if the official lhapdf page has any PDF change or the library version changes.
+I believe the LHAPDF update for CMS in this way will be very infrequent and done only whenever the update is needed.
+With this automation, we will be able to minimize or eliminate the need for the manual intervention of the new LHAPDF upload.
+Then, the CMS generator group can take a particular version of the LHAPDF set from cvmfs for the cmsdist and for an MC generation.
+
+Currently, cron_download_lhapdf.sh is modified to this scheme of automation.
 
 
 References
