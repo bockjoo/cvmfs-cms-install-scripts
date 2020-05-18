@@ -18,16 +18,14 @@ rsync_source="/cvmfs/sft.cern.ch/lcg/external/lhapdfsets/current"
 rsync_destination="/cvmfs/cms.cern.ch/lhapdf"
 LHAPDFSET_VERSION_INITIAL=6.2.3a
 lhapdfset_versions=$HOME/lhapdfset_versions
-# Check if lhapdf_update is yes
-[ "$lhapdf_update" == "yes" ] || { echo INFO lhapdf_update=$lhapdf_update ; echo INFO update cron_install_cmssw.config as needed ; exit 0 ; } ;
 
 # First generate the new lhapdf version to use
 LHAPDFSET_VERSION_NEW=$(generate_reasonable_lhapdf_version_number $(basename $0) $lhapdfset_versions $lhapdf_web)
 [ $? -eq 0 ] || exit 1
 
-grep -q "LHAPDF ${LHAPDFSET_VERSION_NEW}" $updated_list && printf "$(basename $0) ERROR LHAPDF ${LHAPDFSET_VERSION_NEW}" in $updated_list\n" | mail -s "$(basename $0) ERROR LHAPDF ${LHAPDFSET_VERSION_NEW}" in $updated_list" $notifytowhom
+grep -q "LHAPDF ${LHAPDFSET_VERSION_NEW}" $updated_list && printf "$(basename $0) ERROR LHAPDF ${LHAPDFSET_VERSION_NEW}" in $updated_list\n" | mail -s "$(basename $0) ERROR LHAPDF ${LHAPDFSET_VERSION_NEW} in $updated_list" $notifytowhom
 grep -q "LHAPDF ${LHAPDFSET_VERSION_NEW}" $updated_list && exit 1
-grep -q "$LHAPDFSET_VERSION_NEW" $lhapdfset_versions && printf "$(basename $0) ERROR ${LHAPDFSET_VERSION_NEW}" in $lhapdfset_versions\n" | mail -s "$(basename $0) ERROR ${LHAPDFSET_VERSION_NEW}" in $lhapdfset_versions" $notifytowhom
+grep -q "$LHAPDFSET_VERSION_NEW" $lhapdfset_versions && printf "$(basename $0) ERROR ${LHAPDFSET_VERSION_NEW}" in $lhapdfset_versions\n" | mail -s "$(basename $0) ERROR ${LHAPDFSET_VERSION_NEW} in $lhapdfset_versions" $notifytowhom
 grep -q "$LHAPDFSET_VERSION_NEW" $lhapdfset_versions && exit 1
 
 # Make sure there is no ${LHAPDFSET_VERSION_NEW}
@@ -63,7 +61,18 @@ fi
 
 # If there is no change, there is no new version to create
 #grep -v ^current/$ ${thelog}.DRY | grep -q ^current/ || printf "$(basename $0) DEBUG no change in the PDF set content\n" | mail -s "$(basename $0) DEBUG LHAPDF no change" $notifytowhom
+grep -v ^current/$ ${thelog}.DRY | grep -q ^current/ || { echo INFO no change. Exiting... ; exit 0 ; } ;
 grep -v ^current/$ ${thelog}.DRY | grep -q ^current/ || exit 0
+
+# Check if lhapdf_update is yes
+if [ "$lhapdf_update" == "yes" ] ; then
+   :
+else
+   echo INFO lhapdf_update=$lhapdf_update
+   echo INFO update cron_install_cmssw.config as needed
+   printf "$(basename $0) Warning lhapdf_update=$lhapdf_update\nupdate cron_install_cmssw.config as needed\n" | mail -s "$(basename $0) Warning lhapdf_update is not set for update" $notifytowhom
+   exit 0
+fi
 
 
 # OK, there was a change. Put cvmfs in transaction

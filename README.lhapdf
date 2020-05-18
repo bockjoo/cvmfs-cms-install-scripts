@@ -2,7 +2,8 @@ README for lhapdf on cvmfs prepared by Bockjoo Kim on 16MAY2020
 
 [1] What is LHAPDF?
 LHAPDF is a general purpose C++ interpolator, used for evaluating the parton density functions (PDF) {1}.
-For this documentation on the lhapdf on cvmfs, it means the PDF sets that came out at various times.
+For this documentation on the lhapdf on cvmfs, it means the PDF sets that came out at various times with
+a CMS version number derived from various library code version number.
 
 [2] Updating the lhapdf on cvmfs
 Until the version 6.2.1, the generator group requested the upload of the lhapdf on the cvmfs {2} based on the
