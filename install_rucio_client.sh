@@ -2,6 +2,7 @@
 
 #Rucio version to install, default is latest available in pypi.org
 RUCIO_VERSION="latest"
+#RUCIO_VERSION="1.23.11.post3" # 18DEC2020
 
 #CVMFS repository name
 CVMFS_REPO="cms.cern.ch"
@@ -28,6 +29,10 @@ DOCKER_CMD="docker run --net=host --rm -t -v /tmp:/tmp -v /cvmfs:/cvmfs -v /home
 echo INFO Running $DOCKER_CMD sh -c "source /cvmfs/${CVMFS_REPO}/${ARCHITECTURE}/external/py2-pip/${CMS_PIP_VERSION}/etc/profile.d/init.sh ; ${WORKSPACE}/cms-bot/rucio/install.sh -c -v '${RUCIO_VERSION}' -i '/cvmfs/${CVMFS_REPO}/rucio' -C 'file://${WORKSPACE}/cms-bot/rucio/rucio.cfg'"
 $DOCKER_CMD sh -c "source /cvmfs/${CVMFS_REPO}/${ARCHITECTURE}/external/py2-pip/${CMS_PIP_VERSION}/etc/profile.d/init.sh ; \
   ${WORKSPACE}/cms-bot/rucio/install.sh -c -v '${RUCIO_VERSION}' -i '/cvmfs/${CVMFS_REPO}/rucio' -C 'file://${WORKSPACE}/cms-bot/rucio/rucio.cfg'"
+# 18DEC2020
+#$DOCKER_CMD sh -c "source /cvmfs/${CVMFS_REPO}/${ARCHITECTURE}/external/py2-pip/${CMS_PIP_VERSION}/etc/profile.d/init.sh ; \
+#export PATH=\$PATH:/cvmfs/cms.cern.ch/common ; \
+#  ${WORKSPACE}/cms-bot/rucio/install.sh -c -v '${RUCIO_VERSION}' -i '/cvmfs/${CVMFS_REPO}/rucio'" # -C 'file://${WORKSPACE}/cms-bot/rucio/rucio.cfg'"
 if [ $? -eq 0 ] ; then
    grep -q "Rucio_Client_0 $ARCHITECTURE" /cvmfs/$CVMFS_REPO/cvmfs-cms.cern.ch-updates || echo "Rucio_Client_0 $ARCHITECTURE" $(date +%s) $(date -u) >> /cvmfs/$CVMFS_REPO/cvmfs-cms.cern.ch-updates
    #echo Success $0 Done

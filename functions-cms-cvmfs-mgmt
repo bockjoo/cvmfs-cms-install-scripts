@@ -211,6 +211,77 @@ function eosforceumount () {
   return $?
 }
 
+function cvmfs_create_an_lhapdf_version_from_two_versions () {
+    #cvmfs_create_an_lhapdf_version_from_two_versions 6.2.1a_2  6.2.1a_1 6.2.3c > cvmfs_create_an_lhapdf_version_from_two_versions+6.2.1a_2+6.2.1a_1+6.2.3c.log 2>&1 &
+    #newdir=/cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2.1a_1
+    #[ -d $newdir ] || mkdir -p $newdir # mkdir -p /cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2.1a_1
+    #sourcedir1=/cvmfs/cms.cern.ch/lhapdf/pdfsets/$(basename $newdir | sed 's#_# #g' | awk '{print $1}')
+    #sourcedir2=/cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2.1d # current
+    if [ $# -lt 3 ] ; then
+       echo ERROR cvmfs_create_an_lhapdf_version_from_two_versions newversion version1 version2
+       return 1
+    fi
+    newversion=$1 ; version1=$2 ; version2=$3
+    newdir=/cvmfs/cms.cern.ch/lhapdf/pdfsets/$newversion
+    sourcedir1=/cvmfs/cms.cern.ch/lhapdf/pdfsets/$version1
+    sourcedir2=/cvmfs/cms.cern.ch/lhapdf/pdfsets/$version2
+    [ -d $newdir ] && { echo ERROR new directory already exists ; ls $newdir ; return 1 ; } ;
+    mkdir -p $newdir
+    [ ! -d $sourcedir1 ] && [ ! -L $sourcedir1 ] && { echo ERROR version1 directory does not exist = $sourcedir1 ; return 1 ; } ;
+    [ ! -d $sourcedir2 ] && [ ! -L $sourcedir2 ] && { echo ERROR version1 directory does not exist = $sourcedir2 ; return 1 ; } ;
+    count=0
+    for sourcedir in $sourcedir1 $sourcedir2 ; do
+        #echo Content in $sourcedir : $(ls $sourcedir | wc -l)
+        #echo Content in $sourcedir without pdfsets.index : $(ls $sourcedir | grep -v pdfsets.index | wc -l)  $(wc -l $sourcedir/pdfsets.index | awk '{print $1}') $(i=0 ; for d in $sourcedir/* ; do [ -d $d ] || continue ; i=$(expr $i + 1) ; done ; echo $i)
+        cd $newdir # cd /cvmfs/cms.cern.ch/lhapdf/pdfsets/$newdir
+        for d in $(cat $sourcedir/pdfsets.index | awk '{print $2}') ; do
+            [ -L $d ] || { count=$(expr $count + 1) ; echo "[ $count ] $d " ; grep " $d " $sourcedir/pdfsets.index >> pdfsets.index ; ln -s $sourcedir/$d ; } ;
+        done
+    done
+    return 0
+}
+
+function cvmfs_check_an_lhapdf_version_from_two_versions () {
+
+    #newdir=/cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2.1a_1
+    #[ -d $newdir ] || mkdir -p $newdir # mkdir -p /cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2.1a_1
+    #sourcedir1=/cvmfs/cms.cern.ch/lhapdf/pdfsets/$(basename $newdir | sed 's#_# #g' | awk '{print $1}')
+    #sourcedir2=/cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2.1d # current
+    if [ $# -lt 3 ] ; then
+       echo ERROR cvmfs_check_an_lhapdf_version_from_two_versions newversion version1 version2
+       return 1
+    fi
+    newversion=$1 ; version1=$2 ; version2=$3
+    newdir=/cvmfs/cms.cern.ch/lhapdf/pdfsets/$newversion
+    sourcedir1=/cvmfs/cms.cern.ch/lhapdf/pdfsets/$version1
+    sourcedir2=/cvmfs/cms.cern.ch/lhapdf/pdfsets/$version2
+    i=0
+    for d in $(cat $newdir/pdfsets.index | awk '{print $2}') ; do
+        i=$(expr $i + 1)
+        if [ -d $sourcedir1/$d ] ; then
+           if [ -d $sourcedir2/$d ] ; then
+              if [ "x$(grep ' $d ' $sourcedir1/pdfsets.index)" == "x$(grep ' $d ' $newdir/pdfsets.index)" ] ; then
+                 echo "[ $i ] OK1 $d"
+              else
+                 echo "[ $i ] BAD1 $d" #grep \" $d \" $sourcedir1/pdfsets.index "?" grep \" $d \" $newdir/pdfsets.index "|" grep \" $d \" $sourcedir2/pdfsets.index "?" grep \" $d \" $newdir/pdfsets.index
+              fi
+           else
+              echo "[ $i ] BAD2 $d" $sourcedir2 does not have this. Why?
+           fi
+        else
+           if [ -d $sourcedir2/$d ] ; then
+              if [ "x$(grep ' $d ' $sourcedir2/pdfsets.index)" == "x$(grep ' $d ' $newdir/pdfsets.index)" ] ; then
+                 echo "[ $i ] OK2 $d"
+              else
+                 echo "[ $i ] BAD3" #$(grep " $d " $sourcedir2/pdfsets.index) "?" $(grep " $d " $newdir/pdfsets.index)
+              fi
+           else
+              echo "[ $i ] BAD4" 
+           fi           
+        fi
+    done
+}
+
 function cvmfs_create_lhapdf_621a1 () {
     newdir=/cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2.1a_1
     [ -d $newdir ] || mkdir -p $newdir # mkdir -p /cvmfs/cms.cern.ch/lhapdf/pdfsets/6.2.1a_1

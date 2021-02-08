@@ -371,6 +371,7 @@ ipages=0
 status=0
 while [ $ipages -lt 100 ] ; do
    ipages=$(expr $ipages + 1)
+   echo INFO Doing /usr/bin/wget -q --header="PRIVATE-TOKEN: \${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat.${ipages} "$siteconf_cat?page=${ipages}&per_page=100"
    /usr/bin/wget -q --header="PRIVATE-TOKEN: ${AUTH_TKN}" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat.${ipages} "$siteconf_cat?page=${ipages}&per_page=100" 2>&1
   status=$(expr $status + $?)
   [ $status -eq 0 ] || break
@@ -386,9 +387,12 @@ if [ $status -ne 0 ] ; then
 fi
 
 # Just in case, create a cache for siteid_list
-printf "$(cat ${TMP_AREA}/siteconf_cat*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/.*.git | sed 's#,#\n#g' | grep "^{\"id" | cut -d: -f2 | \
+#printf "$(cat ${TMP_AREA}/siteconf_cat*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/.*.git | sed 's#,#\n#g' | grep "^{\"id" | cut -d: -f2 | \
+printf "$(cat ${TMP_AREA}/siteconf_cat*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/.*.git | sed 's#,#\n#g' | sed 's#\[#\n#g' | grep "^{\"id" | cut -d: -f2 | \
 while read id ; do
-  siteconf_sitename=$(printf "$(cat ${TMP_AREA}/siteconf_cat*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/.*.git | sed 's#,#\n#g' | grep -A 2 "^{\"id\":$id" | grep \"name\": | cut -d\" -f4)
+  #siteconf_sitename=$(printf "$(cat ${TMP_AREA}/siteconf_cat*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/.*.git | sed 's#,#\n#g' | grep -A 2 "^{\"id\":$id" | grep \"name\": | cut -d\" -f4)
+  siteconf_sitename=$(printf "$(cat ${TMP_AREA}/siteconf_cat*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/.*.git | sed 's#,#\n#g' | sed 's#\[#\n#g' | grep -A 2 "^{\"id\":$id" | grep \"name\": | cut -d\" -f4)
+  #echo "$siteconf_sitename" | grep ^T
   echo "$siteconf_sitename" | grep -q ^T
   [ $? -eq 0 ] || { echo Warning $siteconf_sitename does not start with 'T' ; continue ; } ;
   grep -q "$siteconf_sitename $id" $siteid_list
@@ -398,6 +402,7 @@ done
 # Sanity check for the downloaded output
 grep -q '"name":"siteconf"' ${TMP_AREA}/siteconf_cat*
 if [ $? -ne 0 ] ; then
+   echo ERROR failed to download \$siteconf_cat
    printf "$(/bin/hostname) $0 failed to download $siteconf_cat\nUsing /usr/bin/wget --header=\"PRIVATE-TOKEN: \$(cat \$AUTH_TKN)\" --read-timeout=180 -O ${TMP_AREA}/siteconf_cat $siteconf_cat \n${TMP_AREA}/siteconf_cat wrong" | mail -s "ERROR: wget $siteconf_cat ${TMP_AREA}/siteconf_cat wrong " $notifytowhom
    /bin/rm ${EXC_LOCK}
    exit 1
@@ -406,18 +411,18 @@ fi
 # Compare the new timestamp ($NEWT) with the old ($OLDT). If they are different, download the siteconf for the site (given the siteid)
 for SITE in $(/bin/cat ${TMP_AREA}/sitedb.list) ; do
    isite=$(expr $isite + 1)
-   #echo "[5]" DEBUG doing SITE=$SITE
+   echo "[6]" DEBUG doing SITE=$SITE
    NEWT=`/usr/bin/awk -F: '{if($1=="'${SITE}'"){print $2}}' ${TMP_AREA}/.timestamp 2>/dev/null`
    if [ -z "${NEWT}" ]; then
       # no repository for this SiteDB site
-      #echo DEBUG SITE=$SITE no repository for this SiteDB site. Continuing...      
+      echo DEBUG SITE=$SITE no repository for this SiteDB site. Continuing...      
       continue
    fi
    if [ -f ${SYNC_DIR}/SITECONF/.timestamp ]; then
       OLDT=`/usr/bin/awk -F: '{if($1=="'${SITE}'"){print $2}}' ${SYNC_DIR}/SITECONF/.timestamp 2>/dev/null`
       if [ "${NEWT}" == "${OLDT}" ]; then
          # SYNC_DIR up-to-date
-         #echo DEBUG SITE=$SITE SYNC_DIR up-to-date. Continuing... OLDT=$OLDT NEWT=$NEWT
+         echo DEBUG SITE=$SITE SYNC_DIR up-to-date. Continuing... OLDT=$OLDT NEWT=$NEWT
          #
          # 02APR2018
          # timestamp in https://gitlab.cern.ch/api/v3/groups/SITECONF/projects?per_page=100&page=1
@@ -437,22 +442,23 @@ for SITE in $(/bin/cat ${TMP_AREA}/sitedb.list) ; do
    #
    # need to update SITECONF:
    # ------------------------
-   echo "[5-1] Updating area of site \"${SITE}\":"
+   echo "[6-1] Updating area of site \"${SITE}\":"
    UPPER=`echo ${SITE} | /usr/bin/tr '[:lower:]' '[:upper:]'`
-   thesiteid=$(printf "$(cat ${TMP_AREA}/siteconf_cat.*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/${UPPER}.git | sed 's#,#\n#g' | grep "^{\"id" | cut -d: -f2)
+   thesiteid=$(printf "$(cat ${TMP_AREA}/siteconf_cat.*)\n" | sed 's#"name":"siteconf"#\n"name":"siteconf"#g' | grep -i siteconf/${UPPER}.git | sed 's#,#\n#g' | sed 's#\[#\n#g' | grep "^{\"id" | cut -d: -f2)
    # The pagination for siteconf_cat does not work from time to time, use the siteid from the cache
    if [ "x$thesiteid" == "x" ] ; then
       thesiteid=$(grep "${SITE} " $siteid_list 2>/dev/null | awk '{print $2}')
    fi
 
-   echo "[5-2] Site id for \"${SITE}\":${thesiteid}:"
+   echo "[6-2] Site id for \"${SITE}\":${thesiteid}:"
    if [ "x$thesiteid" == "x" ] ; then
          /bin/cp ${TMP_AREA}/siteconf_cat.* $HOME/
-         printf "$(/bin/hostname) $0  ERROR: the site id is empty for $SITE. This should not have happened\n" | mail -s "ERROR:  the site id empty with $SITE" $notifytowhom
+         printf "$(/bin/hostname) $0  ERROR: the site id is empty for $SITE. This should not have happened\nCheck https://gitlab.cern.ch/SITECONF/$SITE and\nmanually update $siteid_list\n" | mail -s "ERROR:  the site id empty with $SITE" $notifytowhom
          continue
    fi
    /usr/bin/wget --header="PRIVATE-TOKEN: $(cat .AUTH_TKN)" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz https://gitlab.cern.ch/api/v4/projects/${thesiteid}/repository/archive.tar.gz?ref=master
    RC=$?
+   #[ -f ${TMP_AREA}/archive_T1_DE_KIT.tgz ] && { echo DEBUG /bin/cp ${TMP_AREA}/archive_T1_DE_KIT.tgz $HOME/ ; /bin/cp ${TMP_AREA}/archive_T1_DE_KIT.tgz $HOME/ ; } ;
    if [ ${RC} -ne 0 ]; then
       /usr/bin/wget --header="PRIVATE-TOKEN: $(cat .AUTH_TKN)" --read-timeout=180 -O ${TMP_AREA}/archive_${SITE}.tgz https://gitlab.cern.ch/api/v4/projects/${thesiteid}/repository/archive.tar.gz?ref=master 2>&1 | grep -q "Authorization failed"
       if [ $? -eq 0 ] ; then
@@ -482,7 +488,19 @@ for SITE in $(/bin/cat ${TMP_AREA}/sitedb.list) ; do
    fi
    
    TAR_DIR=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{print $1;exit}') 2>/dev/null`
-   TAR_LST=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{if((($2=="JobConfig")&&(match($3,".*site-local-config.*\\.xml$")!=0))||(($2=="JobConfig")&&(match($3,"^cmsset_.*\\.c?sh$")!=0))||(($2=="PhEDEx")&&(match($3,".*storage.*\\.xml$")!=0))||(($2=="Tier0")&&($3=="override_catalog.xml"))||(($2=="GlideinConfig")&&($3=="")))print $0}') 2>/dev/null`
+
+   # Per the request by katy.ellis@stfc.ac.uk on 29JUN2020
+   #26JAN2021 for sub-site TAR_LST=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{if((($2=="JobConfig")&&(match($3,".*site-local-config.*\\.xml$")!=0))||(($2=="JobConfig")&&(match($3,"^cmsset_.*\\.c?sh$")!=0))||(($2=="PhEDEx")&&(match($3,".*storage.*\\.xml$")!=0))||(($2=="Tier0")&&($3=="override_catalog.xml"))||(($2=="GlideinConfig")&&($3==""))||(match($2,".*storage.*\\.json$")!=0)||(match($3,".*storage.*\\.json$")!=0)||(($2=="testing")&&($3=="")))print $0}') 2>/dev/null`
+   #DEV TAR_LST=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{if((($2=="JobConfig")&&(match($3,".*site-local-config.*\\.xml$")!=0))||(($2=="JobConfig")&&(match($3,"^cmsset_.*\\.c?sh$")!=0))||(($2=="PhEDEx")&&(match($3,".*storage.*\\.xml$")!=0))||(($2=="Tier0")&&($3=="override_catalog.xml"))||(($2=="GlideinConfig")&&($3==""))||(match($2,".*storage.*\\.json$")!=0)||(match($3,".*storage.*\\.json$")!=0)||(($2=="testing")&&($3==""))||(($3=="JobConfig")&&(match($4,".*site-local-config.*\\.xml$")!=0))||(($3=="JobConfig")&&(match($4,"^cmsset_.*\\.c?sh$")!=0)))print $0}') 2>/dev/null`
+   # 28JAN2021 because of https://gitlab.cern.ch/SITECONF/T1_DE_KIT/-/tree/master/KIT-HPC TAR_LST=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{if((($2=="JobConfig")&&(match($3,".*site-local-config.*\\.xml$")!=0))||(($2=="JobConfig")&&(match($3,"^cmsset_.*\\.c?sh$")!=0))||(($2=="PhEDEx")&&(match($3,".*storage.*\\.xml$")!=0))||(($2=="Tier0")&&($3=="override_catalog.xml"))||(($2=="GlideinConfig")&&($3==""))||(match($2,".*storage.*\\.json$")!=0)||(match($3,".*storage.*\\.json$")!=0)||(($2=="testing")&&($3==""))||(($2!="testing")&&($3=="JobConfig")&&(match($4,".*site-local-config.*\\.xml$")!=0))||(($2!="testing")&&($3=="JobConfig")&&(match($4,"^cmsset_.*\\.c?sh$")!=0)))print $0}') 2>/dev/null`
+   #[ -f ${TMP_AREA}/archive_T1_DE_KIT.tgz ] && { echo DEBUG /bin/cp ${TMP_AREA}/archive_T1_DE_KIT.tgz $HOME/ ; /bin/cp ${TMP_AREA}/archive_T1_DE_KIT.tgz $HOME/ ; } ;
+   #echo DEBUG /bin/cp ${TMP_AREA}/archive_${SITE}.tgz
+   TAR_LST=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{if((($2=="JobConfig")&&(match($3,".*site-local-config.*\\.xml$")!=0))||(($2=="JobConfig")&&(match($3,"^cmsset_.*\\.c?sh$")!=0))||(($2=="PhEDEx")&&(match($3,".*storage.*\\.xml$")!=0))||(($2=="Tier0")&&($3=="override_catalog.xml"))||(($2=="GlideinConfig")&&($3==""))||(match($2,".*storage.*\\.json$")!=0)||(match($3,".*storage.*\\.json$")!=0)||(($2=="testing")&&($3==""))||(($2!="testing")&&($3=="JobConfig")&&(match($4,".*\\.xml$")!=0))||(($2!="testing")&&($3=="JobConfig")&&(match($4,"^cmsset_.*\\.c?sh$")!=0))||(($2!="testing")&&($3=="GlideinConfig")&&($4=="")))print $0}') 2>/dev/null`
+   [ $? -eq 0 ] && { echo DEBUG TAR_LST ; /bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{if((($2=="JobConfig")&&(match($3,".*site-local-config.*\\.xml$")!=0))||(($2=="JobConfig")&&(match($3,"^cmsset_.*\\.c?sh$")!=0))||(($2=="PhEDEx")&&(match($3,".*storage.*\\.xml$")!=0))||(($2=="Tier0")&&($3=="override_catalog.xml"))||(($2=="GlideinConfig")&&($3==""))||(match($2,".*storage.*\\.json$")!=0)||(match($3,".*storage.*\\.json$")!=0)||(($2=="testing")&&($3==""))||(($2!="testing")&&($3=="JobConfig")&&(match($4,".*\\.xml$")!=0))||(($2!="testing")&&($3=="JobConfig")&&(match($4,"^cmsset_.*\\.c?sh$")!=0))||(($2!="testing")&&($3=="GlideinConfig")&&($4=="")))print $0}' ; } ;
+
+   #TAR_LST=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{if((($2=="JobConfig")&&(match($3,".*site-local-config.*\\.xml$")!=0))||(($2=="JobConfig")&&(match($3,"^cmsset_.*\\.c?sh$")!=0))||(($2=="PhEDEx")&&(match($3,".*storage.*\\.xml$")!=0))||(($2=="Tier0")&&($3=="override_catalog.xml"))||(($2=="GlideinConfig")&&($3==""))||(match($2,".*storage.*\\.json$")!=0)||(match($3,".*storage.*\\.json$")!=0)||(($2=="testing")&&($3=="")))print $0}') 2>/dev/null`
+   #TAR_LST=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{if((($2=="JobConfig")&&(match($3,".*site-local-config.*\\.xml$")!=0))||(($2=="JobConfig")&&(match($3,"^cmsset_.*\\.c?sh$")!=0))||(($2=="PhEDEx")&&(match($3,".*storage.*\\.xml$")!=0))||(($2=="Tier0")&&($3=="override_catalog.xml"))||(($2=="GlideinConfig")&&($3==""))||(match($2,".*storage.*\\.json$")!=0)||(match($3,".*storage.*\\.json$")!=0)||(($2=="testing")&&($3==""))||(($2!="testing")&&((($3=="JobConfig")&&(match($4,".*site-local-config.*\\.xml$")!=0))||(($3=="JobConfig")&&(match($4,"^cmsset_.*\\.c?sh$")!=0)))))print $0}') 2>/dev/null`
+   #TAR_LST=`(/bin/tar -tzf ${TMP_AREA}/archive_${SITE}.tgz | /usr/bin/awk -F/ '{if((($2=="JobConfig")&&(match($3,".*site-local-config.*\\.xml$")!=0))||(($2=="JobConfig")&&(match($3,"^cmsset_.*\\.c?sh$")!=0))||(($2=="PhEDEx")&&(match($3,".*storage.*\\.xml$")!=0))||(($2=="Tier0")&&($3=="override_catalog.xml"))||(($2=="GlideinConfig")&&($3=="")))print $0}') 2>/dev/null`
    
    # 17JUL2018 forget about sites that do not have xml files in the gitlab
    if [ -s ${TMP_AREA}/archive_${SITE}.tgz ] ; then

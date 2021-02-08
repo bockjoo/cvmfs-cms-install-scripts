@@ -7,7 +7,6 @@
 version=1.8.7 # tag=generic-2020-05-13T17:40:17Z
 
 # Configuration
-notifytowhom=bockjoo@phys.ufl.edu
 source $HOME/cron_install_cmssw.config # notifytowhom
 updated_list=/cvmfs/cms.cern.ch/cvmfs-cms.cern.ch-updates
 
@@ -230,6 +229,7 @@ if [ $status -eq 0 ] ; then
 
       # Update $updated_list
       date_s_now=$(echo $(/bin/date +%s) $(/bin/date -u))
+if [ ] ; then
       grep -q "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" $updated_list
       if [ $? -eq 0 ] ; then
         echo Warning "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" is already in the $updated_list $f
@@ -237,7 +237,17 @@ if [ $status -eq 0 ] ; then
         echo INFO adding "gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')" to $updated_list for $f
       fi
       thestring="gridpacks $(echo $f | cut -d/ -f2) $(echo $date_s_now | awk '{print $1}')"
-
+fi # if [ ] ; then
+      date_YmdH=$(/bin/date +%Y%m%d%H)
+      grep -q "gridpacks $date_YmdH " $updated_list
+      if [ $? -eq 0 ] ; then
+         echo Warning "gridpacks $date_YmdH " in $updated_list
+      else
+         echo INFO adding "gridpacks $date_YmdH " to $updated_list
+         echo "gridpacks $date_YmdH $date_s_now" >> $updated_list
+      fi
+      thestring="gridpacks $date_YmdH $(echo $date_s_now | awk '{print $1}')"
+    
       echo INFO adding 'phys_generator/gridpacks/slc*/*/*' to /cvmfs/cms.cern.ch/.cvmfsdirtab
 
       # nested stuff for cvmfs ( to split for the cvmfs performance )

@@ -61,37 +61,137 @@ fi
 
 # If there is no change, there is no new version to create
 #grep -v ^current/$ ${thelog}.DRY | grep -q ^current/ || printf "$(basename $0) DEBUG no change in the PDF set content\n" | mail -s "$(basename $0) DEBUG LHAPDF no change" $notifytowhom
-grep -v ^current/$ ${thelog}.DRY | grep -q ^current/ || { echo INFO no change. Exiting... ; exit 0 ; } ;
+grep -v ^current/$ ${thelog}.DRY | grep -q ^current/ || echo INFO no change. Exiting...
 grep -v ^current/$ ${thelog}.DRY | grep -q ^current/ || exit 0
 
 # Check if lhapdf_update is yes
 if [ "$lhapdf_update" == "yes" ] ; then
-   :
+   sed -i 's#lhapdf_update=yes#lhapdf_update=no#' $HOME/cron_install_cmssw.config
 else
    echo INFO lhapdf_update=$lhapdf_update
    echo INFO update cron_install_cmssw.config as needed
-   printf "$(basename $0) Warning lhapdf_update=$lhapdf_update\nupdate cron_install_cmssw.config as needed\n" | mail -s "$(basename $0) Warning lhapdf_update is not set for update" $notifytowhom
+   printf "$(basename $0) Warning lhapdf_update=$lhapdf_update\nupdate cron_install_cmssw.config as needed\nOutput of DRY Run\n$(cat ${thelog}.DRY | sed 's#%#%%#g')\n" | mail -s "$(basename $0) Warning lhapdf_update is not set for update" $notifytowhom
    exit 0
 fi
 
 
 # OK, there was a change. Put cvmfs in transaction
 cvmfs_server_transaction_and_check_status $(basename $0) || exit 1
+LHAPDFSET_VERSION_PREVIOUS=$(tail -1 $lhapdfset_versions)
 
 echo INFO LHAPDFSET_VERSION_NEW=$LHAPDFSET_VERSION_NEW
+echo INFO LHAPDFSET_VERSION_PREVIOUS=$LHAPDFSET_VERSION_PREVIOUS
 
 # Notify the start of the new version
 printf "$(basename $0) Warn: will create ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} \n" | mail -s "$(basename $0) Warn creating LHAPDF ${LHAPDFSET_VERSION_NEW}" $notifytowhom
 
+if [ ] ; then
 # Create the new version at the official area of the new version
-echo INFO executing rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@\* --exclude=\*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
-rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@* --exclude=*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} > $thelog 2>&1
-if [ $? -ne 0 ] ; then
-   echo ERROR rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@* --exclude=*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
-   printf "$(basename $0) FAILED: rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@\* --exclude=\*.tar.gz --dry-run ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) FAILED rsync for $LHAPDFSET_VERSION_NEW" $notifytowhom
-   ( cd ; cvmfs_server abort -f ; ) ;
-   exit 1
+if [ "x$(echo ${LHAPDFSET_VERSION_NEW} | sed 's#\.##g' | sed 's#[0-9]##g')" == "xa" ] ; then
+    echo INFO executing rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@\* --exclude=\*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
+    rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@* --exclude=*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} > $thelog 2>&1
+    if [ $? -ne 0 ] ; then
+	echo ERROR rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@* --exclude=*.tar.gz ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
+	printf "$(basename $0) FAILED: rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@\* --exclude=\*.tar.gz --dry-run ${rsync_source}/ ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}\n$(cat $thelog | sed 's#%#%%#g')\n" | mail -s "$(basename $0) FAILED rsync for $LHAPDFSET_VERSION_NEW" $notifytowhom
+	( cd ; cvmfs_server abort -f ; ) ;
+	exit 1
+    fi
+else
+    # Otherwise, use the unchanged previous pdfset as a symlink
+    echo DEBUG PREVIOUS: $LHAPDFSET_VERSION_PREVIOUS
+    echo DEBUG NEW: ${LHAPDFSET_VERSION_NEW}
+    [ -d ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} ] || mkdir -p ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
+
+    # rsync part
+    #for thedir in $(grep -v ^current/$ ${thelog}.DRY | grep ^current/ | sed 's#current/##g') ; do
+    for thedir in $(grep -v ^current/$ ${thelog}.DRY | grep ^current/.*./$ | grep ^current/ | sed 's#current/##g' | sed 's#/$##g') ; do
+        echo DEBUG Doing $thedir
+        echo DEBUG rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@\* --exclude=\*.tar.gz ${rsync_source}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/
+        rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@* --exclude=*.tar.gz ${rsync_source}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/
+        if [ $? -ne 0 ] ; then
+           printf "$(basename $0) FAILED: rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=\@* --exclude=\*.tar.gz ${rsync_source}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/ \n" | mail -s "$(basename $0) FAILED rsync " $notifytowhom
+           ( cd ; cvmfs_server abort -f ; ) ;
+	   exit 1
+        fi
+    done
+
+    # Symlink part
+    for d in $(ls -d ${rsync_source}/*/ | grep -v /@ | sed 's#/$##g') ; do
+        thedir=$(basename $d)
+        if [ -d ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/${thedir} ] ; then
+           echo Warning ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/${thedir} exists
+           continue
+        fi
+        echo DEBUG Doing $thedir
+        echo DEBUG ln -s ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_PREVIOUS}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/
+        ln -s ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_PREVIOUS}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/
+        if [ $? -ne 0 ] ; then
+           printf "$(basename $0) FAILED: ln -s ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_PREVIOUS}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/ \n" | mail -s "$(basename $0) FAILED: symlink" $notifytowhom
+           #rm -rf ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
+           ( cd ; cvmfs_server abort -f ; ) ;
+	   exit 1
+        fi
+    done
+    /bin/cp ${rsync_source}/pdfsets.index ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/
+    printf "$(basename $0) DEBUG case rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=\@* --exclude=\*.tar.gz ${rsync_source}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/ \n" | mail -s "$(basename $0) DEBUG case " $notifytowhom
+    #cd ; cvmfs_server abort -f
+
 fi
+fi # if [ ] ; then
+
+# Otherwise, use the unchanged previous pdfset as a symlink
+echo DEBUG PREVIOUS: $LHAPDFSET_VERSION_PREVIOUS
+echo DEBUG NEW: ${LHAPDFSET_VERSION_NEW}
+[ -d ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW} ] || mkdir -p ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
+
+# rsync part
+#for thedir in $(grep -v ^current/$ ${thelog}.DRY | grep ^current/ | sed 's#current/##g') ; do
+for thedir in $(grep -v ^current/$ ${thelog}.DRY | grep ^current/.*./$ | grep ^current/ | sed 's#current/##g' | sed 's#/$##g') ; do
+    echo DEBUG Doing $thedir
+    echo DEBUG rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@\* --exclude=\*.tar.gz ${rsync_source}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/
+    rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=@* --exclude=*.tar.gz ${rsync_source}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/
+    if [ $? -ne 0 ] ; then
+       printf "$(basename $0) FAILED: rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=\@* --exclude=\*.tar.gz ${rsync_source}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/ \n" | mail -s "$(basename $0) FAILED rsync " $notifytowhom
+       ( cd ; cvmfs_server abort -f ; ) ;
+       exit 1
+    fi
+done
+
+# Symlink part
+for d in $(ls -d ${rsync_source}/*/ | grep -v /@ | sed 's#/$##g') ; do
+    thedir=$(basename $d)
+    if [ -d ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/${thedir} ] ; then
+       echo Warning ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/${thedir} exists
+       continue
+    fi
+    echo DEBUG Doing $thedir
+    echo DEBUG ln -s ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_PREVIOUS}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/
+    ln -s ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_PREVIOUS}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/
+    if [ $? -ne 0 ] ; then
+       printf "$(basename $0) FAILED: ln -s ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_PREVIOUS}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/ \n" | mail -s "$(basename $0) FAILED: symlink" $notifytowhom
+       #rm -rf ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}
+       ( cd ; cvmfs_server abort -f ; ) ;
+       exit 1
+    fi
+done
+/bin/cp ${rsync_source}/pdfsets.index ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/
+printf "$(basename $0) DEBUG case rsync -rLptgoDzuv --delete --exclude=.cvmfscatalog --exclude=\@* --exclude=\*.tar.gz ${rsync_source}/${thedir} ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/ \n" | mail -s "$(basename $0) DEBUG case " $notifytowhom
+#cd ; cvmfs_server abort -f
+
+i=0
+npdfs=$(cat ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/pdfsets.index | wc -l)
+echo DEBUG checking symlink+rsync
+for d in $(cat ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/pdfsets.index | awk '{print $2}') ; do
+   i=$(expr $i + 1)
+   echo "[ $i / $npdfs ]" $d $(echo $(ls -d  ${rsync_destination}/pdfsets/${LHAPDFSET_VERSION_NEW}/$d 2>/dev/null) ; echo $?)
+done
+
+# Comment out the following three lines after this script is fully debugged
+printf "$(basename $0) Warning: this is cron_download_lhapdf.sh for symlink implementation.\n$(cat $HOME/logs/cron_download_lhapdf.log | sed 's#%#%%#g')\n" | mail -s "$(basename $0) Warning: new cron_download_lhapdf.sh for LHAPDF ${LHAPDFSET_VERSION_NEW}" $notifytowhom
+#sleep 30m
+#cvmfs_server abort -f
+#exit 0
+#
 
 # Update ${rsync_destination}
 echo INFO executing rsync -rLptgoDzuv --delete --exclude=\*/.cvmfscatalog --exclude=\*/@\* --exclude=\*/\*.tar.gz ${rsync_source} ${rsync_destination}
