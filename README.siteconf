@@ -7,6 +7,7 @@ Each site usually has different SITECONF.
 The most important two files in the SITECONF/T* directories:
 SITECONF/T*/JobConfig/site-local-config.xml
 SITECONF/T*/PhEDEx/storage.xml
+SITECONF/T*/storage.json
 
 JobConfig/site-local-config.xml points to the so-called trivial catalog, PhEDEx/storage.xml, defines
 local stageout, fallback stageout, and the frontier squid.
